@@ -211,11 +211,9 @@ export default function HouseholdPage() {
               <p className="text-sm text-muted-foreground">Keep track of groceries and other shared items the household plans to purchase.</p>
             </CardContent>
             <CardFooter>
-              <Link href="/household/shopping-list" passHref legacyBehavior>
-                <Button asChild className="w-full">
-                  <a>
-                    <ClipboardList className="mr-2 h-4 w-4" /> View Shopping List
-                  </a>
+              <Link href="/household/shopping-list">
+                <Button className="w-full">
+                  <ClipboardList className="mr-2 h-4 w-4" /> View Shopping List
                 </Button>
               </Link>
             </CardFooter>
