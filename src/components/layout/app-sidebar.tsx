@@ -31,7 +31,7 @@ export function AppSidebar() {
   const pathname = usePathname();
 
   return (
-    <Sidebar collapsible="icon" side="left" variant="sidebar" defaultOpen={true} className="border-r">
+    <Sidebar collapsible="icon" side="left" variant="sidebar" className="border-r">
       <SidebarHeader className="p-4 flex items-center justify-between">
         <Link href="/dashboard" className="flex items-center gap-2 group-data-[collapsible=icon]:hidden">
           <Briefcase className="h-7 w-7 text-primary" />
@@ -60,7 +60,6 @@ export function AppSidebar() {
                       : "hover:bg-accent/50"
                   )}
                 >
-                  {/* The SidebarMenuButton with asChild will pass its props to this span */}
                   <span>
                     <item.icon className="h-5 w-5" />
                     <span>{item.title}</span>
