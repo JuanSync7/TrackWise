@@ -50,7 +50,6 @@ export function AppSidebar() {
             <SidebarMenuItem key={item.title}>
               <Link href={item.href}>
                 <SidebarMenuButton
-                  asChild
                   isActive={pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href))}
                   tooltip={{children: item.title, className: "text-xs"}}
                   className={cn(
@@ -79,3 +78,4 @@ export function AppSidebar() {
     </Sidebar>
   );
 }
+
