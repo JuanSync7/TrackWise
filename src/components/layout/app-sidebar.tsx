@@ -1,0 +1,80 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import {
+  Sidebar,
+  SidebarHeader,
+  SidebarContent,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarFooter,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
+import type { NavItem } from "@/lib/types";
+import { APP_NAME } from "@/lib/constants";
+import { LayoutDashboard, ListChecks, PiggyBank, Settings, BarChart3, LogOut, Briefcase } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+const navItems: NavItem[] = [
+  { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { title: "Expenses", href: "/expenses", icon: ListChecks },
+  { title: "Budgets", href: "/budgets", icon: PiggyBank },
+  { title: "Reports", href: "/reports", icon: BarChart3 },
+  { title: "Settings", href: "/settings", icon: Settings },
+];
+
+export function AppSidebar() {
+  const pathname = usePathname();
+
+  return (
+    <Sidebar collapsible="icon" side="left" variant="sidebar" defaultOpen={true} className="border-r">
+      <SidebarHeader className="p-4 flex items-center justify-between">
+        <Link href="/dashboard" className="flex items-center gap-2 group-data-[collapsible=icon]:hidden">
+          <Briefcase className="h-7 w-7 text-primary" />
+          <h1 className="text-xl font-semibold tracking-tight">{APP_NAME}</h1>
+        </Link>
+        <Link href="/dashboard" className="items-center gap-2 hidden group-data-[collapsible=icon]:flex">
+           <Briefcase className="h-7 w-7 text-primary" />
+        </Link>
+        <div className="md:hidden">
+           <SidebarTrigger />
+        </div>
+      </SidebarHeader>
+      <SidebarContent className="flex-1 overflow-y-auto">
+        <SidebarMenu className="p-2 space-y-1">
+          {navItems.map((item) => (
+            <SidebarMenuItem key={item.title}>
+              <Link href={item.href} legacyBehavior passHref>
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href))}
+                  tooltip={{children: item.title, className: "text-xs"}}
+                  className={cn(
+                    "justify-start",
+                     pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href))
+                      ? "bg-primary/10 text-primary hover:bg-primary/20"
+                      : "hover:bg-accent/50"
+                  )}
+                >
+                  <a>
+                    <item.icon className="h-5 w-5" />
+                    <span>{item.title}</span>
+                  </a>
+                </SidebarMenuButton>
+              </Link>
+            </SidebarMenuItem>
+          ))}
+        </SidebarMenu>
+      </SidebarContent>
+      <SidebarFooter className="p-4 border-t">
+         <Button variant="ghost" className="w-full justify-start gap-2 group-data-[collapsible=icon]:justify-center">
+            <LogOut className="h-5 w-5" />
+            <span className="group-data-[collapsible=icon]:hidden">Log Out</span>
+        </Button>
+      </SidebarFooter>
+    </Sidebar>
+  );
+}
