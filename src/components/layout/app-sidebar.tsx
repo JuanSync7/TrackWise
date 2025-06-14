@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Sidebar,
   SidebarHeader,
@@ -16,8 +16,9 @@ import {
 import { Button } from "@/components/ui/button";
 import type { NavItem } from "@/lib/types";
 import { APP_NAME } from "@/lib/constants";
-import { LayoutDashboard, ListChecks, PiggyBank, Settings, BarChart3, LogOut, Briefcase, Users } from "lucide-react";
+import { LayoutDashboard, ListChecks, PiggyBank, Settings, BarChart3, LogOut, Briefcase, Users, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/auth-context";
 
 const navItems: NavItem[] = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -30,6 +31,12 @@ const navItems: NavItem[] = [
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const { user, logout, loading: authLoading } = useAuth();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    await logout();
+  };
 
   return (
     <Sidebar collapsible="icon" side="left" variant="sidebar" className="border-r">
@@ -72,12 +79,12 @@ export function AppSidebar() {
         </SidebarMenu>
       </SidebarContent>
       <SidebarFooter className="p-4 border-t">
-         <Button variant="ghost" className="w-full justify-start gap-2 group-data-[collapsible=icon]:justify-center">
-            <LogOut className="h-5 w-5" />
+         <Button variant="ghost" className="w-full justify-start gap-2 group-data-[collapsible=icon]:justify-center" onClick={handleLogout} disabled={authLoading}>
+            {authLoading && <Loader2 className="h-5 w-5 animate-spin" />}
+            {!authLoading && <LogOut className="h-5 w-5" />}
             <span className="group-data-[collapsible=icon]:hidden">Log Out</span>
         </Button>
       </SidebarFooter>
     </Sidebar>
   );
 }
-

@@ -1,6 +1,16 @@
 
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
+import { 
+  getAuth, 
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  updateProfile,
+  GoogleAuthProvider,
+  signInWithPopup,
+  type Auth
+} from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -12,7 +22,23 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const auth = getAuth(app);
+let app: FirebaseApp;
+if (!getApps().length) {
+  app = initializeApp(firebaseConfig);
+} else {
+  app = getApp();
+}
 
-export { app, auth };
+const auth: Auth = getAuth(app);
+
+export { 
+  app, 
+  auth,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  updateProfile,
+  GoogleAuthProvider,
+  signInWithPopup
+};
