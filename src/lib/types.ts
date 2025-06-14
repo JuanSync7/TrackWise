@@ -4,7 +4,7 @@ import type { LucideIcon } from 'lucide-react';
 export interface Category {
   id: string;
   name: string;
-  icon: LucideIcon;
+  iconName: string; // Changed from icon: LucideIcon
   color: string; // Hex color for UI elements like chart segments
 }
 
