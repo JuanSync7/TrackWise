@@ -105,6 +105,7 @@ export type AppContextType = AppState & {
   toggleShoppingListItemPurchased: (itemId: string) => void;
   deleteShoppingListItem: (itemId: string) => void;
   addSharedBudget: (budget: Omit<SharedBudget, 'id' | 'createdAt' | 'currentSpending'>) => void;
+  updateSharedBudget: (budget: SharedBudget) => void;
   deleteSharedBudget: (budgetId: string) => void;
   settleDebt: (debtId: string) => void;
   unsettleDebt: (debtId: string) => void;
@@ -121,4 +122,3 @@ export interface NavItem {
   label?: string;
   variant?: 'default' | 'ghost';
 }
-

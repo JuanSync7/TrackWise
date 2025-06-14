@@ -151,6 +151,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setSharedBudgets(prev => [...prev, newSharedBudget]);
   };
 
+  const updateSharedBudget = (updatedBudget: SharedBudget) => {
+    setSharedBudgets(prev =>
+      prev.map(budget => (budget.id === updatedBudget.id ? updatedBudget : budget))
+    );
+  };
+
   const deleteSharedBudget = (budgetId: string) => {
     setSharedBudgets(prev => prev.filter(budget => budget.id !== budgetId));
     setExpenses(prevExpenses => 
@@ -257,6 +263,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     toggleShoppingListItemPurchased,
     deleteShoppingListItem,
     addSharedBudget,
+    updateSharedBudget,
     deleteSharedBudget,
     settleDebt,
     unsettleDebt,
@@ -276,4 +283,3 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
-

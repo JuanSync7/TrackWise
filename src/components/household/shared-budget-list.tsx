@@ -9,10 +9,10 @@ import { WalletCards } from 'lucide-react';
 interface SharedBudgetListProps {
   sharedBudgets: SharedBudget[];
   onDeleteSharedBudget: (budgetId: string) => void;
-  // onEditSharedBudget: (budget: SharedBudget) => void; // For future use
+  onEditSharedBudget: (budget: SharedBudget) => void;
 }
 
-export function SharedBudgetList({ sharedBudgets, onDeleteSharedBudget }: SharedBudgetListProps) {
+export function SharedBudgetList({ sharedBudgets, onDeleteSharedBudget, onEditSharedBudget }: SharedBudgetListProps) {
   if (sharedBudgets.length === 0) {
     return (
       <div className="text-center py-10 border-2 border-dashed border-muted-foreground/30 rounded-lg mt-6">
@@ -41,7 +41,7 @@ export function SharedBudgetList({ sharedBudgets, onDeleteSharedBudget }: Shared
             <SharedBudgetItem
               sharedBudget={budget}
               onDelete={onDeleteSharedBudget}
-              // onEdit={onEditSharedBudget}
+              onEdit={onEditSharedBudget}
             />
           </motion.div>
         ))}

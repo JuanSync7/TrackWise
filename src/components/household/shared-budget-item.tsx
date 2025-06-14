@@ -14,10 +14,10 @@ import { cn } from '@/lib/utils';
 interface SharedBudgetItemProps {
   sharedBudget: SharedBudget;
   onDelete: (budgetId: string) => void;
-  // onEdit: (budget: SharedBudget) => void; // For future use
+  onEdit: (budget: SharedBudget) => void;
 }
 
-export function SharedBudgetItem({ sharedBudget, onDelete }: SharedBudgetItemProps) {
+export function SharedBudgetItem({ sharedBudget, onDelete, onEdit }: SharedBudgetItemProps) {
   const progressPercentage = sharedBudget.amount > 0 ? Math.min((sharedBudget.currentSpending / sharedBudget.amount) * 100, 100) : 0;
   const isOverBudget = sharedBudget.currentSpending > sharedBudget.amount;
   const remainingAmount = sharedBudget.amount - sharedBudget.currentSpending;
@@ -43,9 +43,9 @@ export function SharedBudgetItem({ sharedBudget, onDelete }: SharedBudgetItemPro
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem disabled> {/* Edit not implemented yet */}
+              <DropdownMenuItem onClick={() => onEdit(sharedBudget)}>
                 <Edit2 className="mr-2 h-4 w-4" />
-                Edit (Soon)
+                Edit
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onDelete(sharedBudget.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
                 <Trash2 className="mr-2 h-4 w-4" />
@@ -85,4 +85,3 @@ export function SharedBudgetItem({ sharedBudget, onDelete }: SharedBudgetItemPro
     </Card>
   );
 }
-

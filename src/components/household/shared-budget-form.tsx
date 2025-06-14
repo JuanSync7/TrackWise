@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { SharedBudget } from '@/lib/types';
+import { useEffect } from "react";
 
 const sharedBudgetFormSchema = z.object({
   name: z.string().min(2, { message: "Budget name must be at least 2 characters." }).max(50),
@@ -25,10 +26,10 @@ const sharedBudgetFormSchema = z.object({
   description: z.string().max(200).optional(),
 });
 
-type SharedBudgetFormValues = Omit<SharedBudget, 'id' | 'createdAt'>;
+type SharedBudgetFormValues = Omit<SharedBudget, 'id' | 'createdAt' | 'currentSpending'>;
 
 interface SharedBudgetFormProps {
-  sharedBudget?: SharedBudget; // For editing, not implemented in this version
+  sharedBudget?: SharedBudget; 
   onSave: (data: SharedBudgetFormValues) => void;
   onCancel?: () => void;
   isSubmitting?: boolean;
@@ -38,13 +39,33 @@ export function SharedBudgetForm({ sharedBudget, onSave, onCancel, isSubmitting 
   const form = useForm<SharedBudgetFormValues>({
     resolver: zodResolver(sharedBudgetFormSchema),
     defaultValues: sharedBudget 
-      ? { ...sharedBudget }
+      ? { 
+          name: sharedBudget.name, 
+          amount: sharedBudget.amount, 
+          period: sharedBudget.period, 
+          description: sharedBudget.description || "" 
+        }
       : { name: "", amount: 0, period: "monthly", description: "" },
   });
 
+  useEffect(() => {
+    if (sharedBudget) {
+      form.reset({
+        name: sharedBudget.name,
+        amount: sharedBudget.amount,
+        period: sharedBudget.period,
+        description: sharedBudget.description || "",
+      });
+    } else {
+      form.reset({ name: "", amount: 0, period: "monthly", description: "" });
+    }
+  }, [sharedBudget, form]);
+
   function onSubmit(data: SharedBudgetFormValues) {
     onSave(data);
-    form.reset();
+    if (!sharedBudget) { // Only reset for new creations, not edits
+        form.reset({ name: "", amount: 0, period: "monthly", description: "" });
+    }
   }
 
   return (
@@ -84,7 +105,7 @@ export function SharedBudgetForm({ sharedBudget, onSave, onCancel, isSubmitting 
           render={({ field }) => (
             <FormItem>
               <FormLabel>Period</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select onValueChange={field.onChange} value={field.value}>
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Select a budget period" />

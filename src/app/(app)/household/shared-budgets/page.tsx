@@ -22,27 +22,36 @@ import type { SharedBudget } from '@/lib/types';
 import { SharedBudgetForm } from '@/components/household/shared-budget-form';
 import { SharedBudgetList } from '@/components/household/shared-budget-list';
 
+type SharedBudgetFormValues = Omit<SharedBudget, 'id' | 'createdAt' | 'currentSpending'>;
+
 export default function SharedBudgetsPage() {
-  const { sharedBudgets, addSharedBudget, deleteSharedBudget: contextDeleteSharedBudget } = useAppContext();
+  const { sharedBudgets, addSharedBudget, updateSharedBudget, deleteSharedBudget: contextDeleteSharedBudget } = useAppContext();
   const { toast } = useToast();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
-  // const [editingBudget, setEditingBudget] = useState<SharedBudget | undefined>(undefined); // For future edit
+  const [editingBudget, setEditingBudget] = useState<SharedBudget | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [budgetToDelete, setBudgetToDelete] = useState<string | null>(null);
 
-  const handleSaveBudget = async (data: Omit<SharedBudget, 'id' | 'createdAt'>) => {
+  const handleSaveBudget = async (data: SharedBudgetFormValues) => {
     setIsSubmitting(true);
     try {
-      // if (editingBudget) {
-      //   // updateSharedBudget({ ...editingBudget, ...data }); 
-      //   toast({ title: "Shared Budget Updated", description: "The shared budget has been successfully updated." });
-      // } else {
+      if (editingBudget) {
+        const budgetToUpdate: SharedBudget = {
+            ...editingBudget, // This includes id, createdAt, and importantly currentSpending
+            name: data.name,
+            amount: data.amount,
+            period: data.period,
+            description: data.description,
+        };
+        updateSharedBudget(budgetToUpdate); 
+        toast({ title: "Shared Budget Updated", description: "The shared budget has been successfully updated." });
+      } else {
         addSharedBudget(data);
         toast({ title: "Shared Budget Created", description: "New shared budget has been successfully created." });
-      // }
+      }
       setIsFormOpen(false);
-      // setEditingBudget(undefined);
+      setEditingBudget(undefined);
     } catch (error) {
       toast({ variant: "destructive", title: "Save Failed", description: "Could not save shared budget. Please try again." });
     } finally {
@@ -50,10 +59,10 @@ export default function SharedBudgetsPage() {
     }
   };
 
-  // const handleEditBudget = (budget: SharedBudget) => {
-  //   setEditingBudget(budget);
-  //   setIsFormOpen(true);
-  // };
+  const handleEditBudget = (budget: SharedBudget) => {
+    setEditingBudget(budget);
+    setIsFormOpen(true);
+  };
 
   const handleDeleteBudget = (budgetId: string) => {
     setBudgetToDelete(budgetId);
@@ -69,7 +78,7 @@ export default function SharedBudgetsPage() {
   };
 
   const openFormForNew = () => {
-    // setEditingBudget(undefined);
+    setEditingBudget(undefined);
     setIsFormOpen(true);
   };
 
@@ -86,20 +95,20 @@ export default function SharedBudgetsPage() {
       />
 
       <Dialog open={isFormOpen} onOpenChange={(isOpen) => {
-        // if (!isOpen) setEditingBudget(undefined);
+        if (!isOpen) setEditingBudget(undefined);
         setIsFormOpen(isOpen);
       }}>
         <DialogContent className="sm:max-w-[425px] md:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{/*editingBudget ? 'Edit Shared Budget' :*/ 'Create New Shared Budget'}</DialogTitle>
+            <DialogTitle>{editingBudget ? 'Edit Shared Budget' : 'Create New Shared Budget'}</DialogTitle>
             <DialogDescription>
-              {/*editingBudget ? 'Update the details of the shared budget.' :*/ 'Fill in the details for the new shared household budget.'}
+              {editingBudget ? 'Update the details of the shared budget.' : 'Fill in the details for the new shared household budget.'}
             </DialogDescription>
           </DialogHeader>
           <SharedBudgetForm
-            // sharedBudget={editingBudget}
+            sharedBudget={editingBudget}
             onSave={handleSaveBudget}
-            onCancel={() => { setIsFormOpen(false); /*setEditingBudget(undefined);*/ }}
+            onCancel={() => { setIsFormOpen(false); setEditingBudget(undefined); }}
             isSubmitting={isSubmitting}
           />
         </DialogContent>
@@ -125,7 +134,7 @@ export default function SharedBudgetsPage() {
       <SharedBudgetList
         sharedBudgets={sharedBudgets}
         onDeleteSharedBudget={handleDeleteBudget}
-        // onEditSharedBudget={handleEditBudget}
+        onEditSharedBudget={handleEditBudget}
       />
     </div>
   );
