@@ -19,7 +19,7 @@ interface ExpenseItemProps {
 }
 
 export function ExpenseItem({ expense, onEdit, onDelete }: ExpenseItemProps) {
-  const { getCategoryById, getMemberById, members } = useAppContext();
+  const { getCategoryById, getMemberById } = useAppContext();
   const category = getCategoryById(expense.categoryId);
   const payer = expense.paidByMemberId ? getMemberById(expense.paidByMemberId) : null;
   
@@ -43,7 +43,7 @@ export function ExpenseItem({ expense, onEdit, onDelete }: ExpenseItemProps) {
               </p>
               {expense.isSplit && payer && (
                  <p className="text-xs text-muted-foreground mt-0.5 flex items-center">
-                    <UserCheck className="h-3 w-3 mr-1 text-blue-500"/> Paid by: {payer.name}
+                    <UserCheck className="h-3 w-3 mr-1 text-primary" /> Paid by: {payer.name}
                  </p>
               )}
             </div>
@@ -53,7 +53,7 @@ export function ExpenseItem({ expense, onEdit, onDelete }: ExpenseItemProps) {
               {DEFAULT_CURRENCY}{expense.amount.toFixed(2)}
             </p>
             {expense.isSplit && (
-              <Badge variant="outline" className="mt-1 text-xs flex items-center gap-1 border-blue-500 text-blue-500">
+              <Badge variant="outline" className="mt-1 text-xs flex items-center gap-1 border-primary text-primary">
                 <Users className="h-3 w-3"/> Split
               </Badge>
             )}
