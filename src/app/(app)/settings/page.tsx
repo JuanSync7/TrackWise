@@ -6,10 +6,26 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { useAppContext } from '@/contexts/app-context';
 import { CategoryIcon } from '@/components/shared/category-icon';
 import { Button } from '@/components/ui/button';
-import { List, Palette, Bell, ShieldCheck, Trash2, Edit3, PlusCircle } from 'lucide-react';
+import { List, Palette, Bell, ShieldCheck, Trash2, Edit3, PlusCircle, Moon, Sun } from 'lucide-react';
+import { useTheme } from "next-themes";
+import { useEffect, useState } from 'react';
 
 export default function SettingsPage() {
   const { categories } = useAppContext();
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const toggleTheme = () => {
+    setTheme(theme === 'dark' ? 'light' : 'dark');
+  };
+
+  if (!mounted) {
+    return null; // Avoid hydration mismatch
+  }
 
   return (
     <div className="container mx-auto">
@@ -56,8 +72,11 @@ export default function SettingsPage() {
             <CardDescription>Customize the look and feel of the app.</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-muted-foreground">Theme customization options (e.g., dark mode toggle) will be available here.</p>
-            <Button className="mt-4" disabled>Toggle Dark Mode</Button>
+            <p className="text-muted-foreground">Toggle between light and dark themes.</p>
+            <Button onClick={toggleTheme} className="mt-4">
+              {theme === 'dark' ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
+              Switch to {theme === 'dark' ? 'Light' : 'Dark'} Mode
+            </Button>
           </CardContent>
         </Card>
         
