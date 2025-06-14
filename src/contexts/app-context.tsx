@@ -2,12 +2,12 @@
 "use client";
 
 import type { ReactNode } from 'react';
-import React, { createContext, useContext } from 'react';
-import type { Expense, Category, BudgetGoal, AppState, AppContextType, Member, Contribution, ShoppingListItem, SharedBudget } from '@/lib/types';
+import React, { createContext, useContext, useCallback } from 'react';
+import type { Expense, Category, BudgetGoal, AppState, AppContextType, Member, Contribution, ShoppingListItem, SharedBudget, Debt } from '@/lib/types';
 import { INITIAL_CATEGORIES } from '@/lib/constants';
 import useLocalStorage from '@/hooks/use-local-storage';
 import { v4 as uuidv4 } from 'uuid'; // For generating unique IDs
-import { formatISO } from 'date-fns';
+import { formatISO, parseISO } from 'date-fns';
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
@@ -19,18 +19,53 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [contributions, setContributions] = useLocalStorage<Contribution[]>('trackwise_contributions', []);
   const [shoppingListItems, setShoppingListItems] = useLocalStorage<ShoppingListItem[]>('trackwise_shopping_list_items', []);
   const [sharedBudgets, setSharedBudgets] = useLocalStorage<SharedBudget[]>('trackwise_shared_budgets', []);
+  const [debts, setDebts] = useLocalStorage<Debt[]>('trackwise_debts', []);
+
+  const getMemberById = useCallback((memberId: string) => {
+    return members.find(member => member.id === memberId);
+  }, [members]);
+
+  const manageDebtsForExpense = useCallback((expense: Expense, currentDebts: Debt[]): Debt[] => {
+    let updatedDebts = currentDebts.filter(d => d.expenseId !== expense.id); // Remove old debts for this expense
+
+    if (expense.isSplit && expense.paidByMemberId && expense.splitWithMemberIds && expense.splitWithMemberIds.length > 0) {
+      const amountPerPerson = expense.amount / expense.splitWithMemberIds.length;
+      const payerIsSharing = expense.splitWithMemberIds.includes(expense.paidByMemberId);
+
+      expense.splitWithMemberIds.forEach(memberIdInSplit => {
+        if (memberIdInSplit !== expense.paidByMemberId) {
+          const newDebt: Debt = {
+            id: uuidv4(),
+            expenseId: expense.id,
+            expenseDescription: expense.description,
+            amount: amountPerPerson,
+            owedByMemberId: memberIdInSplit,
+            owedToMemberId: expense.paidByMemberId!,
+            isSettled: false,
+            createdAt: formatISO(new Date()),
+          };
+          updatedDebts.push(newDebt);
+        }
+      });
+    }
+    return updatedDebts;
+  }, []);
 
 
-  const addExpense = (expense: Omit<Expense, 'id'>) => {
-    setExpenses(prev => [...prev, { ...expense, id: uuidv4() }]);
+  const addExpense = (newExpenseData: Omit<Expense, 'id'>) => {
+    const newExpense = { ...newExpenseData, id: uuidv4() };
+    setExpenses(prev => [...prev, newExpense]);
+    setDebts(prevDebts => manageDebtsForExpense(newExpense, prevDebts));
   };
 
   const updateExpense = (updatedExpense: Expense) => {
     setExpenses(prev => prev.map(exp => exp.id === updatedExpense.id ? updatedExpense : exp));
+    setDebts(prevDebts => manageDebtsForExpense(updatedExpense, prevDebts));
   };
 
   const deleteExpense = (expenseId: string) => {
     setExpenses(prev => prev.filter(exp => exp.id !== expenseId));
+    setDebts(prevDebts => prevDebts.filter(debt => debt.expenseId !== expenseId));
   };
   
   const addBudgetGoal = (goal: Omit<BudgetGoal, 'id' | 'currentSpending'>) => {
@@ -45,20 +80,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setBudgetGoals(prev => prev.filter(goal => goal.id !== goalId));
   };
 
-  const getCategoryById = (categoryId: string) => {
+  const getCategoryById = useCallback((categoryId: string) => {
     return categories.find(cat => cat.id === categoryId);
-  }
+  }, [categories]);
 
   const addMember = (member: Omit<Member, 'id'>) => {
     setMembers(prev => [...prev, { ...member, id: uuidv4() }]);
   };
   
-  const deleteMemberContributions = (memberId: string) => {
+  const deleteMemberContributionsAndDebts = (memberId: string) => {
     setContributions(prev => prev.filter(contrib => contrib.memberId !== memberId));
+    setDebts(prevDebts => prevDebts.filter(debt => debt.owedByMemberId !== memberId && debt.owedToMemberId !== memberId));
   };
 
   const deleteMember = (memberId: string) => {
-    deleteMemberContributions(memberId); // Also delete their contributions
+    deleteMemberContributionsAndDebts(memberId);
     setMembers(prev => prev.filter(mem => mem.id !== memberId));
   };
 
@@ -66,17 +102,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setContributions(prev => [...prev, { ...contribution, id: uuidv4() }]);
   };
 
-  const getMemberContributions = (memberId: string): Contribution[] => {
+  const getMemberContributions = useCallback((memberId: string): Contribution[] => {
     return contributions.filter(contrib => contrib.memberId === memberId);
-  };
+  }, [contributions]);
   
-  const getMemberTotalContribution = (memberId: string): number => {
+  const getMemberTotalContribution = useCallback((memberId: string): number => {
     return contributions
       .filter(contrib => contrib.memberId === memberId)
       .reduce((sum, contrib) => sum + contrib.amount, 0);
-  };
+  }, [contributions]);
 
-  // Shopping List Management
   const addShoppingListItem = (item: Omit<ShoppingListItem, 'id' | 'isPurchased' | 'addedAt'>) => {
     const newItem: ShoppingListItem = {
       ...item,
@@ -107,7 +142,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setShoppingListItems(prev => prev.filter(item => item.id !== itemId));
   };
 
-  // Shared Budgets Management
   const addSharedBudget = (budget: Omit<SharedBudget, 'id' | 'createdAt' | 'currentSpending'>) => {
     const newSharedBudget: SharedBudget = {
       ...budget,
@@ -120,34 +154,60 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const deleteSharedBudget = (budgetId: string) => {
     setSharedBudgets(prev => prev.filter(budget => budget.id !== budgetId));
+     // Also unlink expenses from this shared budget
+    setExpenses(prevExpenses => 
+      prevExpenses.map(exp => 
+        exp.sharedBudgetId === budgetId ? { ...exp, sharedBudgetId: undefined } : exp
+      )
+    );
   };
 
+  const settleDebt = (debtId: string) => {
+    setDebts(prev => prev.map(d => d.id === debtId ? { ...d, isSettled: true, settledAt: formatISO(new Date()) } : d));
+  };
+  const unsettleDebt = (debtId: string) => {
+     setDebts(prev => prev.map(d => d.id === debtId ? { ...d, isSettled: false, settledAt: undefined } : d));
+  };
 
-  // Recalculate currentSpending for personal budget goals whenever expenses change
+  const getDebtsOwedByMember = useCallback((memberId: string) => {
+    return debts.filter(d => d.owedByMemberId === memberId && !d.isSettled);
+  }, [debts]);
+
+  const getDebtsOwedToMember = useCallback((memberId: string) => {
+    return debts.filter(d => d.owedToMemberId === memberId && !d.isSettled);
+  }, [debts]);
+
+  const getAllUnsettledDebts = useCallback(() => {
+    return debts.filter(d => !d.isSettled);
+  }, [debts]);
+
+
   React.useEffect(() => {
     setBudgetGoals(prevGoals => 
       prevGoals.map(goal => {
-        // Basic period matching (monthly for now)
-        const relevantExpenses = expenses.filter(
-          exp => exp.categoryId === goal.categoryId && 
-                 new Date(exp.date).getMonth() === new Date().getMonth() && 
-                 new Date(exp.date).getFullYear() === new Date().getFullYear()
-        );
+        const relevantExpenses = expenses.filter(exp => {
+          if (exp.categoryId !== goal.categoryId) return false;
+          const expenseDate = parseISO(exp.date); // Ensure date is parsed correctly
+          const now = new Date();
+          // This basic period matching needs to be more robust for weekly/yearly
+          if (goal.period === 'monthly') {
+            return expenseDate.getMonth() === now.getMonth() && expenseDate.getFullYear() === now.getFullYear();
+          }
+          // Add more sophisticated period matching for weekly/yearly if needed
+          return true; 
+        });
         const currentSpending = relevantExpenses.reduce((sum, exp) => sum + exp.amount, 0);
         return { ...goal, currentSpending };
       })
     );
   }, [expenses, setBudgetGoals]);
 
-  // Recalculate currentSpending for shared budgets whenever expenses change
   React.useEffect(() => {
     setSharedBudgets(prevSharedBudgets =>
       prevSharedBudgets.map(sharedBudget => {
         const relevantExpenses = expenses.filter(
           exp => exp.sharedBudgetId === sharedBudget.id
         );
-        // For simplicity, summing all linked expenses regardless of date relative to shared budget period.
-        // More precise period filtering (e.g., for monthly shared budgets) can be added here if needed.
         const currentSpending = relevantExpenses.reduce((sum, exp) => sum + exp.amount, 0);
         return { ...sharedBudget, currentSpending };
       })
@@ -163,6 +223,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     contributions,
     shoppingListItems,
     sharedBudgets,
+    debts,
     addExpense,
     updateExpense,
     deleteExpense,
@@ -181,6 +242,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     deleteShoppingListItem,
     addSharedBudget,
     deleteSharedBudget,
+    settleDebt,
+    unsettleDebt,
+    getDebtsOwedByMember,
+    getDebtsOwedToMember,
+    getAllUnsettledDebts,
+    getMemberById,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
@@ -193,4 +260,3 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
-

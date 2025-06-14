@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { PageHeader } from '@/components/shared/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Users, DollarSign, ClipboardList, WalletCards } from 'lucide-react';
+import { PlusCircle, Users, DollarSign, ClipboardList, WalletCards, DivideSquare } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -154,7 +154,7 @@ export default function HouseholdPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently remove the member and all their associated contributions from the household.
+              This action cannot be undone. This will permanently remove the member, their contributions, and any associated expense splits from the household.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -172,7 +172,7 @@ export default function HouseholdPage() {
                 <Users className="h-6 w-6 text-primary" />
                 Household Members ({members.length})
               </CardTitle>
-              <CardDescription>View and manage your household members and their contributions. Log shared expenses under the &quot;Household Expenses&quot; category.</CardDescription>
+              <CardDescription>View and manage your household members and their contributions. Log shared expenses under the &quot;Household Expenses&quot; category, or use the split expense feature.</CardDescription>
             </CardHeader>
             <CardContent>
               <MemberList 
@@ -195,7 +195,7 @@ export default function HouseholdPage() {
             </CardHeader>
             <CardContent>
                 <p className="text-3xl font-bold">{DEFAULT_CURRENCY}{totalHouseholdContributions.toFixed(2)}</p>
-                <p className="text-xs text-muted-foreground mt-1">This is the sum of all recorded contributions. Use the &quot;Household Expenses&quot; category when adding shared expenses.</p>
+                <p className="text-xs text-muted-foreground mt-1">This is the sum of all recorded contributions. Use the &quot;Household Expenses&quot; category or split expenses for shared costs.</p>
             </CardContent>
            </Card>
 
@@ -211,7 +211,7 @@ export default function HouseholdPage() {
               <p className="text-sm text-muted-foreground">Keep track of groceries and other shared items the household plans to purchase.</p>
             </CardContent>
             <CardFooter>
-              <Link href="/household/shopping-list">
+              <Link href="/household/shopping-list" className="w-full">
                 <Button className="w-full">
                   <ClipboardList className="mr-2 h-4 w-4" /> View Shopping List
                 </Button>
@@ -241,15 +241,22 @@ export default function HouseholdPage() {
 
           <Card>
             <CardHeader>
-                <CardTitle>Expense Splitting (Coming Soon)</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                    <DivideSquare className="h-6 w-6 text-primary" />
+                    Expense Splitting
+                </CardTitle>
                 <CardDescription>Easily split shared expenses among members and track reimbursements.</CardDescription>
             </CardHeader>
             <CardContent>
-                <div className="flex flex-col items-center justify-center h-40 text-center">
-                    <img src="https://placehold.co/300x150.png" data-ai-hint="shared finances" alt="Coming soon for expense splitting" className="mb-4 rounded-lg opacity-70" />
-                    <p className="text-muted-foreground text-sm">Tools for dividing bills and tracking individual shares will be available soon.</p>
-                </div>
+                <p className="text-sm text-muted-foreground">Mark expenses as shared and track who owes whom to simplify household finances.</p>
             </CardContent>
+             <CardFooter>
+               <Link href="/household/expense-splitting" className="w-full">
+                <Button className="w-full">
+                  <DivideSquare className="mr-2 h-4 w-4" /> Manage Splits & Debts
+                </Button>
+              </Link>
+            </CardFooter>
           </Card>
         </div>
       </div>

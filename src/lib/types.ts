@@ -16,6 +16,11 @@ export interface Expense {
   categoryId: string;
   notes?: string;
   sharedBudgetId?: string; // Link to a shared budget
+
+  // Expense Splitting Fields
+  isSplit?: boolean;
+  paidByMemberId?: string; // ID of the member who paid
+  splitWithMemberIds?: string[]; // IDs of members sharing the expense (includes payer if they are sharing)
 }
 
 export interface BudgetGoal {
@@ -58,6 +63,18 @@ export interface SharedBudget {
   currentSpending: number; // Calculated field for spending linked to this budget
 }
 
+export interface Debt {
+  id: string;
+  expenseId: string;
+  expenseDescription: string; // For easier display
+  amount: number;
+  owedByMemberId: string;
+  owedToMemberId: string;
+  isSettled: boolean;
+  createdAt: string; // ISO string date for when the debt was created
+  settledAt?: string; // ISO string date for when the debt was settled
+}
+
 export interface AppState {
   expenses: Expense[];
   categories: Category[];
@@ -66,6 +83,7 @@ export interface AppState {
   contributions: Contribution[];
   shoppingListItems: ShoppingListItem[];
   sharedBudgets: SharedBudget[];
+  debts: Debt[];
 }
 
 export type AppContextType = AppState & {
@@ -87,7 +105,12 @@ export type AppContextType = AppState & {
   deleteShoppingListItem: (itemId: string) => void;
   addSharedBudget: (budget: Omit<SharedBudget, 'id' | 'createdAt' | 'currentSpending'>) => void;
   deleteSharedBudget: (budgetId: string) => void;
-  // getSharedBudgetById: (budgetId: string) => SharedBudget | undefined; // For future use
+  settleDebt: (debtId: string) => void;
+  unsettleDebt: (debtId: string) => void;
+  getDebtsOwedByMember: (memberId: string) => Debt[];
+  getDebtsOwedToMember: (memberId: string) => Debt[];
+  getAllUnsettledDebts: () => Debt[];
+  getMemberById: (memberId: string) => Member | undefined;
 };
 
 export interface NavItem {
@@ -97,4 +120,3 @@ export interface NavItem {
   label?: string;
   variant?: 'default' | 'ghost';
 }
-

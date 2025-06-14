@@ -2,7 +2,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,12 +17,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Check, ChevronsUpDown, Sparkles as AiSparklesIcon, LinkIcon } from "lucide-react";
+import { CalendarIcon, Check, ChevronsUpDown, Sparkles as AiSparklesIcon, Users, Landmark } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import type { Expense, SharedBudget } from "@/lib/types";
+import type { Expense, SharedBudget, Member } from "@/lib/types";
 import { useAppContext } from "@/contexts/app-context";
 import { format } from "date-fns";
 import { useEffect, useState, useCallback }  from "react";
@@ -30,15 +31,45 @@ import { suggestExpenseCategory, type SuggestExpenseCategoryInput, type SuggestE
 import { useToast } from "@/hooks/use-toast";
 import { CategoryIcon } from "@/components/shared/category-icon";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
-const expenseFormSchema = z.object({
+const expenseFormSchemaBase = z.object({
   description: z.string().min(2, { message: "Description must be at least 2 characters." }).max(100),
   amount: z.coerce.number().positive({ message: "Amount must be positive." }),
   date: z.date({ required_error: "A date is required." }),
   categoryId: z.string({ required_error: "Please select a category." }),
   notes: z.string().max(200).optional(),
   sharedBudgetId: z.string().optional(),
+  isSplit: z.boolean().optional().default(false),
+  paidByMemberId: z.string().optional(),
+  splitWithMemberIds: z.array(z.string()).optional().default([]),
 });
+
+const expenseFormSchema = expenseFormSchemaBase.superRefine((data, ctx) => {
+  if (data.isSplit) {
+    if (!data.paidByMemberId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Please select who paid.",
+        path: ["paidByMemberId"],
+      });
+    }
+    if (!data.splitWithMemberIds || data.splitWithMemberIds.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Please select at least one member to split with.",
+        path: ["splitWithMemberIds"],
+      });
+    } else if (data.paidByMemberId && !data.splitWithMemberIds.includes(data.paidByMemberId)) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "The payer must be included in the list of members to split with.",
+            path: ["splitWithMemberIds"],
+        });
+    }
+  }
+});
+
 
 type ExpenseFormValues = z.infer<typeof expenseFormSchema>;
 
@@ -50,7 +81,7 @@ interface ExpenseFormProps {
 }
 
 export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: ExpenseFormProps) {
-  const { categories, getCategoryById, sharedBudgets } = useAppContext();
+  const { categories, getCategoryById, sharedBudgets, members } = useAppContext();
   const { toast } = useToast();
   const [aiSuggestion, setAiSuggestion] = useState<SuggestExpenseCategoryOutput | null>(null);
   const [isSuggesting, setIsSuggesting] = useState(false);
@@ -58,11 +89,29 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
   const form = useForm<ExpenseFormValues>({
     resolver: zodResolver(expenseFormSchema),
     defaultValues: expense
-      ? { ...expense, date: new Date(expense.date), sharedBudgetId: expense.sharedBudgetId || "" }
-      : { description: "", amount: 0, date: new Date(), categoryId: "", notes: "", sharedBudgetId: "" },
+      ? { 
+          ...expense, 
+          date: new Date(expense.date), 
+          sharedBudgetId: expense.sharedBudgetId || "",
+          isSplit: expense.isSplit || false,
+          paidByMemberId: expense.paidByMemberId || "",
+          splitWithMemberIds: expense.splitWithMemberIds || [],
+        }
+      : { 
+          description: "", 
+          amount: 0, 
+          date: new Date(), 
+          categoryId: "", 
+          notes: "", 
+          sharedBudgetId: "",
+          isSplit: false,
+          paidByMemberId: "",
+          splitWithMemberIds: [],
+        },
   });
 
   const watchedDescription = form.watch("description");
+  const watchedIsSplit = form.watch("isSplit");
 
   const handleSuggestCategory = useCallback(async () => {
     if (!watchedDescription || watchedDescription.length < 3) return;
@@ -87,21 +136,22 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
     }
   }, [watchedDescription, categories, toast, form]);
   
-  // Debounce AI suggestion
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (watchedDescription && watchedDescription.length >= 5 && !form.getValues("categoryId")) { // Only suggest if category is not set
+      if (watchedDescription && watchedDescription.length >= 5 && !form.getValues("categoryId")) { 
         handleSuggestCategory();
       }
-    }, 1000); // Suggest after 1s of inactivity
+    }, 1000);
     return () => clearTimeout(timer);
   }, [watchedDescription, handleSuggestCategory, form]);
 
 
   function onSubmit(data: ExpenseFormValues) {
-    const dataToSave = {
+    const dataToSave: ExpenseFormValues = {
       ...data,
-      sharedBudgetId: data.sharedBudgetId === "" ? undefined : data.sharedBudgetId, // Ensure empty string becomes undefined
+      sharedBudgetId: data.sharedBudgetId === "" ? undefined : data.sharedBudgetId,
+      paidByMemberId: data.isSplit && data.paidByMemberId ? data.paidByMemberId : undefined,
+      splitWithMemberIds: data.isSplit && data.splitWithMemberIds ? data.splitWithMemberIds : [],
     };
     onSave(dataToSave);
     form.reset();
@@ -135,7 +185,7 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
               <FormItem>
                 <FormLabel>Amount</FormLabel>
                 <FormControl>
-                  <Input type="number" placeholder="0.00" {...field} />
+                  <Input type="number" placeholder="0.00" {...field} step="0.01" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -222,7 +272,7 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
                             key={category.id}
                             onSelect={() => {
                               form.setValue("categoryId", category.id);
-                              setAiSuggestion(null); // Clear AI suggestion when manually selecting
+                              setAiSuggestion(null); 
                             }}
                           >
                             <Check
@@ -274,7 +324,7 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
                 const suggestedCat = categories.find(c => c.name.toLowerCase() === aiSuggestion.category.toLowerCase());
                 if (suggestedCat) {
                   form.setValue("categoryId", suggestedCat.id, { shouldValidate: true });
-                  setAiSuggestion(null); // Clear after applying
+                  setAiSuggestion(null); 
                 } else {
                   toast({variant: "destructive", title: "Category not found", description: `AI suggested "${aiSuggestion.category}" which is not an available category.`})
                 }
@@ -292,10 +342,10 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Link to Shared Budget (Optional)</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
+                <Select onValueChange={field.onChange} value={field.value || ""}>
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select a shared budget to link this expense to" />
+                      <SelectValue placeholder="Select a shared budget" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
@@ -308,12 +358,115 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
                   </SelectContent>
                 </Select>
                 <FormDescription>
-                  If this expense is part of a shared household budget, link it here.
+                  Link this expense to a shared household budget.
                 </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
           />
+        )}
+
+        {members.length > 0 && (
+          <div className="space-y-4 p-4 border rounded-md">
+            <FormField
+              control={form.control}
+              name="isSplit"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={(checked) => {
+                        field.onChange(checked);
+                        if (!checked) {
+                          form.setValue("paidByMemberId", "");
+                          form.setValue("splitWithMemberIds", []);
+                        }
+                      }}
+                    />
+                  </FormControl>
+                  <FormLabel className="font-normal text-sm">Split this expense among household members?</FormLabel>
+                </FormItem>
+              )}
+            />
+
+            {watchedIsSplit && (
+              <>
+                <FormField
+                  control={form.control}
+                  name="paidByMemberId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Who Paid?</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || ""}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select member who paid" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {members.map((member) => (
+                            <SelectItem key={member.id} value={member.id}>
+                              {member.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <Controller
+                  control={form.control}
+                  name="splitWithMemberIds"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Split With Whom?</FormLabel>
+                       <FormDescription>Select all members who are sharing this expense (including the payer if they are also sharing the cost).</FormDescription>
+                      <ScrollArea className="h-32 w-full rounded-md border p-2">
+                        {members.map((member) => (
+                          <FormField
+                            key={member.id}
+                            control={form.control}
+                            name="splitWithMemberIds"
+                            render={({ field: checkboxField }) => {
+                              return (
+                                <FormItem
+                                  key={member.id}
+                                  className="flex flex-row items-start space-x-3 space-y-0 py-2"
+                                >
+                                  <FormControl>
+                                    <Checkbox
+                                      checked={checkboxField.value?.includes(member.id)}
+                                      onCheckedChange={(checked) => {
+                                        return checked
+                                          ? checkboxField.onChange([...(checkboxField.value || []), member.id])
+                                          : checkboxField.onChange(
+                                            (checkboxField.value || []).filter(
+                                                (value) => value !== member.id
+                                              )
+                                            );
+                                      }}
+                                    />
+                                  </FormControl>
+                                  <FormLabel className="text-sm font-normal">
+                                    {member.name}
+                                  </FormLabel>
+                                </FormItem>
+                              );
+                            }}
+                          />
+                        ))}
+                      </ScrollArea>
+                      <FormMessage />
+                       {form.formState.errors.splitWithMemberIds?.message && <p className="text-sm font-medium text-destructive">{form.formState.errors.splitWithMemberIds?.message}</p>}
+                    </FormItem>
+                  )}
+                />
+              </>
+            )}
+          </div>
         )}
 
 
@@ -345,4 +498,3 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
     </Form>
   );
 }
-
