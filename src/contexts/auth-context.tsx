@@ -78,6 +78,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       router.push('/dashboard'); // Redirect on successful signup
     } catch (error: any) {
       console.error("Signup error:", error);
+      // Check for specific Firebase error codes if needed for more granular messages
       toast({ variant: "destructive", title: "Signup Failed", description: error.message || "Could not create account." });
       setLoading(false); // Ensure loading is set to false on error
     }
