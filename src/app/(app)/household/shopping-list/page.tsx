@@ -4,9 +4,10 @@
 import { useState } from 'react';
 import { PageHeader } from '@/components/shared/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, CopyCheck } from 'lucide-react';
+import { PlusCircle, CopyCheck, MilkIcon, EggIcon, SandwichIcon, Zap } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAppContext } from '@/contexts/app-context';
 import { useToast } from "@/hooks/use-toast";
 import type { ShoppingListItem } from '@/lib/types';
@@ -21,6 +22,17 @@ export default function ShoppingListPage() {
   const [editingItem, setEditingItem] = useState<ShoppingListItem | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+
+  const commonItems = [
+    { name: "Milk", icon: MilkIcon, defaultQuantity: "1", notes: "e.g., 1 gallon, Whole" },
+    { name: "Eggs", icon: EggIcon, defaultQuantity: "12", notes: "e.g., Dozen, Large" },
+    { name: "Bread", icon: SandwichIcon, defaultQuantity: "1", notes: "e.g., 1 loaf, Wheat" },
+  ];
+
+  const handleAddCommonItem = (itemName: string, quantity: string, itemNotes?: string) => {
+      addShoppingListItem({ itemName, quantity, notes: itemNotes });
+      toast({ title: `${itemName} Added`, description: "Item added to your shopping list." });
+  };
 
   const handleSaveItem = async (data: Omit<ShoppingListItem, 'id' | 'isPurchased' | 'addedAt'>) => {
     setIsSubmitting(true);
@@ -96,6 +108,29 @@ export default function ShoppingListPage() {
           </div>
         }
       />
+
+      <Card className="mb-6 shadow-sm">
+        <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+                <Zap className="h-5 w-5 text-primary" />
+                Quick Add Common Items
+            </CardTitle>
+            <CardDescription>Add frequently bought items to your list with one click.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+            {commonItems.map(commonItem => (
+                <Button 
+                    key={commonItem.name} 
+                    variant="outline" 
+                    onClick={() => handleAddCommonItem(commonItem.name, commonItem.defaultQuantity, commonItem.notes)}
+                    className="flex items-center gap-2 py-2 px-3 h-auto"
+                >
+                    <commonItem.icon className="h-5 w-5" />
+                    {commonItem.name}
+                </Button>
+            ))}
+        </CardContent>
+      </Card>
 
       <Dialog open={isFormOpen} onOpenChange={(isOpen) => {
         if (!isOpen) setEditingItem(undefined);

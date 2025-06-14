@@ -25,7 +25,7 @@ export function ShoppingListItem({ item, onEdit, onDelete, onTogglePurchased }: 
   const handleQuantityChange = (increment: boolean) => {
     if (!isNumericQuantity) return;
     const currentVal = parseInt(item.quantity, 10);
-    const newVal = increment ? currentVal + 1 : Math.max(1, currentVal - 1);
+    const newVal = increment ? currentVal + 1 : Math.max(1, currentVal - 1); // Ensure quantity doesn't go below 1
     onEdit({
       id: item.id,
       itemName: item.itemName,
@@ -36,7 +36,8 @@ export function ShoppingListItem({ item, onEdit, onDelete, onTogglePurchased }: 
 
   return (
     <Card className={cn("overflow-hidden transition-shadow hover:shadow-md", item.isPurchased && "bg-muted/50 opacity-70")}>
-      <CardContent className="p-4 flex items-center justify-between gap-4">
+      <CardContent className="p-4 flex items-center justify-between gap-2">
+        {/* Checkbox and Item Name/Notes/Timestamp */}
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <Checkbox
             id={`item-${item.id}`}
@@ -54,46 +55,52 @@ export function ShoppingListItem({ item, onEdit, onDelete, onTogglePurchased }: 
             >
               {item.itemName}
             </label>
-            <div className="text-xs text-muted-foreground flex items-center gap-2">
-              {!item.isPurchased && isNumericQuantity && (
-                <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleQuantityChange(false)} disabled={parseInt(item.quantity, 10) <= 1}>
-                    <MinusCircle className="h-3 w-3" />
-                  </Button>
-                  <span>Qty: {item.quantity}</span>
-                  <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleQuantityChange(true)}>
-                    <PlusCircle className="h-3 w-3" />
-                  </Button>
-                </div>
-              )}
-              {(!isNumericQuantity || item.isPurchased) && item.quantity && <span>Qty: {item.quantity}</span>}
-              {item.quantity && item.notes && <span>&bull;</span>}
-              {item.notes && <span className="italic truncate" title={item.notes}>{item.notes}</span>}
-            </div>
-             <p className="text-xs text-muted-foreground mt-0.5">Added {timeAgo}</p>
+            {item.notes && <p className="text-xs text-muted-foreground italic truncate" title={item.notes}>{item.notes}</p>}
+            <p className="text-xs text-muted-foreground mt-0.5">Added {timeAgo}</p>
           </div>
         </div>
 
-        <div className="flex items-center shrink-0">
-          <ShoppingBag className={cn("h-5 w-5 mr-3", item.isPurchased ? "text-green-500" : "text-primary/70")} />
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <MoreHorizontal className="h-4 w-4" />
-                <span className="sr-only">Item options</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => onEdit(item)} disabled={item.isPurchased}>
-                <Edit3 className="mr-2 h-4 w-4" />
-                Edit
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onDelete(item.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+        {/* Quantity Controls OR Static Quantity Display - positioned before ShoppingBag/Menu */}
+        <div className="flex items-center"> {/* Wrapper for quantity and action icons */}
+            {/* Quantity Controls */}
+            {!item.isPurchased && isNumericQuantity && (
+                <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleQuantityChange(false)} disabled={parseInt(item.quantity, 10) <= 1}>
+                        <MinusCircle className="h-4 w-4" />
+                    </Button>
+                    <span className="text-sm font-medium w-6 text-center tabular-nums">{item.quantity}</span>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleQuantityChange(true)}>
+                        <PlusCircle className="h-4 w-4" />
+                    </Button>
+                </div>
+            )}
+            {/* Static Quantity Display (if not numeric or purchased) */}
+            {((!isNumericQuantity && item.quantity) || (item.isPurchased && item.quantity)) && (
+                 <div className="px-2">
+                    <span className={cn("text-sm", item.isPurchased ? "text-muted-foreground" : "text-foreground")}>Qty: {item.quantity}</span>
+                </div>
+            )}
+
+            {/* Shopping Bag and Options Menu */}
+            <ShoppingBag className={cn("h-5 w-5 ml-2", item.isPurchased ? "text-green-500" : "text-primary/70")} />
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <MoreHorizontal className="h-4 w-4" />
+                    <span className="sr-only">Item options</span>
+                </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => onEdit(item)} disabled={item.isPurchased}>
+                    <Edit3 className="mr-2 h-4 w-4" />
+                    Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onDelete(item.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete
+                </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
         </div>
       </CardContent>
     </Card>
