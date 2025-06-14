@@ -43,7 +43,7 @@ export default function HouseholdPage() {
       addMember(data);
       toast({ title: "Member Added", description: `${data.name} has been added to the household.` });
       setIsMemberFormOpen(false);
-    } catch (error) {
+    } catch (error) { // Normalized spacing here
       toast({ variant: "destructive", title: "Save Failed", description: "Could not add member. Please try again." });
     } finally {
       setIsSubmittingMember(false);
@@ -158,7 +158,7 @@ export default function HouseholdPage() {
             <AlertDialogDescription>
               This action cannot be undone. This will permanently remove the member and all their associated contributions from the household.
             </AlertDialogDescription>
-          </DialogHeader>
+          </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setMemberToDelete(null)}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDeleteMember} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">Delete</AlertDialogAction>
