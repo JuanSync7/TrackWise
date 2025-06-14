@@ -71,7 +71,7 @@ const expenseFormSchema = expenseFormSchemaBase.superRefine((data, ctx) => {
 });
 
 
-type ExpenseFormValues = z.infer<typeof expenseFormSchema>;
+export type ExpenseFormValues = z.infer<typeof expenseFormSchema>;
 
 interface ExpenseFormProps {
   expense?: Expense;
@@ -87,6 +87,8 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
   const { toast } = useToast();
   const [aiSuggestion, setAiSuggestion] = useState<SuggestExpenseCategoryOutput | null>(null);
   const [isSuggesting, setIsSuggesting] = useState(false);
+  const [categoryPopoverOpen, setCategoryPopoverOpen] = useState(false);
+
 
   const form = useForm<ExpenseFormValues>({
     resolver: zodResolver(expenseFormSchema),
@@ -263,7 +265,7 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
           render={({ field }) => (
             <FormItem className="flex flex-col">
               <FormLabel>Category</FormLabel>
-              <Popover>
+              <Popover open={categoryPopoverOpen} onOpenChange={setCategoryPopoverOpen}>
                 <PopoverTrigger asChild>
                   <FormControl>
                     <Button
@@ -297,6 +299,7 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
                             onSelect={() => {
                               form.setValue("categoryId", category.id);
                               setAiSuggestion(null); 
+                              setCategoryPopoverOpen(false);
                             }}
                           >
                             <Check
@@ -366,7 +369,12 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Link to Shared Budget (Optional)</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value || NONE_SHARED_BUDGET_VALUE}>
+                <Select 
+                  onValueChange={(value) => {
+                    field.onChange(value === NONE_SHARED_BUDGET_VALUE ? "" : value);
+                  }} 
+                  value={field.value || NONE_SHARED_BUDGET_VALUE}
+                >
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Select a shared budget" />

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -27,7 +28,7 @@ export function BudgetProgressCard() {
   return (
     <Card className="shadow-sm hover:shadow-md transition-shadow duration-300">
       <CardHeader>
-        <CardTitle>Budget Goals</CardTitle>
+        <CardTitle>Budget Goals Progress</CardTitle>
         <CardDescription>Track your progress towards your financial goals.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -49,7 +50,7 @@ export function BudgetProgressCard() {
               </div>
               <Progress 
                 value={progressPercentage} 
-                className={isOverBudget ? '[&>div]:bg-destructive' : ''} 
+                className={isOverBudget ? '[&>div]:bg-destructive' : '[&>div]:bg-accent'} 
                 aria-label={`${category?.name || 'Budget'} progress ${progressPercentage.toFixed(0)}%`}
               />
               {isOverBudget && <p className="text-xs text-destructive mt-1">You've exceeded your budget for {category?.name || 'this category'}.</p>}

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -21,6 +22,7 @@ import { cn } from "@/lib/utils";
 import type { BudgetGoal } from '@/lib/types';
 import { useAppContext } from '@/contexts/app-context';
 import { CategoryIcon } from '@/components/shared/category-icon';
+import { useState } from "react";
 
 const budgetFormSchema = z.object({
   categoryId: z.string({ required_error: "Please select a category." }),
@@ -31,7 +33,7 @@ const budgetFormSchema = z.object({
 type BudgetFormValues = z.infer<typeof budgetFormSchema>;
 
 interface BudgetFormProps {
-  budgetGoal?: BudgetGoal; // For editing, not implemented in this version
+  budgetGoal?: BudgetGoal; 
   onSave: (data: Omit<BudgetGoal, 'id' | 'currentSpending'>) => void;
   onCancel?: () => void;
   isSubmitting?: boolean;
@@ -39,6 +41,7 @@ interface BudgetFormProps {
 
 export function BudgetForm({ budgetGoal, onSave, onCancel, isSubmitting }: BudgetFormProps) {
   const { categories, getCategoryById } = useAppContext();
+  const [categoryPopoverOpen, setCategoryPopoverOpen] = useState(false);
 
   const form = useForm<BudgetFormValues>({
     resolver: zodResolver(budgetFormSchema),
@@ -63,7 +66,7 @@ export function BudgetForm({ budgetGoal, onSave, onCancel, isSubmitting }: Budge
           render={({ field }) => (
             <FormItem className="flex flex-col">
               <FormLabel>Category</FormLabel>
-              <Popover>
+              <Popover open={categoryPopoverOpen} onOpenChange={setCategoryPopoverOpen}>
                 <PopoverTrigger asChild>
                   <FormControl>
                     <Button
@@ -96,6 +99,7 @@ export function BudgetForm({ budgetGoal, onSave, onCancel, isSubmitting }: Budge
                           key={category.id}
                           onSelect={() => {
                             form.setValue("categoryId", category.id);
+                            setCategoryPopoverOpen(false);
                           }}
                         >
                           <Check

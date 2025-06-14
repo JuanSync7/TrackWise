@@ -22,6 +22,7 @@ import type { Member, Contribution } from '@/lib/types';
 import { MemberForm } from '@/components/household/member-form';
 import { MemberList } from '@/components/household/member-list';
 import { ContributionForm, type ContributionFormValues } from '@/components/household/contribution-form';
+import { ExpenseForm, type ExpenseFormValues as ExpenseFormValuesType } from '@/components/expenses/expense-form';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { format } from 'date-fns';
@@ -30,14 +31,20 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
 export default function HouseholdPage() {
-  const { members, addMember, deleteMember: contextDeleteMember, addContribution, getMemberTotalContribution, getTotalHouseholdSpending } = useAppContext();
+  const { 
+    members, addMember, deleteMember: contextDeleteMember, 
+    addContribution, getMemberTotalContribution, getTotalHouseholdSpending,
+    addExpense 
+  } = useAppContext();
   const { toast } = useToast();
 
   const [isMemberFormOpen, setIsMemberFormOpen] = useState(false);
   const [isContributionFormOpen, setIsContributionFormOpen] = useState(false);
+  const [isExpenseFormOpen, setIsExpenseFormOpen] = useState(false); 
   const [selectedMemberForContribution, setSelectedMemberForContribution] = useState<Member | null>(null);
   const [isSubmittingMember, setIsSubmittingMember] = useState(false);
   const [isSubmittingContribution, setIsSubmittingContribution] = useState(false);
+  const [isSubmittingExpense, setIsSubmittingExpense] = useState(false);
   const [memberToDelete, setMemberToDelete] = useState<string | null>(null);
 
   const handleSaveMember = async (data: Omit<Member, 'id'>) => {
@@ -97,6 +104,20 @@ export default function HouseholdPage() {
       setIsSubmittingContribution(false);
     }
   };
+
+  const handleSaveExpense = async (data: ExpenseFormValuesType) => {
+    setIsSubmittingExpense(true);
+    const expenseData = { ...data, date: format(data.date, "yyyy-MM-dd") };
+    try {
+      addExpense(expenseData);
+      toast({ title: "Shared Expense Added", description: "Your new shared expense has been successfully recorded." });
+      setIsExpenseFormOpen(false);
+    } catch (error) {
+      toast({ variant: "destructive", title: "Save Failed", description: "Could not save shared expense. Please try again." });
+    } finally {
+      setIsSubmittingExpense(false);
+    }
+  };
   
   const totalHouseholdContributions = members.reduce((sum, member) => sum + getMemberTotalContribution(member.id), 0);
   const totalPotSpending = getTotalHouseholdSpending();
@@ -111,11 +132,9 @@ export default function HouseholdPage() {
         description="Manage members, track contributions, and oversee shared finances."
         actions={
           <div className="flex gap-2">
-            <Link href="/expenses" passHref>
-              <Button variant="outline">
-                <ListChecks className="mr-2 h-4 w-4" /> Add Shared Expense
-              </Button>
-            </Link>
+            <Button variant="outline" onClick={() => setIsExpenseFormOpen(true)}>
+              <ListChecks className="mr-2 h-4 w-4" /> Add Shared Expense
+            </Button>
             <Button onClick={openMemberFormForNew}>
               <PlusCircle className="mr-2 h-4 w-4" /> Add New Member
             </Button>
@@ -162,6 +181,23 @@ export default function HouseholdPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={isExpenseFormOpen} onOpenChange={setIsExpenseFormOpen}>
+        <DialogContent className="sm:max-w-[425px] md:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add New Shared Expense</DialogTitle>
+            <DialogDescription>
+              Fill in the details for a new shared household expense.
+            </DialogDescription>
+          </DialogHeader>
+          <ExpenseForm
+            onSave={handleSaveExpense}
+            onCancel={() => setIsExpenseFormOpen(false)}
+            isSubmitting={isSubmittingExpense}
+          />
+        </DialogContent>
+      </Dialog>
+
+
       <AlertDialog open={!!memberToDelete} onOpenChange={() => setMemberToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -185,7 +221,7 @@ export default function HouseholdPage() {
                 <Users className="h-6 w-6 text-primary" />
                 Household Members ({members.length})
               </CardTitle>
-              <CardDescription>View and manage your household members and their contributions. Log shared expenses under the &quot;Household Expenses&quot; category, or use the split expense feature by clicking &quot;Add Shared Expense&quot; above.</CardDescription>
+              <CardDescription>View and manage your household members and their contributions. Log shared expenses using the "Add Shared Expense" button above. Link them to a Shared Budget or categorize as 'Household Expenses'.</CardDescription>
             </CardHeader>
             <CardContent>
               <MemberList 
@@ -294,4 +330,3 @@ export default function HouseholdPage() {
     </div>
   );
 }
-

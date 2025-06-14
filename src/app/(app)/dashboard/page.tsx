@@ -1,9 +1,10 @@
+
 "use client";
 
 import { PageHeader } from '@/components/shared/page-header';
 import { SummaryCard } from '@/components/dashboard/summary-card';
 import { SpendingChart } from '@/components/dashboard/spending-chart';
-import { BudgetProgressCard } from '@/components/dashboard/budget-progress-card';
+import { BudgetGoalPieChart } from '@/components/dashboard/budget-goal-pie-chart';
 import { DollarSign, TrendingUp, TrendingDown, ListChecks, Wallet } from 'lucide-react';
 import { useAppContext } from '@/contexts/app-context';
 import { DEFAULT_CURRENCY } from '@/lib/constants';
@@ -30,13 +31,13 @@ export default function DashboardPage() {
     return budgetGoals.reduce((sum, goal) => sum + goal.amount, 0);
   }, [budgetGoals]);
 
-  const remainingBudget = totalBudget - totalExpenses; // Simplified, assumes all budgets are for current period of expenses
+  const remainingBudget = totalBudget - totalExpenses; 
 
   const averageExpense = useMemo(() => {
     return expenses.length > 0 ? totalExpenses / expenses.length : 0;
   }, [expenses, totalExpenses]);
 
-  // This is a very basic trend calculation. A real app would compare to previous periods.
+  
   const [expenseTrend, setExpenseTrend] = useState<{ value: string; icon: any; color: string } | null>(null);
 
   useEffect(() => {
@@ -87,7 +88,7 @@ export default function DashboardPage() {
          <SummaryCard 
           title="Remaining Budget" 
           value={`${DEFAULT_CURRENCY}${remainingBudget.toFixed(2)}`}
-          icon={Wallet} // Could use a different icon
+          icon={Wallet} 
           isLoading={isLoading}
           trendColor={remainingBudget >=0 ? "text-green-500" : "text-red-500"}
         />
@@ -104,7 +105,7 @@ export default function DashboardPage() {
           <SpendingChart />
         </div>
         <div className="lg:col-span-1">
-          <BudgetProgressCard />
+          <BudgetGoalPieChart />
         </div>
       </div>
     </div>
