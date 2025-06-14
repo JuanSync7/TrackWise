@@ -9,15 +9,17 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { MoreHorizontal, Edit3, Trash2, ShoppingBag, MinusCircle, PlusCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNowStrict } from 'date-fns';
+import { useAppContext } from '@/contexts/app-context'; // Added for direct context access
 
 interface ShoppingListItemProps {
   item: ShoppingListItemType;
-  onEdit: (item: Pick<ShoppingListItemType, 'id' | 'itemName' | 'quantity' | 'notes'>) => void;
+  onEdit: (item: ShoppingListItemType) => void; // For opening edit form
   onDelete: (itemId: string) => void;
   onTogglePurchased: (itemId: string) => void;
 }
 
 export function ShoppingListItem({ item, onEdit, onDelete, onTogglePurchased }: ShoppingListItemProps) {
+  const { editShoppingListItem } = useAppContext(); // Get context function
   const timeAgo = formatDistanceToNowStrict(new Date(item.addedAt), { addSuffix: true });
 
   const isNumericQuantity = /^\d+$/.test(item.quantity);
@@ -26,7 +28,9 @@ export function ShoppingListItem({ item, onEdit, onDelete, onTogglePurchased }: 
     if (!isNumericQuantity) return;
     const currentVal = parseInt(item.quantity, 10);
     const newVal = increment ? currentVal + 1 : Math.max(1, currentVal - 1); // Ensure quantity doesn't go below 1
-    onEdit({
+    
+    // Directly call context function to update item quantity
+    editShoppingListItem({
       id: item.id,
       itemName: item.itemName,
       quantity: String(newVal),
