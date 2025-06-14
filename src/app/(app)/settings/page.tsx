@@ -1,7 +1,8 @@
+
 "use client";
 
 import { PageHeader } from '@/components/shared/page-header';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { useAppContext } from '@/contexts/app-context';
 import { CategoryIcon } from '@/components/shared/category-icon';
 import { Button } from '@/components/ui/button';
