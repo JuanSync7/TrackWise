@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -16,11 +17,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Check, ChevronsUpDown, Sparkles as AiSparklesIcon } from "lucide-react";
+import { CalendarIcon, Check, ChevronsUpDown, Sparkles as AiSparklesIcon, LinkIcon } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import type { Expense } from "@/lib/types";
+import type { Expense, SharedBudget } from "@/lib/types";
 import { useAppContext } from "@/contexts/app-context";
 import { format } from "date-fns";
 import { useEffect, useState, useCallback }  from "react";
@@ -35,6 +37,7 @@ const expenseFormSchema = z.object({
   date: z.date({ required_error: "A date is required." }),
   categoryId: z.string({ required_error: "Please select a category." }),
   notes: z.string().max(200).optional(),
+  sharedBudgetId: z.string().optional(),
 });
 
 type ExpenseFormValues = z.infer<typeof expenseFormSchema>;
@@ -47,7 +50,7 @@ interface ExpenseFormProps {
 }
 
 export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: ExpenseFormProps) {
-  const { categories, getCategoryById } = useAppContext();
+  const { categories, getCategoryById, sharedBudgets } = useAppContext();
   const { toast } = useToast();
   const [aiSuggestion, setAiSuggestion] = useState<SuggestExpenseCategoryOutput | null>(null);
   const [isSuggesting, setIsSuggesting] = useState(false);
@@ -55,8 +58,8 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
   const form = useForm<ExpenseFormValues>({
     resolver: zodResolver(expenseFormSchema),
     defaultValues: expense
-      ? { ...expense, date: new Date(expense.date) }
-      : { description: "", amount: 0, date: new Date(), categoryId: "", notes: "" },
+      ? { ...expense, date: new Date(expense.date), sharedBudgetId: expense.sharedBudgetId || "" }
+      : { description: "", amount: 0, date: new Date(), categoryId: "", notes: "", sharedBudgetId: "" },
   });
 
   const watchedDescription = form.watch("description");
@@ -96,7 +99,11 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
 
 
   function onSubmit(data: ExpenseFormValues) {
-    onSave(data);
+    const dataToSave = {
+      ...data,
+      sharedBudgetId: data.sharedBudgetId === "" ? undefined : data.sharedBudgetId, // Ensure empty string becomes undefined
+    };
+    onSave(dataToSave);
     form.reset();
     setAiSuggestion(null);
   }
@@ -278,6 +285,37 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
           </Alert>
         )}
 
+        {sharedBudgets.length > 0 && (
+          <FormField
+            control={form.control}
+            name="sharedBudgetId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Link to Shared Budget (Optional)</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a shared budget to link this expense to" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="">None</SelectItem>
+                    {sharedBudgets.map((budget: SharedBudget) => (
+                      <SelectItem key={budget.id} value={budget.id}>
+                        {budget.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormDescription>
+                  If this expense is part of a shared household budget, link it here.
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
+
 
         <FormField
           control={form.control}
@@ -307,3 +345,4 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
     </Form>
   );
 }
+

@@ -15,6 +15,7 @@ export interface Expense {
   date: string; // ISO string date
   categoryId: string;
   notes?: string;
+  sharedBudgetId?: string; // Link to a shared budget
 }
 
 export interface BudgetGoal {
@@ -54,7 +55,7 @@ export interface SharedBudget {
   period: 'monthly' | 'yearly' | 'weekly';
   description?: string;
   createdAt: string; // ISO string date
-  // In a more complex system, you might link specific expenses or track current spending here
+  currentSpending: number; // Calculated field for spending linked to this budget
 }
 
 export interface AppState {
@@ -84,7 +85,7 @@ export type AppContextType = AppState & {
   editShoppingListItem: (item: Pick<ShoppingListItem, 'id' | 'itemName' | 'quantity' | 'notes'>) => void;
   toggleShoppingListItemPurchased: (itemId: string) => void;
   deleteShoppingListItem: (itemId: string) => void;
-  addSharedBudget: (budget: Omit<SharedBudget, 'id' | 'createdAt'>) => void;
+  addSharedBudget: (budget: Omit<SharedBudget, 'id' | 'createdAt' | 'currentSpending'>) => void;
   deleteSharedBudget: (budgetId: string) => void;
   // getSharedBudgetById: (budgetId: string) => SharedBudget | undefined; // For future use
 };
@@ -96,3 +97,4 @@ export interface NavItem {
   label?: string;
   variant?: 'default' | 'ghost';
 }
+

@@ -108,11 +108,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // Shared Budgets Management
-  const addSharedBudget = (budget: Omit<SharedBudget, 'id' | 'createdAt'>) => {
+  const addSharedBudget = (budget: Omit<SharedBudget, 'id' | 'createdAt' | 'currentSpending'>) => {
     const newSharedBudget: SharedBudget = {
       ...budget,
       id: uuidv4(),
       createdAt: formatISO(new Date()),
+      currentSpending: 0,
     };
     setSharedBudgets(prev => [...prev, newSharedBudget]);
   };
@@ -122,10 +123,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
 
-  // Recalculate currentSpending for budget goals whenever expenses change
+  // Recalculate currentSpending for personal budget goals whenever expenses change
   React.useEffect(() => {
     setBudgetGoals(prevGoals => 
       prevGoals.map(goal => {
+        // Basic period matching (monthly for now)
         const relevantExpenses = expenses.filter(
           exp => exp.categoryId === goal.categoryId && 
                  new Date(exp.date).getMonth() === new Date().getMonth() && 
@@ -136,6 +138,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       })
     );
   }, [expenses, setBudgetGoals]);
+
+  // Recalculate currentSpending for shared budgets whenever expenses change
+  React.useEffect(() => {
+    setSharedBudgets(prevSharedBudgets =>
+      prevSharedBudgets.map(sharedBudget => {
+        const relevantExpenses = expenses.filter(
+          exp => exp.sharedBudgetId === sharedBudget.id
+        );
+        // For simplicity, summing all linked expenses regardless of date relative to shared budget period.
+        // More precise period filtering (e.g., for monthly shared budgets) can be added here if needed.
+        const currentSpending = relevantExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+        return { ...sharedBudget, currentSpending };
+      })
+    );
+  }, [expenses, setSharedBudgets]);
 
 
   const value: AppContextType = {
@@ -176,3 +193,4 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
+
