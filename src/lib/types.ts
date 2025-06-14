@@ -1,3 +1,4 @@
+
 import type { LucideIcon } from 'lucide-react';
 
 export interface Category {
@@ -37,12 +38,22 @@ export interface Contribution {
   notes?: string;
 }
 
+export interface ShoppingListItem {
+  id: string;
+  itemName: string;
+  quantity: string; // e.g., "1 kg", "2 bottles"
+  notes?: string;
+  addedAt: string; // ISO string date
+  isPurchased: boolean;
+}
+
 export interface AppState {
   expenses: Expense[];
   categories: Category[];
   budgetGoals: BudgetGoal[];
   members: Member[];
   contributions: Contribution[];
+  shoppingListItems: ShoppingListItem[];
 }
 
 export type AppContextType = AppState & {
@@ -58,6 +69,10 @@ export type AppContextType = AppState & {
   addContribution: (contribution: Omit<Contribution, 'id'>) => void;
   getMemberContributions: (memberId: string) => Contribution[];
   getMemberTotalContribution: (memberId: string) => number;
+  addShoppingListItem: (item: Omit<ShoppingListItem, 'id' | 'isPurchased' | 'addedAt'>) => void;
+  editShoppingListItem: (item: Pick<ShoppingListItem, 'id' | 'itemName' | 'quantity' | 'notes'>) => void;
+  toggleShoppingListItemPurchased: (itemId: string) => void;
+  deleteShoppingListItem: (itemId: string) => void;
 };
 
 export interface NavItem {

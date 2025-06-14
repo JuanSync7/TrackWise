@@ -21,7 +21,6 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   }, [user, loading, router]);
 
   if (loading || !user) {
-    // You can show a global loading spinner here if preferred
     return (
       <div className="flex min-h-screen w-full items-center justify-center bg-muted/40">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
@@ -32,11 +31,11 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   return (
     <AppProvider>
       <SidebarProvider>
-        <div className="flex min-h-screen w-full bg-muted/40">
+        <div className="flex h-screen w-full bg-muted/40 overflow-hidden">
           <AppSidebar />
-          <div className="flex flex-col flex-1">
+          <div className="flex flex-col flex-1 overflow-hidden">
             <AppHeader />
-            <main className="flex-1 p-4 sm:px-6 sm:py-0 md:gap-8 md:p-6 lg:p-8 overflow-auto">
+            <main className="flex-1 p-4 sm:px-6 sm:py-0 md:gap-8 md:p-6 lg:p-8 overflow-y-auto">
               {children}
             </main>
           </div>

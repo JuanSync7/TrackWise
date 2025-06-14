@@ -1,11 +1,13 @@
+
 "use client";
 
 import type { ReactNode } from 'react';
 import React, { createContext, useContext } from 'react';
-import type { Expense, Category, BudgetGoal, AppState, AppContextType, Member, Contribution } from '@/lib/types';
+import type { Expense, Category, BudgetGoal, AppState, AppContextType, Member, Contribution, ShoppingListItem } from '@/lib/types';
 import { INITIAL_CATEGORIES } from '@/lib/constants';
 import useLocalStorage from '@/hooks/use-local-storage';
 import { v4 as uuidv4 } from 'uuid'; // For generating unique IDs
+import { formatISO } from 'date-fns';
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
@@ -15,6 +17,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [budgetGoals, setBudgetGoals] = useLocalStorage<BudgetGoal[]>('trackwise_budget_goals', []);
   const [members, setMembers] = useLocalStorage<Member[]>('trackwise_members', []);
   const [contributions, setContributions] = useLocalStorage<Contribution[]>('trackwise_contributions', []);
+  const [shoppingListItems, setShoppingListItems] = useLocalStorage<ShoppingListItem[]>('trackwise_shopping_list_items', []);
+
 
   const addExpense = (expense: Omit<Expense, 'id'>) => {
     setExpenses(prev => [...prev, { ...expense, id: uuidv4() }]);
@@ -71,6 +75,37 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       .reduce((sum, contrib) => sum + contrib.amount, 0);
   };
 
+  // Shopping List Management
+  const addShoppingListItem = (item: Omit<ShoppingListItem, 'id' | 'isPurchased' | 'addedAt'>) => {
+    const newItem: ShoppingListItem = {
+      ...item,
+      id: uuidv4(),
+      isPurchased: false,
+      addedAt: formatISO(new Date()),
+    };
+    setShoppingListItems(prev => [...prev, newItem]);
+  };
+
+  const editShoppingListItem = (updatedItem: Pick<ShoppingListItem, 'id' | 'itemName' | 'quantity' | 'notes'>) => {
+    setShoppingListItems(prev => 
+      prev.map(item => 
+        item.id === updatedItem.id ? { ...item, ...updatedItem } : item
+      )
+    );
+  };
+
+  const toggleShoppingListItemPurchased = (itemId: string) => {
+    setShoppingListItems(prev =>
+      prev.map(item =>
+        item.id === itemId ? { ...item, isPurchased: !item.isPurchased } : item
+      )
+    );
+  };
+
+  const deleteShoppingListItem = (itemId: string) => {
+    setShoppingListItems(prev => prev.filter(item => item.id !== itemId));
+  };
+
 
   // Recalculate currentSpending for budget goals whenever expenses change
   React.useEffect(() => {
@@ -78,7 +113,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       prevGoals.map(goal => {
         const relevantExpenses = expenses.filter(
           exp => exp.categoryId === goal.categoryId && 
-                 new Date(exp.date).getMonth() === new Date().getMonth() && // Basic monthly check
+                 new Date(exp.date).getMonth() === new Date().getMonth() && 
                  new Date(exp.date).getFullYear() === new Date().getFullYear()
         );
         const currentSpending = relevantExpenses.reduce((sum, exp) => sum + exp.amount, 0);
@@ -94,6 +129,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     budgetGoals,
     members,
     contributions,
+    shoppingListItems,
     addExpense,
     updateExpense,
     deleteExpense,
@@ -106,6 +142,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addContribution,
     getMemberContributions,
     getMemberTotalContribution,
+    addShoppingListItem,
+    editShoppingListItem,
+    toggleShoppingListItemPurchased,
+    deleteShoppingListItem,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

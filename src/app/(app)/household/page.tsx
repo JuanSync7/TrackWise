@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { PageHeader } from '@/components/shared/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Users, DollarSign } from 'lucide-react';
+import { PlusCircle, Users, DollarSign, ClipboardList } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -25,6 +25,7 @@ import { ContributionForm, type ContributionFormValues } from '@/components/hous
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
 import { DEFAULT_CURRENCY } from '@/lib/constants';
+import Link from 'next/link';
 
 export default function HouseholdPage() {
   const { members, addMember, deleteMember: contextDeleteMember, addContribution, getMemberTotalContribution } = useAppContext();
@@ -43,7 +44,7 @@ export default function HouseholdPage() {
       addMember(data);
       toast({ title: "Member Added", description: `${data.name} has been added to the household.` });
       setIsMemberFormOpen(false);
-    } catch (error) { // Normalized spacing here
+    } catch (error) { 
       toast({ variant: "destructive", title: "Save Failed", description: "Could not add member. Please try again." });
     } finally {
       setIsSubmittingMember(false);
@@ -109,7 +110,6 @@ export default function HouseholdPage() {
         }
       />
       
-      {/* Add Member Dialog */}
       <Dialog open={isMemberFormOpen} onOpenChange={setIsMemberFormOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -126,7 +126,6 @@ export default function HouseholdPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Add Contribution Dialog */}
       <Dialog open={isContributionFormOpen} onOpenChange={(isOpen) => {
         if (!isOpen) setSelectedMemberForContribution(null);
         setIsContributionFormOpen(isOpen);
@@ -150,7 +149,6 @@ export default function HouseholdPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Member Alert Dialog */}
       <AlertDialog open={!!memberToDelete} onOpenChange={() => setMemberToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -186,7 +184,7 @@ export default function HouseholdPage() {
           </Card>
         </div>
         
-        <div className="md:col-span-1">
+        <div className="md:col-span-1 space-y-6">
            <Card>
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -201,7 +199,30 @@ export default function HouseholdPage() {
             </CardContent>
            </Card>
 
-          <Card className="mt-6">
+           <Card>
+            <CardHeader>
+              <CardTitle  className="flex items-center gap-2">
+                <ClipboardList className="h-6 w-6 text-primary" />
+                Shared Shopping List
+              </CardTitle>
+              <CardDescription>Manage items your household needs to buy together.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">Keep track of groceries and other shared items the household plans to purchase.</p>
+            </CardContent>
+            <CardFooter>
+              <Link href="/household/shopping-list" passHref legacyBehavior>
+                <Button asChild className="w-full">
+                  <a>
+                    <ClipboardList className="mr-2 h-4 w-4" /> View Shopping List
+                  </a>
+                </Button>
+              </Link>
+            </CardFooter>
+          </Card>
+
+
+          <Card>
             <CardHeader>
                 <CardTitle>Shared Budgeting (Coming Soon)</CardTitle>
                  <CardDescription>Manage shared household budgets and track group spending against them.</CardDescription>
@@ -214,7 +235,7 @@ export default function HouseholdPage() {
             </CardContent>
           </Card>
 
-          <Card className="mt-6">
+          <Card>
             <CardHeader>
                 <CardTitle>Expense Splitting (Coming Soon)</CardTitle>
                 <CardDescription>Easily split shared expenses among members and track reimbursements.</CardDescription>

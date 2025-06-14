@@ -1,0 +1,77 @@
+
+"use client";
+
+import type { ShoppingListItem as ShoppingListItemType } from '@/lib/types';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { MoreHorizontal, Edit3, Trash2, ShoppingBag } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { formatDistanceToNowStrict } from 'date-fns';
+
+
+interface ShoppingListItemProps {
+  item: ShoppingListItemType;
+  onEdit: (item: ShoppingListItemType) => void;
+  onDelete: (itemId: string) => void;
+  onTogglePurchased: (itemId: string) => void;
+}
+
+export function ShoppingListItem({ item, onEdit, onDelete, onTogglePurchased }: ShoppingListItemProps) {
+  const timeAgo = formatDistanceToNowStrict(new Date(item.addedAt), { addSuffix: true });
+
+  return (
+    <Card className={cn("overflow-hidden transition-shadow hover:shadow-md", item.isPurchased && "bg-muted/50 opacity-70")}>
+      <CardContent className="p-4 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <Checkbox
+            id={`item-${item.id}`}
+            checked={item.isPurchased}
+            onCheckedChange={() => onTogglePurchased(item.id)}
+            aria-label={`Mark ${item.itemName} as ${item.isPurchased ? 'not purchased' : 'purchased'}`}
+          />
+          <div className="flex-1 min-w-0">
+            <label 
+              htmlFor={`item-${item.id}`} 
+              className={cn(
+                "font-medium cursor-pointer",
+                item.isPurchased && "line-through text-muted-foreground"
+              )}
+            >
+              {item.itemName}
+            </label>
+            <div className="text-xs text-muted-foreground space-x-2">
+                {item.quantity && <span>Qty: {item.quantity}</span>}
+                {item.quantity && item.notes && <span>&bull;</span>}
+                {item.notes && <span className="italic truncate" title={item.notes}>{item.notes}</span>}
+            </div>
+             <p className="text-xs text-muted-foreground mt-0.5">Added {timeAgo}</p>
+          </div>
+        </div>
+
+        <div className="flex items-center shrink-0">
+          <ShoppingBag className={cn("h-5 w-5 mr-3", item.isPurchased ? "text-green-500" : "text-primary/70")} />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreHorizontal className="h-4 w-4" />
+                <span className="sr-only">Item options</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onEdit(item)} disabled={item.isPurchased}>
+                <Edit3 className="mr-2 h-4 w-4" />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onDelete(item.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
