@@ -17,13 +17,13 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 const signupFormSchema = z.object({
-  displayName: z.string().min(2, { message: "Display name must be at least 2 characters." }).optional(),
-  email: z.string().email({ message: "Please enter a valid email address." }),
-  password: z.string().min(6, { message: "Password must be at least 6 characters." }),
-  confirmPassword: z.string(),
-}).refine((data) => data.password === data.confirmPassword, {
+  displayName: z.string().optional(),
+  email: z.string().optional(), // Made optional for mock signup
+  password: z.string().optional(), // Made optional for mock signup
+  confirmPassword: z.string().optional(), // Made optional
+}).refine((data) => data.password === data.confirmPassword || (!data.password && !data.confirmPassword), { // Adjusted refine for optional fields
   message: "Passwords don't match",
-  path: ["confirmPassword"], // path of error
+  path: ["confirmPassword"],
 });
 
 type SignupFormValues = z.infer<typeof signupFormSchema>;
@@ -35,10 +35,10 @@ export default function SignupPage() {
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupFormSchema),
     defaultValues: {
-      displayName: "",
-      email: "",
-      password: "",
-      confirmPassword: "",
+      displayName: "Mock User",
+      email: "mock@example.com",
+      password: "password",
+      confirmPassword: "password",
     },
   });
 
@@ -49,11 +49,14 @@ export default function SignupPage() {
   }, [user, router]);
 
   const onSubmit = async (data: SignupFormValues) => {
-    await signupWithEmail(data);
-    // Redirection is handled within signupWithEmail or by useEffect
+    await signupWithEmail({
+        displayName: data.displayName || "Mock User",
+        email: data.email || "mockuser@example.com",
+        password: data.password || "mockpassword"
+    });
   };
   
-  if (user) {
+  if (user && !loading) { // Check loading state as well
     return (
       <div className="flex justify-center items-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -71,7 +74,7 @@ export default function SignupPage() {
           <h1 className="text-2xl font-semibold tracking-tight">{APP_NAME}</h1>
         </div>
         <CardTitle className="text-2xl">Create an account</CardTitle>
-        <CardDescription>Enter your details below to create your account</CardDescription>
+        <CardDescription>Enter any details or just click (mock mode)</CardDescription>
       </CardHeader>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
@@ -81,7 +84,7 @@ export default function SignupPage() {
               name="displayName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Display Name (Optional)</FormLabel>
+                  <FormLabel>Display Name (Optional for Mock)</FormLabel>
                   <FormControl>
                     <Input placeholder="e.g., Jane Doe" {...field} />
                   </FormControl>
@@ -94,7 +97,7 @@ export default function SignupPage() {
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email</FormLabel>
+                  <FormLabel>Email (Optional for Mock)</FormLabel>
                   <FormControl>
                     <Input placeholder="m@example.com" {...field} />
                   </FormControl>
@@ -107,7 +110,7 @@ export default function SignupPage() {
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Password</FormLabel>
+                  <FormLabel>Password (Optional for Mock)</FormLabel>
                   <FormControl>
                     <Input type="password" {...field} />
                   </FormControl>
@@ -120,7 +123,7 @@ export default function SignupPage() {
               name="confirmPassword"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Confirm Password</FormLabel>
+                  <FormLabel>Confirm Password (Optional for Mock)</FormLabel>
                   <FormControl>
                     <Input type="password" {...field} />
                   </FormControl>

@@ -17,8 +17,8 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 const loginFormSchema = z.object({
-  email: z.string().email({ message: "Please enter a valid email address." }),
-  password: z.string().min(1, { message: "Password is required." }),
+  email: z.string().optional(), // Made optional for mock login
+  password: z.string().optional(), // Made optional for mock login
 });
 
 type LoginFormValues = z.infer<typeof loginFormSchema>;
@@ -30,8 +30,8 @@ export default function LoginPage() {
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginFormSchema),
     defaultValues: {
-      email: "",
-      password: "",
+      email: "user@example.com", // Pre-fill for convenience with mock
+      password: "password", // Pre-fill for convenience with mock
     },
   });
 
@@ -42,11 +42,14 @@ export default function LoginPage() {
   }, [user, router]);
 
   const onSubmit = async (data: LoginFormValues) => {
-    await loginWithEmail(data);
-    // Redirection is handled within loginWithEmail or by useEffect
+    // For mock login, we don't strictly need the data, but we pass it anyway
+    await loginWithEmail({
+      email: data.email || "mockuser@example.com", // Provide default if empty
+      password: data.password || "mockpassword"   // Provide default if empty
+    });
   };
   
-  if (user) {
+  if (user && !loading) { // Check loading state as well
     return (
       <div className="flex justify-center items-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -64,7 +67,7 @@ export default function LoginPage() {
           <h1 className="text-2xl font-semibold tracking-tight">{APP_NAME}</h1>
         </div>
         <CardTitle className="text-2xl">Login</CardTitle>
-        <CardDescription>Enter your email below to login to your account</CardDescription>
+        <CardDescription>Enter any details or just click login (mock mode)</CardDescription>
       </CardHeader>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
@@ -74,7 +77,7 @@ export default function LoginPage() {
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email</FormLabel>
+                  <FormLabel>Email (Optional for Mock)</FormLabel>
                   <FormControl>
                     <Input placeholder="m@example.com" {...field} />
                   </FormControl>
@@ -87,7 +90,7 @@ export default function LoginPage() {
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Password</FormLabel>
+                  <FormLabel>Password (Optional for Mock)</FormLabel>
                   <FormControl>
                     <Input type="password" {...field} />
                   </FormControl>
