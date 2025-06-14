@@ -1,5 +1,5 @@
 import type { Category } from '@/lib/types';
-import { Utensils, ShoppingCart, CarFront, Home, Lightbulb, Drama, HeartPulse, ShoppingBag, Archive, Plane, BookOpen, Sparkles, Gift } from 'lucide-react';
+import { Utensils, ShoppingCart, CarFront, Home, Lightbulb, Drama, HeartPulse, ShoppingBag, Archive, Plane, BookOpen, Sparkles, Gift, ReceiptText } from 'lucide-react';
 
 export const APP_NAME = "Trackwise";
 
@@ -16,6 +16,7 @@ export const INITIAL_CATEGORIES: Category[] = [
   { id: 'education', name: 'Education', icon: BookOpen, color: '#FD7E14'},
   { id: 'personal_care', name: 'Personal Care', icon: Sparkles, color: '#F76707'},
   { id: 'gifts', name: 'Gifts & Donations', icon: Gift, color: '#845EF7'},
+  { id: 'household_expenses', name: 'Household Expenses', icon: ReceiptText, color: '#607D8B' }, // New Category
   { id: 'other', name: 'Other', icon: Archive, color: '#6C757D' },
 ];
 

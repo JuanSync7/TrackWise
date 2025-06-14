@@ -58,7 +58,6 @@ export type AppContextType = AppState & {
   addContribution: (contribution: Omit<Contribution, 'id'>) => void;
   getMemberContributions: (memberId: string) => Contribution[];
   getMemberTotalContribution: (memberId: string) => number;
-  // Add more actions as needed, e.g., for categories
 };
 
 export interface NavItem {

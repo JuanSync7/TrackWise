@@ -24,6 +24,7 @@ import { MemberList } from '@/components/household/member-list';
 import { ContributionForm, type ContributionFormValues } from '@/components/household/contribution-form';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
+import { DEFAULT_CURRENCY } from '@/lib/constants';
 
 export default function HouseholdPage() {
   const { members, addMember, deleteMember: contextDeleteMember, addContribution, getMemberTotalContribution } = useAppContext();
@@ -132,9 +133,9 @@ export default function HouseholdPage() {
       }}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Add Contribution</DialogTitle>
+            <DialogTitle>Add Contribution for {selectedMemberForContribution?.name}</DialogTitle>
             <DialogDescription>
-              Record a new contribution from a household member.
+              Record a new contribution from this household member.
             </DialogDescription>
           </DialogHeader>
           <ContributionForm
@@ -157,7 +158,7 @@ export default function HouseholdPage() {
             <AlertDialogDescription>
               This action cannot be undone. This will permanently remove the member and all their associated contributions from the household.
             </AlertDialogDescription>
-          </AlertDialogHeader>
+          </DialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setMemberToDelete(null)}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDeleteMember} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">Delete</AlertDialogAction>
@@ -173,7 +174,7 @@ export default function HouseholdPage() {
                 <Users className="h-6 w-6 text-primary" />
                 Household Members ({members.length})
               </CardTitle>
-              <CardDescription>View and manage your household members and their contributions.</CardDescription>
+              <CardDescription>View and manage your household members and their contributions. Log shared expenses under the &quot;Household Expenses&quot; category.</CardDescription>
             </CardHeader>
             <CardContent>
               <MemberList 
@@ -192,18 +193,18 @@ export default function HouseholdPage() {
                     <DollarSign className="h-6 w-6 text-primary" />
                     Household Pot
                 </CardTitle>
-                <CardDescription>Total contributions from all members.</CardDescription>
+                <CardDescription>Total contributions from all members available for shared expenses.</CardDescription>
             </CardHeader>
             <CardContent>
-                <p className="text-3xl font-bold">${totalHouseholdContributions.toFixed(2)}</p>
-                <p className="text-xs text-muted-foreground mt-1">This is the sum of all recorded contributions.</p>
+                <p className="text-3xl font-bold">{DEFAULT_CURRENCY}{totalHouseholdContributions.toFixed(2)}</p>
+                <p className="text-xs text-muted-foreground mt-1">This is the sum of all recorded contributions. Use the &quot;Household Expenses&quot; category when adding shared expenses.</p>
             </CardContent>
            </Card>
 
           <Card className="mt-6">
             <CardHeader>
                 <CardTitle>Shared Budgeting (Coming Soon)</CardTitle>
-                 <CardDescription>Manage shared household budgets and track group spending.</CardDescription>
+                 <CardDescription>Manage shared household budgets and track group spending against them.</CardDescription>
             </CardHeader>
             <CardContent>
                 <div className="flex flex-col items-center justify-center h-40 text-center">
@@ -216,12 +217,12 @@ export default function HouseholdPage() {
           <Card className="mt-6">
             <CardHeader>
                 <CardTitle>Expense Splitting (Coming Soon)</CardTitle>
-                <CardDescription>Easily split shared expenses among members.</CardDescription>
+                <CardDescription>Easily split shared expenses among members and track reimbursements.</CardDescription>
             </CardHeader>
             <CardContent>
                 <div className="flex flex-col items-center justify-center h-40 text-center">
                     <img src="https://placehold.co/300x150.png" data-ai-hint="shared finances" alt="Coming soon" className="mb-4 rounded-lg opacity-70" />
-                    <p className="text-muted-foreground text-sm">Tools for dividing bills and tracking reimbursements will be available soon.</p>
+                    <p className="text-muted-foreground text-sm">Tools for dividing bills and tracking individual shares will be available soon.</p>
                 </div>
             </CardContent>
           </Card>
