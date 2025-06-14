@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -20,13 +21,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { BudgetGoalPieChart } from '@/components/dashboard/budget-goal-pie-chart';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+
 
 export default function BudgetsPage() {
   const { budgetGoals, addBudgetGoal, updateBudgetGoal, deleteBudgetGoal: contextDeleteBudget } = useAppContext();
   const { toast } = useToast();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingBudget, setEditingBudget] = useState<BudgetGoal | undefined>(undefined); // For future edit functionality
+  const [editingBudget, setEditingBudget] = useState<BudgetGoal | undefined>(undefined); 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [budgetToDelete, setBudgetToDelete] = useState<string | null>(null);
 
@@ -123,6 +127,12 @@ export default function BudgetsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {budgetGoals.length > 0 && (
+        <div className="mb-6">
+          <BudgetGoalPieChart />
+        </div>
+      )}
 
       <BudgetList 
         budgetGoals={budgetGoals}

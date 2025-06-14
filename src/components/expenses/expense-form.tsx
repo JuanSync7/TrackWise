@@ -25,8 +25,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import type { Expense, SharedBudget, Member } from "@/lib/types";
 import { useAppContext } from "@/contexts/app-context";
+import { useAuth } from "@/contexts/auth-context";
 import { format } from "date-fns";
-import { useEffect, useState, useCallback }  from "react";
+import { useEffect, useState, useCallback, useMemo }  from "react";
 import { suggestExpenseCategory, type SuggestExpenseCategoryInput, type SuggestExpenseCategoryOutput } from "@/ai/flows/suggest-expense-category";
 import { useToast } from "@/hooks/use-toast";
 import { CategoryIcon } from '@/components/shared/category-icon';
@@ -84,6 +85,7 @@ const NONE_SHARED_BUDGET_VALUE = "__NONE__";
 
 export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: ExpenseFormProps) {
   const { categories, getCategoryById, sharedBudgets, members } = useAppContext();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [aiSuggestion, setAiSuggestion] = useState<SuggestExpenseCategoryOutput | null>(null);
   const [isSuggesting, setIsSuggesting] = useState(false);
@@ -116,7 +118,23 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
 
   const watchedDescription = form.watch("description");
   const watchedIsSplit = form.watch("isSplit");
+  const watchedPaidByMemberId = form.watch("paidByMemberId");
   const watchedSplitWithMemberIds = form.watch("splitWithMemberIds");
+
+  const currentUserMember = useMemo(() => {
+    if (!user || !members) return null;
+    return members.find(m => 
+      (user.displayName && m.name.toLowerCase().includes(user.displayName.toLowerCase())) ||
+      (user.email && m.name.toLowerCase().includes(user.email.split('@')[0].toLowerCase()))
+    );
+  }, [user, members]);
+
+  useEffect(() => {
+    if (watchedIsSplit && !watchedPaidByMemberId && currentUserMember && !expense) { // Only default for new expenses
+      form.setValue("paidByMemberId", currentUserMember.id, { shouldValidate: true });
+    }
+  }, [watchedIsSplit, watchedPaidByMemberId, currentUserMember, form, expense]);
+
 
   const handleSuggestCategory = useCallback(async () => {
     if (!watchedDescription || watchedDescription.length < 3) return;
@@ -413,6 +431,11 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
                         if (!checked) {
                           form.setValue("paidByMemberId", "");
                           form.setValue("splitWithMemberIds", []);
+                        } else {
+                           // Default to current user if they are a member when 'isSplit' is checked
+                           if (currentUserMember && !form.getValues("paidByMemberId")) {
+                            form.setValue("paidByMemberId", currentUserMember.id, { shouldValidate: true });
+                          }
                         }
                       }}
                     />
