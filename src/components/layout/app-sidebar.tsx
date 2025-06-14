@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -59,10 +60,11 @@ export function AppSidebar() {
                       : "hover:bg-accent/50"
                   )}
                 >
-                  <a>
+                  {/* The SidebarMenuButton with asChild will pass its props to this span */}
+                  <span>
                     <item.icon className="h-5 w-5" />
                     <span>{item.title}</span>
-                  </a>
+                  </span>
                 </SidebarMenuButton>
               </Link>
             </SidebarMenuItem>
