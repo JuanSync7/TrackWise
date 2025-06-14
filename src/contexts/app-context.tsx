@@ -7,7 +7,7 @@ import type { Expense, Category, BudgetGoal, AppState, AppContextType, Member, C
 import { INITIAL_CATEGORIES, HOUSEHOLD_EXPENSE_CATEGORY_ID } from '@/lib/constants';
 import useLocalStorage from '@/hooks/use-local-storage';
 import { v4 as uuidv4 } from 'uuid'; // For generating unique IDs
-import { formatISO, parseISO } from 'date-fns';
+import { formatISO, parseISO, subDays, isWithinInterval } from 'date-fns';
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
@@ -141,6 +141,42 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setShoppingListItems(prev => prev.filter(item => item.id !== itemId));
   };
 
+  const copyLastWeeksPurchasedItems = useCallback(() => {
+    const today = new Date();
+    const fourteenDaysAgo = subDays(today, 14);
+    
+    const recentPurchasedItems = shoppingListItems.filter(item => {
+      if (!item.isPurchased) return false;
+      try {
+        const addedDate = parseISO(item.addedAt);
+        return isWithinInterval(addedDate, { start: fourteenDaysAgo, end: today });
+      } catch (e) {
+        return false; 
+      }
+    });
+
+    const currentUnpurchasedNames = shoppingListItems
+      .filter(item => !item.isPurchased)
+      .map(item => item.itemName.toLowerCase());
+
+    const itemsToAdd: ShoppingListItem[] = recentPurchasedItems
+      .filter(item => !currentUnpurchasedNames.includes(item.itemName.toLowerCase()))
+      .map(item => ({
+        id: uuidv4(),
+        itemName: item.itemName,
+        quantity: item.quantity,
+        notes: item.notes,
+        isPurchased: false,
+        addedAt: formatISO(new Date()),
+      }));
+
+    if (itemsToAdd.length > 0) {
+      setShoppingListItems(prev => [...itemsToAdd, ...prev]);
+    }
+    return itemsToAdd.length;
+  }, [shoppingListItems, setShoppingListItems]);
+
+
   const addSharedBudget = (budget: Omit<SharedBudget, 'id' | 'createdAt' | 'currentSpending'>) => {
     const newSharedBudget: SharedBudget = {
       ...budget,
@@ -221,7 +257,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return { ...goal, currentSpending };
       })
     );
-  }, [expenses, setBudgetGoals]); // setBudgetGoals dependency is okay here as it's setting a different piece of state
+  }, [expenses, setBudgetGoals]); 
 
   React.useEffect(() => {
     setSharedBudgets(prevSharedBudgets => {
@@ -236,10 +272,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
         return { ...sharedBudget, currentSpending: newCurrentSpending };
       });
-      // Only update state if any currentSpending value actually changed to avoid unnecessary re-renders
       return hasChanged ? newSharedBudgets : prevSharedBudgets;
     });
-  }, [expenses]); // Now only depends on expenses for recalculating currentSpending
+  }, [expenses, setSharedBudgets]);
 
 
   const value: AppContextType = {
@@ -268,6 +303,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     editShoppingListItem,
     toggleShoppingListItemPurchased,
     deleteShoppingListItem,
+    copyLastWeeksPurchasedItems,
     addSharedBudget,
     updateSharedBudget,
     deleteSharedBudget,
@@ -289,4 +325,3 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
-

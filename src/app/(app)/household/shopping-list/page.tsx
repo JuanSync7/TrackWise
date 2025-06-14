@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { PageHeader } from '@/components/shared/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, CopyCheck } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useAppContext } from '@/contexts/app-context';
@@ -14,7 +14,7 @@ import { ShoppingListItemForm } from '@/components/household/shopping-list-item-
 import { ShoppingList } from '@/components/household/shopping-list';
 
 export default function ShoppingListPage() {
-  const { shoppingListItems, addShoppingListItem, editShoppingListItem, deleteShoppingListItem: contextDeleteShoppingListItem, toggleShoppingListItemPurchased } = useAppContext();
+  const { shoppingListItems, addShoppingListItem, editShoppingListItem, deleteShoppingListItem: contextDeleteShoppingListItem, toggleShoppingListItemPurchased, copyLastWeeksPurchasedItems } = useAppContext();
   const { toast } = useToast();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -71,15 +71,29 @@ export default function ShoppingListPage() {
     setIsFormOpen(true);
   };
 
+  const handleCopyItems = () => {
+    const count = copyLastWeeksPurchasedItems();
+    if (count > 0) {
+      toast({ title: "Items Copied", description: `${count} item(s) from recent purchases were added to your list.` });
+    } else {
+      toast({ title: "No Items to Copy", description: "No recently purchased items found to copy to the list." });
+    }
+  };
+
   return (
     <div className="container mx-auto">
       <PageHeader
         title="Household Shopping List"
         description="Manage items your household needs to buy together."
         actions={
-          <Button onClick={openFormForNew}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Add New Item
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={handleCopyItems} variant="outline">
+              <CopyCheck className="mr-2 h-4 w-4" /> Add Recent Purchases
+            </Button>
+            <Button onClick={openFormForNew}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Add New Item
+            </Button>
+          </div>
         }
       />
 

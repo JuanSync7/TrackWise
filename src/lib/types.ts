@@ -104,6 +104,7 @@ export type AppContextType = AppState & {
   editShoppingListItem: (item: Pick<ShoppingListItem, 'id' | 'itemName' | 'quantity' | 'notes'>) => void;
   toggleShoppingListItemPurchased: (itemId: string) => void;
   deleteShoppingListItem: (itemId: string) => void;
+  copyLastWeeksPurchasedItems: () => number; // Returns number of items copied
   addSharedBudget: (budget: Omit<SharedBudget, 'id' | 'createdAt' | 'currentSpending'>) => void;
   updateSharedBudget: (budget: SharedBudget) => void;
   deleteSharedBudget: (budgetId: string) => void;

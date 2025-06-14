@@ -6,20 +6,33 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Edit3, Trash2, ShoppingBag } from 'lucide-react';
+import { MoreHorizontal, Edit3, Trash2, ShoppingBag, MinusCircle, PlusCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNowStrict } from 'date-fns';
 
-
 interface ShoppingListItemProps {
   item: ShoppingListItemType;
-  onEdit: (item: ShoppingListItemType) => void;
+  onEdit: (item: Pick<ShoppingListItemType, 'id' | 'itemName' | 'quantity' | 'notes'>) => void;
   onDelete: (itemId: string) => void;
   onTogglePurchased: (itemId: string) => void;
 }
 
 export function ShoppingListItem({ item, onEdit, onDelete, onTogglePurchased }: ShoppingListItemProps) {
   const timeAgo = formatDistanceToNowStrict(new Date(item.addedAt), { addSuffix: true });
+
+  const isNumericQuantity = /^\d+$/.test(item.quantity);
+
+  const handleQuantityChange = (increment: boolean) => {
+    if (!isNumericQuantity) return;
+    const currentVal = parseInt(item.quantity, 10);
+    const newVal = increment ? currentVal + 1 : Math.max(1, currentVal - 1);
+    onEdit({
+      id: item.id,
+      itemName: item.itemName,
+      quantity: String(newVal),
+      notes: item.notes,
+    });
+  };
 
   return (
     <Card className={cn("overflow-hidden transition-shadow hover:shadow-md", item.isPurchased && "bg-muted/50 opacity-70")}>
@@ -41,10 +54,21 @@ export function ShoppingListItem({ item, onEdit, onDelete, onTogglePurchased }: 
             >
               {item.itemName}
             </label>
-            <div className="text-xs text-muted-foreground space-x-2">
-                {item.quantity && <span>Qty: {item.quantity}</span>}
-                {item.quantity && item.notes && <span>&bull;</span>}
-                {item.notes && <span className="italic truncate" title={item.notes}>{item.notes}</span>}
+            <div className="text-xs text-muted-foreground flex items-center gap-2">
+              {!item.isPurchased && isNumericQuantity && (
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleQuantityChange(false)} disabled={parseInt(item.quantity, 10) <= 1}>
+                    <MinusCircle className="h-3 w-3" />
+                  </Button>
+                  <span>Qty: {item.quantity}</span>
+                  <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleQuantityChange(true)}>
+                    <PlusCircle className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
+              {(!isNumericQuantity || item.isPurchased) && item.quantity && <span>Qty: {item.quantity}</span>}
+              {item.quantity && item.notes && <span>&bull;</span>}
+              {item.notes && <span className="italic truncate" title={item.notes}>{item.notes}</span>}
             </div>
              <p className="text-xs text-muted-foreground mt-0.5">Added {timeAgo}</p>
           </div>
