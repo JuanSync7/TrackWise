@@ -23,7 +23,7 @@ export default function ShoppingListPage() {
     deleteShoppingListItem: contextDeleteShoppingListItem, 
     toggleShoppingListItemPurchased, 
     copyLastWeeksPurchasedItems,
-    setExpensePrefillData 
+    // setExpensePrefillData // Removed as it's not in context
   } = useAppContext();
   const { toast } = useToast();
 
@@ -97,10 +97,10 @@ export default function ShoppingListPage() {
     setIsFormOpen(true);
   }, []);
 
-
-  useEffect(() => {
-    setExpensePrefillData(null); 
-  }, [setExpensePrefillData]);
+  // Removed useEffect that called non-existent setExpensePrefillData
+  // useEffect(() => {
+  //   setExpensePrefillData(null); 
+  // }, [setExpensePrefillData]);
 
 
   const handleCopyItems = () => {
@@ -201,3 +201,4 @@ export default function ShoppingListPage() {
     </div>
   );
 }
+
