@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import React, { createContext, useContext } from 'react';
-import type { Expense, Category, BudgetGoal, AppState, AppContextType, Member } from '@/lib/types';
+import type { Expense, Category, BudgetGoal, AppState, AppContextType, Member, Contribution } from '@/lib/types';
 import { INITIAL_CATEGORIES } from '@/lib/constants';
 import useLocalStorage from '@/hooks/use-local-storage';
 import { v4 as uuidv4 } from 'uuid'; // For generating unique IDs
@@ -14,6 +14,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [categories, setCategories] = useLocalStorage<Category[]>('trackwise_categories', INITIAL_CATEGORIES);
   const [budgetGoals, setBudgetGoals] = useLocalStorage<BudgetGoal[]>('trackwise_budget_goals', []);
   const [members, setMembers] = useLocalStorage<Member[]>('trackwise_members', []);
+  const [contributions, setContributions] = useLocalStorage<Contribution[]>('trackwise_contributions', []);
 
   const addExpense = (expense: Omit<Expense, 'id'>) => {
     setExpenses(prev => [...prev, { ...expense, id: uuidv4() }]);
@@ -46,10 +47,30 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const addMember = (member: Omit<Member, 'id'>) => {
     setMembers(prev => [...prev, { ...member, id: uuidv4() }]);
   };
+  
+  const deleteMemberContributions = (memberId: string) => {
+    setContributions(prev => prev.filter(contrib => contrib.memberId !== memberId));
+  };
 
   const deleteMember = (memberId: string) => {
+    deleteMemberContributions(memberId); // Also delete their contributions
     setMembers(prev => prev.filter(mem => mem.id !== memberId));
   };
+
+  const addContribution = (contribution: Omit<Contribution, 'id'>) => {
+    setContributions(prev => [...prev, { ...contribution, id: uuidv4() }]);
+  };
+
+  const getMemberContributions = (memberId: string): Contribution[] => {
+    return contributions.filter(contrib => contrib.memberId === memberId);
+  };
+  
+  const getMemberTotalContribution = (memberId: string): number => {
+    return contributions
+      .filter(contrib => contrib.memberId === memberId)
+      .reduce((sum, contrib) => sum + contrib.amount, 0);
+  };
+
 
   // Recalculate currentSpending for budget goals whenever expenses change
   React.useEffect(() => {
@@ -72,6 +93,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     categories,
     budgetGoals,
     members,
+    contributions,
     addExpense,
     updateExpense,
     deleteExpense,
@@ -81,6 +103,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     getCategoryById,
     addMember,
     deleteMember,
+    addContribution,
+    getMemberContributions,
+    getMemberTotalContribution,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

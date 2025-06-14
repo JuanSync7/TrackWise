@@ -29,11 +29,20 @@ export interface Member {
   name: string;
 }
 
+export interface Contribution {
+  id: string;
+  memberId: string;
+  amount: number;
+  date: string; // ISO string date
+  notes?: string;
+}
+
 export interface AppState {
   expenses: Expense[];
   categories: Category[];
   budgetGoals: BudgetGoal[];
   members: Member[];
+  contributions: Contribution[];
 }
 
 export type AppContextType = AppState & {
@@ -46,6 +55,9 @@ export type AppContextType = AppState & {
   getCategoryById: (categoryId: string) => Category | undefined;
   addMember: (member: Omit<Member, 'id'>) => void;
   deleteMember: (memberId: string) => void;
+  addContribution: (contribution: Omit<Contribution, 'id'>) => void;
+  getMemberContributions: (memberId: string) => Contribution[];
+  getMemberTotalContribution: (memberId: string) => number;
   // Add more actions as needed, e.g., for categories
 };
 

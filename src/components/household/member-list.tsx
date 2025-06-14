@@ -9,9 +9,10 @@ import { Users } from 'lucide-react';
 interface MemberListProps {
   members: Member[];
   onDeleteMember: (memberId: string) => void;
+  onAddContribution: (memberId: string) => void;
 }
 
-export function MemberList({ members, onDeleteMember }: MemberListProps) {
+export function MemberList({ members, onDeleteMember, onAddContribution }: MemberListProps) {
   if (members.length === 0) {
     return (
       <div className="text-center py-10 border-2 border-dashed border-muted-foreground/30 rounded-lg mt-6">
@@ -37,6 +38,7 @@ export function MemberList({ members, onDeleteMember }: MemberListProps) {
             <MemberItem
               member={member}
               onDelete={onDeleteMember}
+              onAddContribution={onAddContribution}
             />
           </motion.div>
         ))}
