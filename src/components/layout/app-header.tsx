@@ -3,7 +3,7 @@
 
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { Menu, Search, UserCircle, LogOutIcon, SettingsIcon } from "lucide-react";
+import { Menu, Search, UserCircle, LogOutIcon, SettingsIcon, ArrowLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
@@ -16,18 +16,28 @@ export function AppHeader() {
 
   const handleLogout = async () => {
     await logout();
-    // Redirection is handled within the logout function in AuthContext
   };
 
   const handleGoToSettings = () => {
     router.push('/settings');
-  }
+  };
+
+  const handleGoBack = () => {
+    router.back();
+  };
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6 shadow-sm">
-      <div className="md:hidden">
-        <SidebarTrigger />
+      <div className="flex items-center gap-2">
+        <div className="md:hidden">
+          <SidebarTrigger />
+        </div>
+        <Button variant="ghost" size="icon" onClick={handleGoBack} className="h-8 w-8">
+          <ArrowLeft className="h-5 w-5" />
+          <span className="sr-only">Go back</span>
+        </Button>
       </div>
+      
       <div className="flex w-full items-center gap-4 md:ml-auto md:gap-2 lg:gap-4">
         <form className="ml-auto flex-1 sm:flex-initial">
           <div className="relative">
