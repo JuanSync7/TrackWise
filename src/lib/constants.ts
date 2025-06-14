@@ -1,7 +1,10 @@
+
 import type { Category } from '@/lib/types';
 import { Utensils, ShoppingCart, CarFront, Home, Lightbulb, Drama, HeartPulse, ShoppingBag, Archive, Plane, BookOpen, Sparkles, Gift, ReceiptText } from 'lucide-react';
 
 export const APP_NAME = "Trackwise";
+
+export const HOUSEHOLD_EXPENSE_CATEGORY_ID = 'household_expenses';
 
 export const INITIAL_CATEGORIES: Category[] = [
   { id: 'food', name: 'Food', icon: Utensils, color: '#FF6384' },
@@ -16,8 +19,9 @@ export const INITIAL_CATEGORIES: Category[] = [
   { id: 'education', name: 'Education', icon: BookOpen, color: '#FD7E14'},
   { id: 'personal_care', name: 'Personal Care', icon: Sparkles, color: '#F76707'},
   { id: 'gifts', name: 'Gifts & Donations', icon: Gift, color: '#845EF7'},
-  { id: 'household_expenses', name: 'Household Expenses', icon: ReceiptText, color: '#607D8B' }, // New Category
+  { id: HOUSEHOLD_EXPENSE_CATEGORY_ID, name: 'Household Expenses', icon: ReceiptText, color: '#607D8B' },
   { id: 'other', name: 'Other', icon: Archive, color: '#6C757D' },
 ];
 
 export const DEFAULT_CURRENCY = '$'; // Or your preferred currency symbol
+

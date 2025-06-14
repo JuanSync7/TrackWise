@@ -99,6 +99,7 @@ export type AppContextType = AppState & {
   addContribution: (contribution: Omit<Contribution, 'id'>) => void;
   getMemberContributions: (memberId: string) => Contribution[];
   getMemberTotalContribution: (memberId: string) => number;
+  getTotalHouseholdSpending: () => number;
   addShoppingListItem: (item: Omit<ShoppingListItem, 'id' | 'isPurchased' | 'addedAt'>) => void;
   editShoppingListItem: (item: Pick<ShoppingListItem, 'id' | 'itemName' | 'quantity' | 'notes'>) => void;
   toggleShoppingListItemPurchased: (itemId: string) => void;
@@ -120,3 +121,4 @@ export interface NavItem {
   label?: string;
   variant?: 'default' | 'ghost';
 }
+

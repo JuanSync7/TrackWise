@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { PageHeader } from '@/components/shared/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Users, DollarSign, ClipboardList, WalletCards, DivideSquare } from 'lucide-react';
+import { PlusCircle, Users, DollarSign, ClipboardList, WalletCards, DivideSquare, TrendingDown, TrendingUp, Banknote } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -23,12 +23,14 @@ import { MemberForm } from '@/components/household/member-form';
 import { MemberList } from '@/components/household/member-list';
 import { ContributionForm, type ContributionFormValues } from '@/components/household/contribution-form';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
 import { format } from 'date-fns';
 import { DEFAULT_CURRENCY } from '@/lib/constants';
 import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
 export default function HouseholdPage() {
-  const { members, addMember, deleteMember: contextDeleteMember, addContribution, getMemberTotalContribution } = useAppContext();
+  const { members, addMember, deleteMember: contextDeleteMember, addContribution, getMemberTotalContribution, getTotalHouseholdSpending } = useAppContext();
   const { toast } = useToast();
 
   const [isMemberFormOpen, setIsMemberFormOpen] = useState(false);
@@ -97,6 +99,10 @@ export default function HouseholdPage() {
   };
   
   const totalHouseholdContributions = members.reduce((sum, member) => sum + getMemberTotalContribution(member.id), 0);
+  const totalPotSpending = getTotalHouseholdSpending();
+  const remainingInPot = totalHouseholdContributions - totalPotSpending;
+  const potUsagePercentage = totalHouseholdContributions > 0 ? Math.min((totalPotSpending / totalHouseholdContributions) * 100, 100) : 0;
+
 
   return (
     <div className="container mx-auto">
@@ -188,14 +194,32 @@ export default function HouseholdPage() {
            <Card>
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                    <DollarSign className="h-6 w-6 text-primary" />
-                    Household Pot
+                    <Banknote className="h-6 w-6 text-primary" />
+                    Household Pot Summary
                 </CardTitle>
-                <CardDescription>Total contributions from all members available for shared expenses.</CardDescription>
+                <CardDescription>Overview of the collective household funds and their usage.</CardDescription>
             </CardHeader>
-            <CardContent>
-                <p className="text-3xl font-bold">{DEFAULT_CURRENCY}{totalHouseholdContributions.toFixed(2)}</p>
-                <p className="text-xs text-muted-foreground mt-1">This is the sum of all recorded contributions. Use the &quot;Household Expenses&quot; category or split expenses for shared costs.</p>
+            <CardContent className="space-y-3">
+                <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground flex items-center gap-1.5"><TrendingUp className="h-4 w-4 text-accent"/>Total Contributions:</span>
+                    <span className="font-semibold text-accent">{DEFAULT_CURRENCY}{totalHouseholdContributions.toFixed(2)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground flex items-center gap-1.5"><TrendingDown className="h-4 w-4 text-destructive"/>Total Shared Spending:</span>
+                    <span className="font-semibold text-destructive">{DEFAULT_CURRENCY}{totalPotSpending.toFixed(2)}</span>
+                </div>
+                 <hr className="my-1 border-border"/>
+                <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold">Remaining in Pot:</span>
+                    <span className={cn("font-bold text-lg", remainingInPot >=0 ? "text-primary" : "text-destructive")}>{DEFAULT_CURRENCY}{remainingInPot.toFixed(2)}</span>
+                </div>
+                {totalHouseholdContributions > 0 && (
+                    <div>
+                        <Progress value={potUsagePercentage} className="h-2 mt-1" aria-label={`Pot usage ${potUsagePercentage.toFixed(0)}%`}/>
+                        <p className="text-xs text-muted-foreground mt-1 text-right">{potUsagePercentage.toFixed(0)}% of pot used.</p>
+                    </div>
+                )}
+                <p className="text-xs text-muted-foreground pt-1">Shared spending includes expenses linked to Shared Budgets and those categorized as 'Household Expenses'.</p>
             </CardContent>
            </Card>
 
@@ -228,7 +252,7 @@ export default function HouseholdPage() {
                  <CardDescription>Create and manage budgets for shared household expenses.</CardDescription>
             </CardHeader>
             <CardContent>
-                <p className="text-sm text-muted-foreground">Define spending targets for categories like groceries, utilities, or rent that are shared by the household.</p>
+                <p className="text-sm text-muted-foreground">Define spending targets for categories like groceries, utilities, or rent that are shared by the household. Track spending against these directly.</p>
             </CardContent>
             <CardFooter>
                <Link href="/household/shared-budgets" className="w-full">
@@ -263,3 +287,4 @@ export default function HouseholdPage() {
     </div>
   );
 }
+

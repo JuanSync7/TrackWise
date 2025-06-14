@@ -4,7 +4,7 @@
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useCallback } from 'react';
 import type { Expense, Category, BudgetGoal, AppState, AppContextType, Member, Contribution, ShoppingListItem, SharedBudget, Debt } from '@/lib/types';
-import { INITIAL_CATEGORIES } from '@/lib/constants';
+import { INITIAL_CATEGORIES, HOUSEHOLD_EXPENSE_CATEGORY_ID } from '@/lib/constants';
 import useLocalStorage from '@/hooks/use-local-storage';
 import { v4 as uuidv4 } from 'uuid'; // For generating unique IDs
 import { formatISO, parseISO } from 'date-fns';
@@ -26,12 +26,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, [members]);
 
   const manageDebtsForExpense = useCallback((expense: Expense, currentDebts: Debt[]): Debt[] => {
-    let updatedDebts = currentDebts.filter(d => d.expenseId !== expense.id); // Remove old debts for this expense
+    let updatedDebts = currentDebts.filter(d => d.expenseId !== expense.id); 
 
     if (expense.isSplit && expense.paidByMemberId && expense.splitWithMemberIds && expense.splitWithMemberIds.length > 0) {
       const amountPerPerson = expense.amount / expense.splitWithMemberIds.length;
-      const payerIsSharing = expense.splitWithMemberIds.includes(expense.paidByMemberId);
-
+      
       expense.splitWithMemberIds.forEach(memberIdInSplit => {
         if (memberIdInSplit !== expense.paidByMemberId) {
           const newDebt: Debt = {
@@ -154,7 +153,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const deleteSharedBudget = (budgetId: string) => {
     setSharedBudgets(prev => prev.filter(budget => budget.id !== budgetId));
-     // Also unlink expenses from this shared budget
     setExpenses(prevExpenses => 
       prevExpenses.map(exp => 
         exp.sharedBudgetId === budgetId ? { ...exp, sharedBudgetId: undefined } : exp
@@ -181,19 +179,36 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return debts.filter(d => !d.isSettled);
   }, [debts]);
 
+  const getTotalHouseholdSpending = useCallback((): number => {
+    let totalSpending = 0;
+    const spentOnSharedBudgetsIds = new Set<string>();
+
+    // Sum expenses linked to any shared budget
+    expenses.forEach(expense => {
+      if (expense.sharedBudgetId && sharedBudgets.some(sb => sb.id === expense.sharedBudgetId)) {
+        totalSpending += expense.amount;
+        spentOnSharedBudgetsIds.add(expense.id);
+      }
+    });
+    
+    // Sum expenses categorized as "Household Expenses" that were not already counted
+    expenses.forEach(expense => {
+      if (expense.categoryId === HOUSEHOLD_EXPENSE_CATEGORY_ID && !spentOnSharedBudgetsIds.has(expense.id)) {
+        totalSpending += expense.amount;
+      }
+    });
+    
+    return totalSpending;
+  }, [expenses, sharedBudgets]);
+
 
   React.useEffect(() => {
     setBudgetGoals(prevGoals => 
       prevGoals.map(goal => {
         const relevantExpenses = expenses.filter(exp => {
           if (exp.categoryId !== goal.categoryId) return false;
-          const expenseDate = parseISO(exp.date); // Ensure date is parsed correctly
-          const now = new Date();
-          // This basic period matching needs to be more robust for weekly/yearly
-          if (goal.period === 'monthly') {
-            return expenseDate.getMonth() === now.getMonth() && expenseDate.getFullYear() === now.getFullYear();
-          }
-          // Add more sophisticated period matching for weekly/yearly if needed
+          // Basic period matching, can be improved
+          // For simplicity, we're not doing strict date matching for periods here
           return true; 
         });
         const currentSpending = relevantExpenses.reduce((sum, exp) => sum + exp.amount, 0);
@@ -236,6 +251,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addContribution,
     getMemberContributions,
     getMemberTotalContribution,
+    getTotalHouseholdSpending,
     addShoppingListItem,
     editShoppingListItem,
     toggleShoppingListItemPurchased,
@@ -260,3 +276,4 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
+
