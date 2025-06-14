@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { PageHeader } from '@/components/shared/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Users, DollarSign, ClipboardList, WalletCards, DivideSquare, TrendingDown, TrendingUp, Banknote } from 'lucide-react';
+import { PlusCircle, Users, DollarSign, ClipboardList, WalletCards, DivideSquare, TrendingDown, TrendingUp, Banknote, ListChecks } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -110,9 +110,16 @@ export default function HouseholdPage() {
         title="Household Management"
         description="Manage members, track contributions, and oversee shared finances."
         actions={
-          <Button onClick={openMemberFormForNew}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Add New Member
-          </Button>
+          <div className="flex gap-2">
+            <Link href="/expenses" passHref>
+              <Button variant="outline">
+                <ListChecks className="mr-2 h-4 w-4" /> Add Shared Expense
+              </Button>
+            </Link>
+            <Button onClick={openMemberFormForNew}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Add New Member
+            </Button>
+          </div>
         }
       />
       
@@ -178,7 +185,7 @@ export default function HouseholdPage() {
                 <Users className="h-6 w-6 text-primary" />
                 Household Members ({members.length})
               </CardTitle>
-              <CardDescription>View and manage your household members and their contributions. Log shared expenses under the &quot;Household Expenses&quot; category, or use the split expense feature.</CardDescription>
+              <CardDescription>View and manage your household members and their contributions. Log shared expenses under the &quot;Household Expenses&quot; category, or use the split expense feature by clicking &quot;Add Shared Expense&quot; above.</CardDescription>
             </CardHeader>
             <CardContent>
               <MemberList 

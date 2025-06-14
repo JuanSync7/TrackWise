@@ -17,7 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Check, ChevronsUpDown, Sparkles as AiSparklesIcon, Users, Landmark } from "lucide-react";
+import { CalendarIcon, Check, ChevronsUpDown, Sparkles as AiSparklesIcon, Users, Landmark, CheckSquare, Square } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -29,7 +29,7 @@ import { format } from "date-fns";
 import { useEffect, useState, useCallback }  from "react";
 import { suggestExpenseCategory, type SuggestExpenseCategoryInput, type SuggestExpenseCategoryOutput } from "@/ai/flows/suggest-expense-category";
 import { useToast } from "@/hooks/use-toast";
-import { CategoryIcon } from "@/components/shared/category-icon";
+import { CategoryIcon } from '@/components/shared/category-icon';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -94,7 +94,7 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
       ? { 
           ...expense, 
           date: new Date(expense.date), 
-          sharedBudgetId: expense.sharedBudgetId || "",
+          sharedBudgetId: expense.sharedBudgetId || NONE_SHARED_BUDGET_VALUE,
           isSplit: expense.isSplit || false,
           paidByMemberId: expense.paidByMemberId || "",
           splitWithMemberIds: expense.splitWithMemberIds || [],
@@ -105,7 +105,7 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
           date: new Date(), 
           categoryId: "", 
           notes: "", 
-          sharedBudgetId: "",
+          sharedBudgetId: NONE_SHARED_BUDGET_VALUE,
           isSplit: false,
           paidByMemberId: "",
           splitWithMemberIds: [],
@@ -114,6 +114,7 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
 
   const watchedDescription = form.watch("description");
   const watchedIsSplit = form.watch("isSplit");
+  const watchedSplitWithMemberIds = form.watch("splitWithMemberIds");
 
   const handleSuggestCategory = useCallback(async () => {
     if (!watchedDescription || watchedDescription.length < 3) return;
@@ -151,16 +152,37 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
   function onSubmit(data: ExpenseFormValues) {
     const dataToSave: ExpenseFormValues = {
       ...data,
-      sharedBudgetId: data.sharedBudgetId === "" || data.sharedBudgetId === NONE_SHARED_BUDGET_VALUE ? undefined : data.sharedBudgetId,
+      sharedBudgetId: data.sharedBudgetId === NONE_SHARED_BUDGET_VALUE ? undefined : data.sharedBudgetId,
       paidByMemberId: data.isSplit && data.paidByMemberId ? data.paidByMemberId : undefined,
       splitWithMemberIds: data.isSplit && data.splitWithMemberIds ? data.splitWithMemberIds : [],
     };
     onSave(dataToSave);
-    form.reset();
+    form.reset({
+      description: "", 
+      amount: 0, 
+      date: new Date(), 
+      categoryId: "", 
+      notes: "", 
+      sharedBudgetId: NONE_SHARED_BUDGET_VALUE,
+      isSplit: false,
+      paidByMemberId: "",
+      splitWithMemberIds: [],
+    });
     setAiSuggestion(null);
   }
   
   const selectedCategory = getCategoryById(form.watch("categoryId"));
+
+  const handleSelectAllSplitMembers = (checked: boolean) => {
+    if (checked) {
+      form.setValue("splitWithMemberIds", members.map(m => m.id), { shouldValidate: true });
+    } else {
+      form.setValue("splitWithMemberIds", [], { shouldValidate: true });
+    }
+  };
+
+  const areAllMembersSelected = members.length > 0 && watchedSplitWithMemberIds?.length === members.length;
+
 
   return (
     <Form {...form}>
@@ -344,7 +366,7 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Link to Shared Budget (Optional)</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value || ""}>
+                <Select onValueChange={field.onChange} value={field.value || NONE_SHARED_BUDGET_VALUE}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Select a shared budget" />
@@ -424,8 +446,23 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
                   name="splitWithMemberIds"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Split With Whom?</FormLabel>
-                       <FormDescription>Select all members who are sharing this expense (including the payer if they are also sharing the cost).</FormDescription>
+                      <div className="mb-2 flex items-center justify-between">
+                        <div>
+                            <FormLabel>Split With Whom?</FormLabel>
+                            <FormDescription>Select all members sharing this expense (including payer).</FormDescription>
+                        </div>
+                        <Button 
+                            type="button" 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => handleSelectAllSplitMembers(!areAllMembersSelected)}
+                            disabled={members.length === 0}
+                            className="ml-auto"
+                        >
+                            {areAllMembersSelected ? <CheckSquare className="mr-2 h-4 w-4" /> : <Square className="mr-2 h-4 w-4" />}
+                            {areAllMembersSelected ? 'Deselect All' : 'Select All'}
+                        </Button>
+                      </div>
                       <ScrollArea className="h-32 w-full rounded-md border p-2">
                         {members.map((member) => (
                           <FormField

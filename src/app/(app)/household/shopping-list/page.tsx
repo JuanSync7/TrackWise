@@ -1,19 +1,19 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from 'react'; // Added useEffect, useCallback
+import { useState, useEffect, useCallback } from 'react';
 import { PageHeader } from '@/components/shared/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, CopyCheck, MilkIcon, EggIcon, SandwichIcon, Zap } from 'lucide-react';
+import { PlusCircle, CopyCheck, MilkIcon, EggIcon, SandwichIcon, Zap, Apple, Banana, Drumstick, Grape, Layers } from 'lucide-react'; // Added new icons
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAppContext } from '@/contexts/app-context';
 import { useToast } from "@/hooks/use-toast";
-import type { ShoppingListItem, Expense } from '@/lib/types'; // Added Expense type
+import type { ShoppingListItem, Expense } from '@/lib/types';
 import { ShoppingListItemForm } from '@/components/household/shopping-list-item-form';
 import { ShoppingList } from '@/components/household/shopping-list';
-import type { ExpenseFormValues } from '@/components/expenses/expense-form'; // For prefill type
+import type { ExpenseFormValues } from '@/components/expenses/expense-form';
 
 export default function ShoppingListPage() {
   const { 
@@ -23,8 +23,7 @@ export default function ShoppingListPage() {
     deleteShoppingListItem: contextDeleteShoppingListItem, 
     toggleShoppingListItemPurchased, 
     copyLastWeeksPurchasedItems,
-    expensePrefillData, // Added
-    setExpensePrefillData // Added
+    setExpensePrefillData 
   } = useAppContext();
   const { toast } = useToast();
 
@@ -37,6 +36,11 @@ export default function ShoppingListPage() {
     { name: "Milk", icon: MilkIcon, defaultQuantity: "1", notes: "e.g., 1 gallon, Whole" },
     { name: "Eggs", icon: EggIcon, defaultQuantity: "12", notes: "e.g., Dozen, Large" },
     { name: "Bread", icon: SandwichIcon, defaultQuantity: "1", notes: "e.g., 1 loaf, Wheat" },
+    { name: "Apples", icon: Apple, defaultQuantity: "5", notes: "e.g., Fuji, Gala" },
+    { name: "Bananas", icon: Banana, defaultQuantity: "1 bunch", notes: "e.g., ~5-7 count" },
+    { name: "Chicken", icon: Drumstick, defaultQuantity: "1 lb", notes: "e.g., Breasts, Thighs" },
+    { name: "Rice", icon: Grape, defaultQuantity: "1 bag", notes: "e.g., Basmati, Jasmine (Using Grape as produce proxy)" }, // Using Grape as a placeholder visual for a bag of produce/grains
+    { name: "Toilet Paper", icon: Layers, defaultQuantity: "1 pack", notes: "e.g., 6 rolls, 12 rolls (Using Layers as placeholder)" }, // Using Layers as a placeholder
   ];
 
   const handleAddCommonItem = (itemName: string, quantity: string, itemNotes?: string) => {
@@ -48,7 +52,6 @@ export default function ShoppingListPage() {
     setIsSubmitting(true);
     try {
       if (editingItem) {
-        // Pass only the editable fields to editShoppingListItem
         editShoppingListItem({ id: editingItem.id, itemName: data.itemName, quantity: data.quantity, notes: data.notes });
         toast({ title: "Item Updated", description: "The shopping list item has been successfully updated." });
       } else {
@@ -64,7 +67,6 @@ export default function ShoppingListPage() {
     }
   };
 
-  // This function is for opening the form for editing via the dropdown menu
   const handleEditItemModal = (item: ShoppingListItem) => {
     setEditingItem(item);
     setIsFormOpen(true);
@@ -96,18 +98,9 @@ export default function ShoppingListPage() {
   }, []);
 
 
-  // Handle prefill from other pages
   useEffect(() => {
-    if (expensePrefillData?.fromShoppingList) {
-      const itemToConvert = shoppingListItems.find(item => item.id === expensePrefillData.shoppingListItemId);
-      if (itemToConvert) {
-        // Potentially pre-fill ExpenseForm if navigated here with specific intent
-        // For now, we are just clearing the prefill data if it was for shopping list
-        console.log("Prefill data from shopping list detected, but action not implemented on this page.", expensePrefillData);
-      }
-      setExpensePrefillData(null); // Clear prefill data
-    }
-  }, [expensePrefillData, setExpensePrefillData, shoppingListItems]);
+    setExpensePrefillData(null); 
+  }, [setExpensePrefillData]);
 
 
   const handleCopyItems = () => {
@@ -138,7 +131,7 @@ export default function ShoppingListPage() {
         />
       </div>
 
-      <div className="flex-grow overflow-y-auto pb-6"> {/* Added pb-6 for spacing */}
+      <div className="flex-grow overflow-y-auto pb-6">
         <Card className="mb-6 shadow-sm">
           <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
@@ -164,7 +157,7 @@ export default function ShoppingListPage() {
 
         <ShoppingList
           items={shoppingListItems}
-          onEditItem={handleEditItemModal} // This opens the modal for full edit
+          onEditItem={handleEditItemModal}
           onDeleteItem={handleDeleteItem}
           onTogglePurchased={handleTogglePurchased}
         />
