@@ -221,19 +221,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return { ...goal, currentSpending };
       })
     );
-  }, [expenses, setBudgetGoals]);
+  }, [expenses, setBudgetGoals]); // setBudgetGoals dependency is okay here as it's setting a different piece of state
 
   React.useEffect(() => {
-    setSharedBudgets(prevSharedBudgets =>
-      prevSharedBudgets.map(sharedBudget => {
+    setSharedBudgets(prevSharedBudgets => {
+      let hasChanged = false;
+      const newSharedBudgets = prevSharedBudgets.map(sharedBudget => {
         const relevantExpenses = expenses.filter(
           exp => exp.sharedBudgetId === sharedBudget.id
         );
-        const currentSpending = relevantExpenses.reduce((sum, exp) => sum + exp.amount, 0);
-        return { ...sharedBudget, currentSpending };
-      })
-    );
-  }, [expenses, setSharedBudgets]);
+        const newCurrentSpending = relevantExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+        if (newCurrentSpending !== sharedBudget.currentSpending) {
+          hasChanged = true;
+        }
+        return { ...sharedBudget, currentSpending: newCurrentSpending };
+      });
+      // Only update state if any currentSpending value actually changed to avoid unnecessary re-renders
+      return hasChanged ? newSharedBudgets : prevSharedBudgets;
+    });
+  }, [expenses]); // Now only depends on expenses for recalculating currentSpending
 
 
   const value: AppContextType = {
@@ -283,3 +289,4 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
+
