@@ -80,6 +80,8 @@ interface ExpenseFormProps {
   isSubmitting?: boolean;
 }
 
+const NONE_SHARED_BUDGET_VALUE = "__NONE__";
+
 export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: ExpenseFormProps) {
   const { categories, getCategoryById, sharedBudgets, members } = useAppContext();
   const { toast } = useToast();
@@ -149,7 +151,7 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
   function onSubmit(data: ExpenseFormValues) {
     const dataToSave: ExpenseFormValues = {
       ...data,
-      sharedBudgetId: data.sharedBudgetId === "" ? undefined : data.sharedBudgetId,
+      sharedBudgetId: data.sharedBudgetId === "" || data.sharedBudgetId === NONE_SHARED_BUDGET_VALUE ? undefined : data.sharedBudgetId,
       paidByMemberId: data.isSplit && data.paidByMemberId ? data.paidByMemberId : undefined,
       splitWithMemberIds: data.isSplit && data.splitWithMemberIds ? data.splitWithMemberIds : [],
     };
@@ -349,7 +351,7 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value={NONE_SHARED_BUDGET_VALUE}>None</SelectItem>
                     {sharedBudgets.map((budget: SharedBudget) => (
                       <SelectItem key={budget.id} value={budget.id}>
                         {budget.name}
@@ -498,3 +500,4 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
     </Form>
   );
 }
+
