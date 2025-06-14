@@ -229,7 +229,7 @@ export default function HouseholdPage() {
             </CardHeader>
             <CardContent>
                 <div className="flex flex-col items-center justify-center h-40 text-center">
-                    <img src="https://placehold.co/300x150.png" data-ai-hint="budget planning" alt="Coming soon" className="mb-4 rounded-lg opacity-70" />
+                    <img src="https://placehold.co/300x150.png" data-ai-hint="budget planning" alt="Coming soon for shared budgeting" className="mb-4 rounded-lg opacity-70" />
                     <p className="text-muted-foreground text-sm">Functionality to create shared budgets and allocate household funds will be here.</p>
                 </div>
             </CardContent>
@@ -242,7 +242,7 @@ export default function HouseholdPage() {
             </CardHeader>
             <CardContent>
                 <div className="flex flex-col items-center justify-center h-40 text-center">
-                    <img src="https://placehold.co/300x150.png" data-ai-hint="shared finances" alt="Coming soon" className="mb-4 rounded-lg opacity-70" />
+                    <img src="https://placehold.co/300x150.png" data-ai-hint="shared finances" alt="Coming soon for expense splitting" className="mb-4 rounded-lg opacity-70" />
                     <p className="text-muted-foreground text-sm">Tools for dividing bills and tracking individual shares will be available soon.</p>
                 </div>
             </CardContent>
