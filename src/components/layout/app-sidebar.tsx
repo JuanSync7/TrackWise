@@ -16,13 +16,14 @@ import {
 import { Button } from "@/components/ui/button";
 import type { NavItem } from "@/lib/types";
 import { APP_NAME } from "@/lib/constants";
-import { LayoutDashboard, ListChecks, PiggyBank, Settings, BarChart3, LogOut, Briefcase } from "lucide-react";
+import { LayoutDashboard, ListChecks, PiggyBank, Settings, BarChart3, LogOut, Briefcase, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems: NavItem[] = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { title: "Expenses", href: "/expenses", icon: ListChecks },
   { title: "Budgets", href: "/budgets", icon: PiggyBank },
+  { title: "Household", href: "/household", icon: Users },
   { title: "Reports", href: "/reports", icon: BarChart3 },
   { title: "Settings", href: "/settings", icon: Settings },
 ];
@@ -50,6 +51,7 @@ export function AppSidebar() {
             <SidebarMenuItem key={item.title}>
               <Link href={item.href}>
                 <SidebarMenuButton
+                  
                   isActive={pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href))}
                   tooltip={{children: item.title, className: "text-xs"}}
                   className={cn(

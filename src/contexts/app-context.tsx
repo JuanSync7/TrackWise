@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import React, { createContext, useContext } from 'react';
-import type { Expense, Category, BudgetGoal, AppState, AppContextType } from '@/lib/types';
+import type { Expense, Category, BudgetGoal, AppState, AppContextType, Member } from '@/lib/types';
 import { INITIAL_CATEGORIES } from '@/lib/constants';
 import useLocalStorage from '@/hooks/use-local-storage';
 import { v4 as uuidv4 } from 'uuid'; // For generating unique IDs
@@ -13,6 +13,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [expenses, setExpenses] = useLocalStorage<Expense[]>('trackwise_expenses', []);
   const [categories, setCategories] = useLocalStorage<Category[]>('trackwise_categories', INITIAL_CATEGORIES);
   const [budgetGoals, setBudgetGoals] = useLocalStorage<BudgetGoal[]>('trackwise_budget_goals', []);
+  const [members, setMembers] = useLocalStorage<Member[]>('trackwise_members', []);
 
   const addExpense = (expense: Omit<Expense, 'id'>) => {
     setExpenses(prev => [...prev, { ...expense, id: uuidv4() }]);
@@ -42,6 +43,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return categories.find(cat => cat.id === categoryId);
   }
 
+  const addMember = (member: Omit<Member, 'id'>) => {
+    setMembers(prev => [...prev, { ...member, id: uuidv4() }]);
+  };
+
+  const deleteMember = (memberId: string) => {
+    setMembers(prev => prev.filter(mem => mem.id !== memberId));
+  };
+
   // Recalculate currentSpending for budget goals whenever expenses change
   React.useEffect(() => {
     setBudgetGoals(prevGoals => 
@@ -62,6 +71,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     expenses,
     categories,
     budgetGoals,
+    members,
     addExpense,
     updateExpense,
     deleteExpense,
@@ -69,6 +79,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     updateBudgetGoal,
     deleteBudgetGoal,
     getCategoryById,
+    addMember,
+    deleteMember,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

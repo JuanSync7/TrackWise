@@ -24,10 +24,16 @@ export interface BudgetGoal {
   period: 'monthly' | 'yearly' | 'weekly'; // Example periods
 }
 
+export interface Member {
+  id: string;
+  name: string;
+}
+
 export interface AppState {
   expenses: Expense[];
   categories: Category[];
   budgetGoals: BudgetGoal[];
+  members: Member[];
 }
 
 export type AppContextType = AppState & {
@@ -38,6 +44,8 @@ export type AppContextType = AppState & {
   updateBudgetGoal: (goal: BudgetGoal) => void;
   deleteBudgetGoal: (goalId: string) => void;
   getCategoryById: (categoryId: string) => Category | undefined;
+  addMember: (member: Omit<Member, 'id'>) => void;
+  deleteMember: (memberId: string) => void;
   // Add more actions as needed, e.g., for categories
 };
 
