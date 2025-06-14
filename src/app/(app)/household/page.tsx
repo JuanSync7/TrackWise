@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { PageHeader } from '@/components/shared/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Users, DollarSign, ClipboardList } from 'lucide-react';
+import { PlusCircle, Users, DollarSign, ClipboardList, WalletCards } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -219,18 +219,24 @@ export default function HouseholdPage() {
             </CardFooter>
           </Card>
 
-
           <Card>
             <CardHeader>
-                <CardTitle>Shared Budgeting (Coming Soon)</CardTitle>
-                 <CardDescription>Manage shared household budgets and track group spending against them.</CardDescription>
+                <CardTitle className="flex items-center gap-2">
+                    <WalletCards className="h-6 w-6 text-primary" />
+                    Shared Budgets
+                </CardTitle>
+                 <CardDescription>Create and manage budgets for shared household expenses.</CardDescription>
             </CardHeader>
             <CardContent>
-                <div className="flex flex-col items-center justify-center h-40 text-center">
-                    <img src="https://placehold.co/300x150.png" data-ai-hint="budget planning" alt="Coming soon for shared budgeting" className="mb-4 rounded-lg opacity-70" />
-                    <p className="text-muted-foreground text-sm">Functionality to create shared budgets and allocate household funds will be here.</p>
-                </div>
+                <p className="text-sm text-muted-foreground">Define spending targets for categories like groceries, utilities, or rent that are shared by the household.</p>
             </CardContent>
+            <CardFooter>
+               <Link href="/household/shared-budgets" className="w-full">
+                <Button className="w-full">
+                  <WalletCards className="mr-2 h-4 w-4" /> Manage Shared Budgets
+                </Button>
+              </Link>
+            </CardFooter>
           </Card>
 
           <Card>

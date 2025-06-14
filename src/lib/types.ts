@@ -47,6 +47,16 @@ export interface ShoppingListItem {
   isPurchased: boolean;
 }
 
+export interface SharedBudget {
+  id: string;
+  name: string;
+  amount: number;
+  period: 'monthly' | 'yearly' | 'weekly';
+  description?: string;
+  createdAt: string; // ISO string date
+  // In a more complex system, you might link specific expenses or track current spending here
+}
+
 export interface AppState {
   expenses: Expense[];
   categories: Category[];
@@ -54,6 +64,7 @@ export interface AppState {
   members: Member[];
   contributions: Contribution[];
   shoppingListItems: ShoppingListItem[];
+  sharedBudgets: SharedBudget[];
 }
 
 export type AppContextType = AppState & {
@@ -73,6 +84,9 @@ export type AppContextType = AppState & {
   editShoppingListItem: (item: Pick<ShoppingListItem, 'id' | 'itemName' | 'quantity' | 'notes'>) => void;
   toggleShoppingListItemPurchased: (itemId: string) => void;
   deleteShoppingListItem: (itemId: string) => void;
+  addSharedBudget: (budget: Omit<SharedBudget, 'id' | 'createdAt'>) => void;
+  deleteSharedBudget: (budgetId: string) => void;
+  // getSharedBudgetById: (budgetId: string) => SharedBudget | undefined; // For future use
 };
 
 export interface NavItem {

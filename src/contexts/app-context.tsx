@@ -3,7 +3,7 @@
 
 import type { ReactNode } from 'react';
 import React, { createContext, useContext } from 'react';
-import type { Expense, Category, BudgetGoal, AppState, AppContextType, Member, Contribution, ShoppingListItem } from '@/lib/types';
+import type { Expense, Category, BudgetGoal, AppState, AppContextType, Member, Contribution, ShoppingListItem, SharedBudget } from '@/lib/types';
 import { INITIAL_CATEGORIES } from '@/lib/constants';
 import useLocalStorage from '@/hooks/use-local-storage';
 import { v4 as uuidv4 } from 'uuid'; // For generating unique IDs
@@ -18,6 +18,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [members, setMembers] = useLocalStorage<Member[]>('trackwise_members', []);
   const [contributions, setContributions] = useLocalStorage<Contribution[]>('trackwise_contributions', []);
   const [shoppingListItems, setShoppingListItems] = useLocalStorage<ShoppingListItem[]>('trackwise_shopping_list_items', []);
+  const [sharedBudgets, setSharedBudgets] = useLocalStorage<SharedBudget[]>('trackwise_shared_budgets', []);
 
 
   const addExpense = (expense: Omit<Expense, 'id'>) => {
@@ -106,6 +107,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setShoppingListItems(prev => prev.filter(item => item.id !== itemId));
   };
 
+  // Shared Budgets Management
+  const addSharedBudget = (budget: Omit<SharedBudget, 'id' | 'createdAt'>) => {
+    const newSharedBudget: SharedBudget = {
+      ...budget,
+      id: uuidv4(),
+      createdAt: formatISO(new Date()),
+    };
+    setSharedBudgets(prev => [...prev, newSharedBudget]);
+  };
+
+  const deleteSharedBudget = (budgetId: string) => {
+    setSharedBudgets(prev => prev.filter(budget => budget.id !== budgetId));
+  };
+
 
   // Recalculate currentSpending for budget goals whenever expenses change
   React.useEffect(() => {
@@ -130,6 +145,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     members,
     contributions,
     shoppingListItems,
+    sharedBudgets,
     addExpense,
     updateExpense,
     deleteExpense,
@@ -146,6 +162,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     editShoppingListItem,
     toggleShoppingListItemPurchased,
     deleteShoppingListItem,
+    addSharedBudget,
+    deleteSharedBudget,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
