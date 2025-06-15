@@ -6,7 +6,7 @@ import { usePersonalFinance } from '@/contexts/personal-finance-context';
 import { useHousehold } from '@/contexts/household-context';
 import { useTrips } from '@/contexts/trip-context';
 import { DEFAULT_CURRENCY } from '@/lib/constants';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isValid } from 'date-fns'; // Added isValid
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -64,14 +64,20 @@ const TransactionItemComponent = ({ transaction, onEdit, onDelete, transactionCo
     let text = `Repeats ${transaction.recurrencePeriod}`;
     if (transaction.nextRecurrenceDate) {
       try {
-        text += ` (Next: ${format(parseISO(transaction.nextRecurrenceDate), 'MMM d, yyyy')})`;
+        const nextDate = parseISO(transaction.nextRecurrenceDate);
+        if (isValid(nextDate)) {
+            text += ` (Next: ${format(nextDate, 'MMM d, yyyy')})`;
+        }
       } catch (e) {
          console.error("Error parsing nextRecurrenceDate for display:", transaction.nextRecurrenceDate, e);
       }
     }
     if (transaction.recurrenceEndDate) {
       try {
-        text += ` until ${format(parseISO(transaction.recurrenceEndDate), 'MMM d, yyyy')}`;
+        const endDate = parseISO(transaction.recurrenceEndDate);
+        if (isValid(endDate)) {
+            text += ` until ${format(endDate, 'MMM d, yyyy')}`;
+        }
       } catch (e) {
         console.error("Error parsing recurrenceEndDate for display:", transaction.recurrenceEndDate, e);
       }
