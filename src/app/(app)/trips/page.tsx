@@ -87,7 +87,7 @@ export default function TripsPage() {
           <PlaneTakeoff className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
           <h3 className="text-xl font-semibold mb-2 text-muted-foreground">No Trips Yet</h3>
           <p className="text-muted-foreground">Click "Create New Trip" to start planning your next adventure!</p>
-          <img src="https://placehold.co/400x250.png" data-ai-hint="travel adventure map" alt="No trips illustration" className="mx-auto mt-8 rounded-lg opacity-70" />
+          <img src="https://placehold.co/400x250.png" data-ai-hint="adventure map" alt="No trips illustration" className="mx-auto mt-8 rounded-lg opacity-70" />
         </div>
       )}
 

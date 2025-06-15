@@ -19,7 +19,7 @@ export function SharedBudgetList({ sharedBudgets, onDeleteSharedBudget, onEditSh
         <WalletCards className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
         <h3 className="text-xl font-semibold mb-2 text-muted-foreground">No Shared Budgets Yet</h3>
         <p className="text-muted-foreground">Create shared budgets for household expenses like groceries or utilities.</p>
-        <img src="https://placehold.co/300x200.png" data-ai-hint="budget piggyBank" alt="Empty shared budgets" className="mx-auto mt-6 rounded-lg opacity-70" />
+        <img src="https://placehold.co/300x200.png" data-ai-hint="shared budget" alt="Empty shared budgets" className="mx-auto mt-6 rounded-lg opacity-70" />
       </div>
     );
   }
