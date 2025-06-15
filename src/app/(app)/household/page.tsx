@@ -19,7 +19,7 @@ import {
 import { useAppContext } from '@/contexts/app-context';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from "@/hooks/use-toast";
-import type { Member, Contribution, Expense, HouseholdSettlement } from '@/lib/types';
+import type { Member, Contribution, Expense, HouseholdSettlement, CalculatedMemberFinancials } from '@/lib/types';
 import { MemberForm } from '@/components/household/member-form';
 import { MemberList } from '@/components/household/member-list';
 import { ContributionForm, type ContributionFormValues } from '@/components/household/contribution-form';
@@ -39,6 +39,7 @@ export default function HouseholdPage() {
     contributions, addContribution, 
     expenses, addExpense, sharedBudgets, getCategoryById,
     getHouseholdOverallSettlements, triggerHouseholdSettlementCalculation, getHouseholdMemberNetPotData,
+    householdFinancialSummaries, // Get the summary map
     members: globalMembers, // for useEffect dependency
     contributions: globalContributions, // for useEffect dependency
     expenses: globalExpenses, // for useEffect dependency
@@ -381,7 +382,12 @@ export default function HouseholdPage() {
               <CardDescription>Who owes whom to balance all household finances (cash contributions, pot-paid expenses, and member-paid shared expenses).</CardDescription>
             </CardHeader>
             <CardContent>
-                <TripSettlementList settlements={memoizedHouseholdSettlements} tripId="household_pot_settlement" />
+                <TripSettlementList 
+                    settlements={memoizedHouseholdSettlements} 
+                    tripId="household_pot_settlement" 
+                    finalMemberFinancials={householdFinancialSummaries}
+                    remainingCashInPot={householdFinancialSummary.remainingCashInPot}
+                />
             </CardContent>
           </Card>
         </div>
@@ -495,3 +501,6 @@ export default function HouseholdPage() {
     </div>
   );
 }
+
+
+    
