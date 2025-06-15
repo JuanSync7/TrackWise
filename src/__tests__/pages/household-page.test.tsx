@@ -5,10 +5,10 @@ import userEvent from '@testing-library/user-event';
 import HouseholdPage from '@/app/(app)/household/page';
 import { AppContext } from '@/contexts/app-context';
 import { AuthContext } from '@/contexts/auth-context';
-import type { AppContextType, Member, Contribution, Expense } from '@/lib/types';
+import type { AppContextType, Member, Contribution, Expense, SharedBudget } from '@/lib/types';
 import type { User as FirebaseUser } from 'firebase/auth';
 import { DEFAULT_CURRENCY, HOUSEHOLD_EXPENSE_CATEGORY_ID } from '@/lib/constants';
-import { formatISO } from 'date-fns';
+import { formatISO, format as formatDateFns } from 'date-fns';
 
 const mockToast = jest.fn();
 jest.mock('@/hooks/use-toast', () => ({
@@ -33,6 +33,10 @@ const mockContributionsBase: Contribution[] = [
   { id: 'contrib-2', memberId: 'member-2', amount: 150, date: formatISO(new Date()), notes: 'Bob contribution' },
 ];
 
+const mockSharedBudgetsBase: SharedBudget[] = [
+    { id: 'sb-household', name: 'General Household', amount: 500, period: 'monthly', createdAt: formatISO(new Date()), currentSpending: 0 }
+];
+
 const mockExpensesBase: Expense[] = [
     { id: 'exp-1', description: 'Shared Groceries', amount: 50, date: formatISO(new Date()), categoryId: HOUSEHOLD_EXPENSE_CATEGORY_ID, sharedBudgetId: undefined },
 ];
@@ -42,7 +46,9 @@ const mockAppContextBase: Partial<AppContextType> = {
   members: mockMembersBase,
   contributions: mockContributionsBase,
   expenses: mockExpensesBase,
-  sharedBudgets: [], // Assume no specific shared budgets for these base tests unless overridden
+  sharedBudgets: mockSharedBudgetsBase, 
+  categories: [{id: HOUSEHOLD_EXPENSE_CATEGORY_ID, name: "Household Expenses", iconName: "ReceiptText", color: "#ccc"}], // Ensure HOUSEHOLD_EXPENSE_CATEGORY_ID is defined
+  getCategoryById: (id) => id === HOUSEHOLD_EXPENSE_CATEGORY_ID ? {id: HOUSEHOLD_EXPENSE_CATEGORY_ID, name: "Household Expenses", iconName: "ReceiptText", color: "#ccc"} : undefined,
   addMember: jest.fn(),
   deleteMember: jest.fn(),
   addContribution: jest.fn(),
@@ -53,11 +59,22 @@ const mockAppContextBase: Partial<AppContextType> = {
       .reduce((sum, c) => sum + c.amount, 0);
   },
   getTotalHouseholdSpending: () => {
-    // Simplified for testing: sum of expenses categorized as household or linked to any shared budget
-    // In real context, it's more nuanced with sharedBudgets list.
-    return mockExpensesBase
-        .filter(e => e.categoryId === HOUSEHOLD_EXPENSE_CATEGORY_ID || e.sharedBudgetId)
-        .reduce((sum, e) => sum + e.amount, 0);
+    let totalSpending = 0;
+    const spentOnSharedBudgetsIds = new Set<string>();
+
+    mockExpensesBase.forEach(expense => {
+      if (expense.sharedBudgetId && mockSharedBudgetsBase.some(sb => sb.id === expense.sharedBudgetId)) {
+        totalSpending += expense.amount;
+        spentOnSharedBudgetsIds.add(expense.id);
+      }
+    });
+    
+    mockExpensesBase.forEach(expense => {
+      if (expense.categoryId === HOUSEHOLD_EXPENSE_CATEGORY_ID && !spentOnSharedBudgetsIds.has(expense.id)) {
+        totalSpending += expense.amount;
+      }
+    });
+    return totalSpending;
   },
 };
 
@@ -65,11 +82,10 @@ describe('HouseholdPage', () => {
   const user = userEvent.setup();
 
   const renderPage = (appContextOverrides: Partial<AppContextType> = {}) => {
-    // Allow dynamic calculation for overridden contributions/expenses
     const currentMembers = appContextOverrides.members || mockMembersBase;
     const currentContributions = appContextOverrides.contributions || mockContributionsBase;
     const currentExpenses = appContextOverrides.expenses || mockExpensesBase;
-    const currentSharedBudgets = appContextOverrides.sharedBudgets || [];
+    const currentSharedBudgets = appContextOverrides.sharedBudgets || mockSharedBudgetsBase;
 
 
     const finalAppContext: Partial<AppContextType> = {
@@ -84,7 +100,7 @@ describe('HouseholdPage', () => {
           .filter(c => c.memberId === memberId)
           .reduce((sum, c) => sum + c.amount, 0);
       },
-      getTotalHouseholdSpending: () => {
+      getTotalHouseholdSpending: () => { // This needs to use the currentExpenses and currentSharedBudgets from overrides
         let totalSpending = 0;
         const spentOnSharedBudgetsIds = new Set<string>();
 
@@ -124,6 +140,7 @@ describe('HouseholdPage', () => {
   it('renders the page header and action buttons correctly', () => {
     renderPage();
     expect(screen.getByRole('heading', { name: /household management/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /export household data/i})).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /add shared expense/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /add new member/i })).toBeInTheDocument();
   });
@@ -199,7 +216,7 @@ describe('HouseholdPage', () => {
     // Alice: 100, Bob: 150. Total Contributions: 250
     // Shared Expense: 50. Total Spending: 50
     // Remaining in Pot: 250 - 50 = 200
-    renderPage();
+    renderPage(); // Uses mockAppContextBase defaults
     expect(screen.getByText(`${DEFAULT_CURRENCY}250.00`)).toBeInTheDocument(); // Total Contributions
     expect(screen.getByText(`${DEFAULT_CURRENCY}50.00`)).toBeInTheDocument(); // Total Shared Spending
     expect(screen.getByText(`${DEFAULT_CURRENCY}200.00`)).toBeInTheDocument(); // Remaining in Pot
@@ -220,12 +237,12 @@ describe('HouseholdPage', () => {
 
   it('calculates and displays correct household pot summary (negative balance)', () => {
     const highExpenses: Expense[] = [
-      { id: 'exp-high', description: 'Big Repair', amount: 300, date: formatISO(new Date()), categoryId: HOUSEHOLD_EXPENSE_CATEGORY_ID },
+      { id: 'exp-high', description: 'Big Repair', amount: 300, date: formatISO(new Date()), categoryId: HOUSEHOLD_EXPENSE_CATEGORY_ID, sharedBudgetId: undefined },
     ];
-    // Total Contributions: 250 (Alice 100, Bob 150)
-    // Total Spending: 300
+    // Total Contributions: 250 (Alice 100, Bob 150 from mockContributionsBase)
+    // Total Spending: 300 (from highExpenses override)
     // Remaining in Pot: 250 - 300 = -50
-    renderPage({ expenses: highExpenses });
+    renderPage({ expenses: highExpenses, contributions: mockContributionsBase, members: mockMembersBase });
     expect(screen.getByText(`${DEFAULT_CURRENCY}250.00`)).toBeInTheDocument(); // Total Contributions
     expect(screen.getByText(`${DEFAULT_CURRENCY}300.00`)).toBeInTheDocument(); // Total Shared Spending
     expect(screen.getByText(`-${DEFAULT_CURRENCY}50.00`)).toBeInTheDocument(); // Remaining in Pot (negative)
@@ -234,12 +251,12 @@ describe('HouseholdPage', () => {
 
   it('calculates and displays correct "Net Share in Pot" for each member (negative pot balance)', () => {
     const highExpenses: Expense[] = [
-      { id: 'exp-high', description: 'Big Repair', amount: 300, date: formatISO(new Date()), categoryId: HOUSEHOLD_EXPENSE_CATEGORY_ID },
+      { id: 'exp-high', description: 'Big Repair', amount: 300, date: formatISO(new Date()), categoryId: HOUSEHOLD_EXPENSE_CATEGORY_ID, sharedBudgetId: undefined },
     ];
     // Pot: -50. Alice contributed 100/250 = 40%. Bob contributed 150/250 = 60%.
     // Alice share: 0.40 * -50 = -20
     // Bob share: 0.60 * -50 = -30
-    renderPage({ expenses: highExpenses });
+    renderPage({ expenses: highExpenses, contributions: mockContributionsBase, members: mockMembersBase });
 
     const aliceCard = screen.getByText('Alice').closest('div[class*="card"]');
     const bobCard = screen.getByText('Bob').closest('div[class*="card"]');
@@ -247,12 +264,10 @@ describe('HouseholdPage', () => {
     expect(aliceCard).toHaveTextContent(`Net Share in Pot:-${DEFAULT_CURRENCY}20.00`);
     expect(bobCard).toHaveTextContent(`Net Share in Pot:-${DEFAULT_CURRENCY}30.00`);
     
-    // Check for destructive text color (simplified check, actual class might be nested)
     const aliceShareElement = screen.getByText(`-${DEFAULT_CURRENCY}20.00`);
     expect(aliceShareElement).toHaveClass('text-destructive');
     const bobShareElement = screen.getByText(`-${DEFAULT_CURRENCY}30.00`);
     expect(bobShareElement).toHaveClass('text-destructive');
-
   });
   
   it('handles deletion of a member', async () => {
@@ -272,6 +287,71 @@ describe('HouseholdPage', () => {
     
     expect(mockAppContextBase.deleteMember).toHaveBeenCalledWith('member-2'); // Bob's ID
     expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ title: "Member Deleted" }));
+  });
+
+  it('exports household data to CSV correctly', async () => {
+    const mockExportToCsv = jest.fn();
+    // Spy on the actual utility from the correct module path
+    jest.spyOn(require('@/lib/utils'), 'exportToCsv').mockImplementation(mockExportToCsv);
+
+    // Prepare specific data for this test to ensure calculations are predictable
+    const testMembers: Member[] = [{ id: 'm1', name: 'Tester1' }];
+    const testContributions: Contribution[] = [{ id: 'c1', memberId: 'm1', amount: 200, date: '2023-01-01', notes: 'Initial' }];
+    const testExpenses: Expense[] = [{ id: 'e1', description: 'Test Shared Item', amount: 50, date: '2023-01-02', categoryId: HOUSEHOLD_EXPENSE_CATEGORY_ID }];
+    
+    renderPage({
+      members: testMembers,
+      contributions: testContributions,
+      expenses: testExpenses,
+      sharedBudgets: [], // No specific shared budgets for this simple case
+      getMemberTotalContribution: (memberId) => testContributions.filter(c => c.memberId === memberId).reduce((sum, c) => sum + c.amount, 0),
+      getTotalHouseholdSpending: () => testExpenses.filter(e => e.categoryId === HOUSEHOLD_EXPENSE_CATEGORY_ID).reduce((sum, e) => sum + e.amount, 0),
+    });
+
+    await user.click(screen.getByRole('button', { name: /export household data/i }));
+    
+    expect(mockExportToCsv).toHaveBeenCalledTimes(1);
+    
+    const expectedFilename = `trackwise_household_data_${formatDateFns(new Date(), 'yyyy-MM-dd')}.csv`;
+    const capturedArgs = mockExportToCsv.mock.calls[0];
+    const csvData = capturedArgs[1]; // This is the array of arrays
+
+    expect(capturedArgs[0]).toBe(expectedFilename);
+
+    // Check Household Pot Summary
+    expect(csvData).toEqual(expect.arrayContaining([
+      ["Household Pot Summary"],
+      ["Metric", "Amount"],
+      [`Total Household Contributions (${DEFAULT_CURRENCY})`, "200.00"],
+      [`Total Shared Household Spending (${DEFAULT_CURRENCY})`, "50.00"],
+      [`Remaining in Pot (${DEFAULT_CURRENCY})`, "150.00"],
+    ]));
+
+    // Check Member Overview
+    // Tester1: Contributed 200. Pot remaining 150. (200/200) * 150 = 150
+    expect(csvData).toEqual(expect.arrayContaining([
+      ["Member Overview"],
+      ["Member Name", `Total Direct Contributions (${DEFAULT_CURRENCY})`, `Net Share in Pot (${DEFAULT_CURRENCY})`],
+      ["Tester1", "200.00", "150.00"],
+    ]));
+
+    // Check Individual Contributions
+    expect(csvData).toEqual(expect.arrayContaining([
+      ["Individual Contributions"],
+      ["Member Name", `Amount (${DEFAULT_CURRENCY})`, "Date", "Notes"],
+      ["Tester1", "200.00", "2023-01-01", "Initial"],
+    ]));
+    
+    // Check Shared Expenses Affecting Pot
+    expect(csvData).toEqual(expect.arrayContaining([
+      ["Shared Expenses Affecting Pot"],
+      ["Description", `Amount (${DEFAULT_CURRENCY})`, "Date", "Source"],
+      ["Test Shared Item", "50.00", "2023-01-02", "Category: Household Expenses"],
+    ]));
+
+    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ title: "Household Data Exported" }));
+    
+    jest.restoreAllMocks(); // Clean up spy
   });
 
 });

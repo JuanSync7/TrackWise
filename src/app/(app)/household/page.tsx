@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { PageHeader } from '@/components/shared/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Users, DollarSign, ClipboardList, WalletCards, DivideSquare, TrendingDown, TrendingUp, Banknote, ListChecks } from 'lucide-react';
+import { PlusCircle, Users, DollarSign, ClipboardList, WalletCards, DivideSquare, TrendingDown, TrendingUp, Banknote, ListChecks, Download } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useAppContext } from '@/contexts/app-context';
 import { useToast } from "@/hooks/use-toast";
-import type { Member, Contribution } from '@/lib/types';
+import type { Member, Contribution, Expense } from '@/lib/types';
 import { MemberForm } from '@/components/household/member-form';
 import { MemberList } from '@/components/household/member-list';
 import { ContributionForm, type ContributionFormValues } from '@/components/household/contribution-form';
@@ -28,13 +28,14 @@ import { Progress } from '@/components/ui/progress';
 import { format } from 'date-fns';
 import { DEFAULT_CURRENCY, HOUSEHOLD_EXPENSE_CATEGORY_ID } from '@/lib/constants';
 import Link from 'next/link';
-import { cn } from '@/lib/utils';
+import { cn, exportToCsv } from '@/lib/utils';
 
 export default function HouseholdPage() {
   const { 
     members, addMember, deleteMember: contextDeleteMember, 
-    addContribution, getMemberTotalContribution, getTotalHouseholdSpending,
-    addExpense 
+    contributions, addContribution, getMemberTotalContribution, 
+    expenses, addExpense, sharedBudgets, getCategoryById, // Added expenses, sharedBudgets, getCategoryById
+    getTotalHouseholdSpending
   } = useAppContext();
   const { toast } = useToast();
 
@@ -133,6 +134,68 @@ export default function HouseholdPage() {
   const remainingInPot = totalHouseholdContributions - totalPotSpending;
   const potUsagePercentage = totalHouseholdContributions > 0 ? Math.min((totalPotSpending / totalHouseholdContributions) * 100, 100) : 0;
 
+  const handleExportHouseholdData = () => {
+    const csvRows: (string | number | undefined)[][] = [];
+    const currentDate = format(new Date(), 'yyyy-MM-dd');
+    const filename = `trackwise_household_data_${currentDate}.csv`;
+
+    csvRows.push([`Trackwise Household Data - ${currentDate}`]);
+    csvRows.push([]); // Blank line
+
+    // Section 1: Household Pot Summary
+    csvRows.push(["Household Pot Summary"]);
+    csvRows.push(["Metric", "Amount"]);
+    csvRows.push([`Total Household Contributions (${DEFAULT_CURRENCY})`, totalHouseholdContributions.toFixed(2)]);
+    csvRows.push([`Total Shared Household Spending (${DEFAULT_CURRENCY})`, totalPotSpending.toFixed(2)]);
+    csvRows.push([`Remaining in Pot (${DEFAULT_CURRENCY})`, remainingInPot.toFixed(2)]);
+    csvRows.push([]);
+
+    // Section 2: Member Overview
+    csvRows.push(["Member Overview"]);
+    csvRows.push(["Member Name", `Total Direct Contributions (${DEFAULT_CURRENCY})`, `Net Share in Pot (${DEFAULT_CURRENCY})`]);
+    members.forEach(member => {
+      const directContribution = getMemberTotalContribution(member.id);
+      const memberShareOfPot = totalHouseholdContributions > 0 
+        ? (directContribution / totalHouseholdContributions) * remainingInPot 
+        : 0;
+      csvRows.push([member.name, directContribution.toFixed(2), memberShareOfPot.toFixed(2)]);
+    });
+    csvRows.push([]);
+
+    // Section 3: Detailed Contributions List
+    csvRows.push(["Individual Contributions"]);
+    csvRows.push(["Member Name", `Amount (${DEFAULT_CURRENCY})`, "Date", "Notes"]);
+    contributions.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).forEach(contrib => {
+      const memberName = members.find(m => m.id === contrib.memberId)?.name || 'Unknown Member';
+      csvRows.push([memberName, contrib.amount.toFixed(2), contrib.date, contrib.notes || '']);
+    });
+    csvRows.push([]);
+
+    // Section 4: Shared Expenses (Pot-Affecting)
+    csvRows.push(["Shared Expenses Affecting Pot"]);
+    csvRows.push(["Description", `Amount (${DEFAULT_CURRENCY})`, "Date", "Source"]);
+    const potAffectingExpenses = expenses.filter(exp => {
+      const isHouseholdCategory = exp.categoryId === HOUSEHOLD_EXPENSE_CATEGORY_ID;
+      const isLinkedToSharedBudget = exp.sharedBudgetId && sharedBudgets.some(sb => sb.id === exp.sharedBudgetId);
+      return isHouseholdCategory || isLinkedToSharedBudget;
+    }).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    potAffectingExpenses.forEach(exp => {
+      let source = "Unknown";
+      if (exp.sharedBudgetId) {
+        const budget = sharedBudgets.find(sb => sb.id === exp.sharedBudgetId);
+        source = budget ? `Shared Budget: ${budget.name}` : `Shared Budget: ID ${exp.sharedBudgetId}`;
+      } else if (exp.categoryId === HOUSEHOLD_EXPENSE_CATEGORY_ID) {
+        const category = getCategoryById(exp.categoryId);
+        source = category ? `Category: ${category.name}` : `Category: Household`;
+      }
+      csvRows.push([exp.description, exp.amount.toFixed(2), exp.date, source]);
+    });
+
+    exportToCsv(filename, csvRows);
+    toast({ title: "Household Data Exported", description: `Data exported to ${filename}` });
+  };
+
 
   return (
     <div className="container mx-auto">
@@ -140,7 +203,10 @@ export default function HouseholdPage() {
         title="Household Management"
         description="Manage members, track contributions, and oversee shared finances."
         actions={
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            <Button variant="outline" onClick={handleExportHouseholdData} disabled={members.length === 0 && contributions.length === 0 && expenses.length === 0}>
+                <Download className="mr-2 h-4 w-4" /> Export Household Data
+            </Button>
             <Button variant="outline" onClick={() => setIsExpenseFormOpen(true)}>
               <ListChecks className="mr-2 h-4 w-4" /> Add Shared Expense
             </Button>
