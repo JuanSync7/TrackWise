@@ -51,8 +51,16 @@ export interface CalculatedMemberFinancials {
   totalShareOfAllGroupExpenses: number;
   finalNetShareForSettlement: number;
 }
-export type HouseholdMemberNetData = CalculatedMemberFinancials;
-export type TripMemberNetData = CalculatedMemberFinancials;
+
+export interface MemberDisplayFinancials {
+  directCashContribution: number;
+  amountPersonallyPaidForGroup: number;
+  totalShareOfAllGroupExpenses: number;
+  netOverallPosition: number;
+}
+
+export type HouseholdMemberNetData = MemberDisplayFinancials; // Used for UI display
+export type TripMemberNetData = MemberDisplayFinancials; // Used for UI display
 
 
 // Using TripSettlement type for household settlements as structure is identical
@@ -99,9 +107,9 @@ export interface TripExpense {
 
 export interface TripSettlement {
   id: string;
-  tripId: string; // Can be tripId for trips, or a generic 'household' constant for household settlements
-  owedByTripMemberId: string; // For trips, this is TripMember['id']. For household, Member['id']
-  owedToTripMemberId: string; // For trips, this is TripMember['id']. For household, Member['id']
+  tripId: string; 
+  owedByTripMemberId: string; 
+  owedToTripMemberId: string; 
   amount: number;
 }
 
@@ -154,8 +162,8 @@ export interface AppState {
   contributions: Contribution[];
   sharedBudgets: SharedBudget[];
   debts: Debt[];
+  householdFinancialSummaries: Record<string, CalculatedMemberFinancials>; // Keyed by memberId
   householdOverallSettlements: HouseholdSettlement[];
-  householdMemberFinancialsMap: Record<string, CalculatedMemberFinancials>; // Keyed by memberId
   
   shoppingListItems: ShoppingListItem[];
 
@@ -164,12 +172,21 @@ export interface AppState {
   tripMembers: TripMember[];
   tripContributions: TripContribution[];
   tripExpenses: TripExpense[]; 
+  tripFinancialSummaries: Record<string, Record<string, CalculatedMemberFinancials>>; // Outer key: tripId, Inner key: tripMemberId
   tripSettlementsMap: Record<string, TripSettlement[]>; // Keyed by tripId
-  tripMemberFinancialsMap: Record<string, Record<string, CalculatedMemberFinancials>>; // Outer key: tripId, Inner key: tripMemberId
 }
 
 
-export type AppContextType = Omit<AppState, 'tripSettlementsMap' | 'householdOverallSettlements' | 'tripMemberFinancialsMap' | 'householdMemberFinancialsMap'> & {
+export type AppContextType = Omit<AppState, 
+  'tripSettlementsMap' | 
+  'householdOverallSettlements' | 
+  'tripFinancialSummaries' | 
+  'householdFinancialSummaries'
+> & {
+  // Raw summary maps for direct access if needed, though getters are preferred
+  householdFinancialSummaries: Record<string, CalculatedMemberFinancials>;
+  tripFinancialSummaries: Record<string, Record<string, CalculatedMemberFinancials>>;
+
   // Expense functions
   addExpense: (expense: Omit<Expense, 'id'>) => void;
   updateExpense: (expense: Expense) => void;
@@ -191,11 +208,11 @@ export type AppContextType = Omit<AppState, 'tripSettlementsMap' | 'householdOve
   // Household Contribution functions
   addContribution: (contribution: Omit<Contribution, 'id'>) => void;
   getMemberContributions: (memberId: string) => Contribution[];
-  getMemberTotalContribution: (memberId: string) => number; // Total direct cash contributions
+  getMemberTotalContribution: (memberId: string) => number; 
   
   // Household Pot & Net Data functions
-  getTotalHouseholdSpending: () => number; // Total spent from the pot
-  getHouseholdMemberNetPotData: (memberId: string) => HouseholdMemberNetData | undefined; // Updated return type
+  getTotalHouseholdSpending: () => number; 
+  getHouseholdMemberNetPotData: (memberId: string) => MemberDisplayFinancials; // No longer optional
   getHouseholdOverallSettlements: () => HouseholdSettlement[];
   triggerHouseholdSettlementCalculation: () => void;
 
@@ -233,14 +250,14 @@ export type AppContextType = Omit<AppState, 'tripSettlementsMap' | 'householdOve
   // Trip Contribution functions
   addTripContribution: (tripId: string, tripMemberId: string, contributionData: Omit<TripContribution, 'id' | 'tripId' | 'tripMemberId'>) => void;
   getTripContributionsForMember: (tripMemberId: string) => TripContribution[];
-  getTripMemberTotalDirectContribution: (tripMemberId: string, tripIdToFilter?: string) => number; // Total direct cash contributions
+  getTripMemberTotalDirectContribution: (tripMemberId: string, tripIdToFilter?: string) => number; 
   
   // Trip Expense functions
   addTripExpense: (expenseData: Omit<TripExpense, 'id'>) => void; 
   getTripExpenses: (tripId: string) => TripExpense[];
 
   // Trip Net Data & Settlement functions
-  getTripMemberNetData: (tripId: string, tripMemberId: string) => TripMemberNetData | undefined; // Updated return type
+  getTripMemberNetData: (tripId: string, tripMemberId: string) => MemberDisplayFinancials; // No longer optional
   getTripSettlements: (tripId: string) => TripSettlement[];
   triggerTripSettlementCalculation: (tripId: string) => void;
 };
