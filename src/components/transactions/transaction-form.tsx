@@ -391,13 +391,17 @@ export function TransactionForm({
                   className="flex space-x-4"
                 >
                   <FormItem className="flex items-center space-x-2 space-y-0">
-                    <RadioGroupItem value="expense" id="type-expense"/>
+                    <FormControl>
+                        <RadioGroupItem value="expense" id="type-expense"/>
+                    </FormControl>
                     <FormLabel htmlFor="type-expense" className="font-normal flex items-center gap-1 cursor-pointer">
                       <TrendingDown className="h-4 w-4 text-destructive"/>Expense
                     </FormLabel>
                   </FormItem>
                   <FormItem className="flex items-center space-x-2 space-y-0">
-                    <RadioGroupItem value="income" id="type-income"/>
+                    <FormControl>
+                        <RadioGroupItem value="income" id="type-income"/>
+                    </FormControl>
                     <FormLabel htmlFor="type-income" className="font-normal flex items-center gap-1 cursor-pointer">
                       <TrendingUp className="h-4 w-4 text-accent"/>Income
                     </FormLabel>
