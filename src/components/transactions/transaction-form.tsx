@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -121,7 +122,6 @@ interface TransactionFormProps {
 
 const NONE_SHARED_BUDGET_VALUE = "__NONE__";
 
-// Memoized initial values for the form
 const useFormInitialValues = (
   transaction?: Transaction | HouseholdTransaction | TripTransaction,
   showSplittingFeatureProp?: boolean,
@@ -131,7 +131,7 @@ const useFormInitialValues = (
 ): TransactionFormValues => {
   return useMemo(() => {
     if (transaction) {
-      const typedTransaction = transaction as (HouseholdTransaction | TripTransaction); // Type assertion for split properties
+      const typedTransaction = transaction as (HouseholdTransaction | TripTransaction);
       const initialSplitType = typedTransaction.splitType || (typedTransaction.isSplit ? 'even' : undefined);
       const initialCustomSplits = typedTransaction.customSplitAmounts?.map(s => ({
         ...s,
@@ -155,7 +155,6 @@ const useFormInitialValues = (
         customSplitAmounts: initialCustomSplits,
       };
     }
-    // Default values for a new form
     return {
       transactionType: 'expense' as TransactionType,
       description: "",
@@ -223,7 +222,7 @@ export function TransactionForm({
   const { fields: customSplitFields, replace: replaceCustomSplits } = useFieldArray({
     control: form.control,
     name: "customSplitAmounts",
-    keyName: "fieldId" // Use a different key name if 'id' is part of your field structure
+    keyName: "fieldId"
   });
 
   const watchedTransactionType = form.watch("transactionType");
@@ -231,13 +230,12 @@ export function TransactionForm({
   const watchedNotes = form.watch("notes");
   const watchedCategoryId = form.watch("categoryId");
   const watchedIsSplit = form.watch("isSplit");
-  const watchedSplitWithMemberIds = form.watch("splitWithMemberIds") || []; // Ensure it's an array
+  const watchedSplitWithMemberIds = form.watch("splitWithMemberIds") || [];
   const watchedIsRecurring = form.watch("isRecurring");
   const watchedSplitType = form.watch("splitType");
   const watchedAmount = form.watch("amount");
   const watchedCustomSplitAmounts = form.watch("customSplitAmounts");
 
-  // Effect to handle default state of splitting options when 'isSplit' changes
   useEffect(() => {
     if (watchedIsSplit) {
         if (!form.getValues("splitType")) {
@@ -257,7 +255,6 @@ export function TransactionForm({
             form.setValue("splitWithMemberIds", availableMembersForSplitting.map(m => m.id), { shouldValidate: true });
         }
     } else {
-        // When unchecking isSplit, clear related fields
         form.setValue("splitType", undefined);
         form.setValue("customSplitAmounts", []);
         form.setValue("paidByMemberId", undefined);
@@ -266,7 +263,6 @@ export function TransactionForm({
   }, [watchedIsSplit, form, allowPotPayer, currentUserIdForDefaultPayer, availableMembersForSplitting]);
 
 
-  // Effect to manage customSplitAmounts array based on selected members for splitting
   useEffect(() => {
     if (watchedIsSplit && watchedSplitType === 'custom') {
       const newCustomSplits = watchedSplitWithMemberIds.map(memberId => {
@@ -274,12 +270,10 @@ export function TransactionForm({
         const member = availableMembersForSplitting.find(m => m.id === memberId);
         return {
           memberId,
-          amount: existing?.amount ?? 0, // Default to 0 or existing amount
+          amount: existing?.amount ?? 0,
           memberName: member?.name || 'Unknown Member'
         };
       });
-      // Only replace if the structure or member list has actually changed
-      // This avoids unnecessary re-renders and potential loss of user input
       const currentCustomSplitMembers = form.getValues("customSplitAmounts")?.map(cs => cs.memberId).sort().join(',') || "";
       const newCustomSplitMembers = newCustomSplits.map(cs => cs.memberId).sort().join(',');
 
@@ -287,7 +281,6 @@ export function TransactionForm({
         replaceCustomSplits(newCustomSplits);
       }
     } else if (watchedIsSplit && watchedSplitType === 'even') {
-      // Clear custom amounts if switching back to even split
       if (form.getValues("customSplitAmounts")?.length > 0) {
         replaceCustomSplits([]);
       }
@@ -304,7 +297,8 @@ export function TransactionForm({
 
   const customSplitDifference = useMemo(() => {
     if (watchedSplitType === 'custom') {
-      return watchedAmount - sumOfCustomSplits;
+      // Round to avoid floating point precision issues for display
+      return parseFloat((watchedAmount - sumOfCustomSplits).toFixed(2));
     }
     return 0;
   }, [watchedAmount, sumOfCustomSplits, watchedSplitType]);
@@ -316,16 +310,14 @@ export function TransactionForm({
   useEffect(() => {
     const currentCategoryIdVal = form.getValues("categoryId");
     if (currentCategoryIdVal && !filteredCategories.some(cat => cat.id === currentCategoryIdVal)) {
-        form.setValue("categoryId", ""); // Reset if current category not valid for new type
+        form.setValue("categoryId", "");
     }
-    // Clear AI category suggestion if transaction type changes
     setAiCategorySuggestion(null);
   }, [watchedTransactionType, form, filteredCategories]);
 
-  // Clear splitting fields if transaction type changes to income
   useEffect(() => {
     if (watchedTransactionType === 'income') {
-      form.setValue('isSplit', false); // This should trigger the useEffect above to clear split details
+      form.setValue('isSplit', false);
     }
   }, [watchedTransactionType, form]);
 
@@ -366,15 +358,15 @@ export function TransactionForm({
       ...data,
       recurrenceEndDate: data.recurrenceEndDate ? format(data.recurrenceEndDate, "yyyy-MM-dd") : undefined,
       sharedBudgetId: (data.sharedBudgetId === NONE_SHARED_BUDGET_VALUE) ? undefined : data.sharedBudgetId,
-      isSplit: data.transactionType === 'expense' ? data.isSplit : false, // Ensure isSplit is false for income
+      isSplit: data.transactionType === 'expense' ? data.isSplit : false,
       splitType: data.transactionType === 'expense' && data.isSplit ? data.splitType : undefined,
       customSplitAmounts: data.transactionType === 'expense' && data.isSplit && data.splitType === 'custom' ? data.customSplitAmounts?.map(s => ({ memberId: s.memberId, amount: s.amount })) : [],
       paidByMemberId: data.transactionType === 'expense' && data.isSplit ? data.paidByMemberId : undefined,
       splitWithMemberIds: data.transactionType === 'expense' && data.isSplit ? data.splitWithMemberIds : [],
     };
     onSave(dataToSave);
-    if (!transaction) { // Only reset if it's a new transaction form
-        form.reset(initialValues); // Reset to fresh initial values
+    if (!transaction) {
+        form.reset(initialValues);
         setAiCategorySuggestion(null); setAiNoteSuggestion(null);
     }
   }
@@ -399,13 +391,13 @@ export function TransactionForm({
                   className="flex space-x-4"
                 >
                   <FormItem className="flex items-center space-x-2 space-y-0">
-                    <FormControl><RadioGroupItem value="expense" id="type-expense"/></FormControl>
+                    <RadioGroupItem value="expense" id="type-expense"/>
                     <FormLabel htmlFor="type-expense" className="font-normal flex items-center gap-1 cursor-pointer">
                       <TrendingDown className="h-4 w-4 text-destructive"/>Expense
                     </FormLabel>
                   </FormItem>
                   <FormItem className="flex items-center space-x-2 space-y-0">
-                    <FormControl><RadioGroupItem value="income" id="type-income"/></FormControl>
+                    <RadioGroupItem value="income" id="type-income"/>
                     <FormLabel htmlFor="type-income" className="font-normal flex items-center gap-1 cursor-pointer">
                       <TrendingUp className="h-4 w-4 text-accent"/>Income
                     </FormLabel>
@@ -437,7 +429,7 @@ export function TransactionForm({
             {watchedIsSplit && (
               <>
                 <FormField control={form.control} name="paidByMemberId" render={({ field }) => ( <FormItem> <FormLabel>Who Paid?</FormLabel> <Select onValueChange={field.onChange} value={field.value || ""}> <FormControl><SelectTrigger><SelectValue placeholder="Select payer" /></SelectTrigger></FormControl> <SelectContent>{allowPotPayer && <SelectItem value={POT_PAYER_ID}><div className="flex items-center gap-2"><CircleDollarSign className="h-4 w-4 text-primary"/>Paid from Pot</div></SelectItem>}{availableMembersForSplitting.map((member) => ( <SelectItem key={member.id} value={member.id}>{member.name}</SelectItem>))}</SelectContent> </Select> <FormMessage /> </FormItem> )} />
-                <FormField control={form.control} name="splitType" render={({ field }) => ( <FormItem className="space-y-2"><FormLabel>Split Method</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex space-x-4"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="even" id="split-even"/></FormControl><FormLabel htmlFor="split-even" className="font-normal cursor-pointer">Split Evenly</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="custom" id="split-custom"/></FormControl><FormLabel htmlFor="split-custom" className="font-normal cursor-pointer">Custom Amounts</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
+                <FormField control={form.control} name="splitType" render={({ field }) => ( <FormItem className="space-y-2"><FormLabel>Split Method</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex space-x-4"><FormItem className="flex items-center space-x-2 space-y-0"><RadioGroupItem value="even" id="split-even"/><FormLabel htmlFor="split-even" className="font-normal cursor-pointer">Split Evenly</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><RadioGroupItem value="custom" id="split-custom"/><FormLabel htmlFor="split-custom" className="font-normal cursor-pointer">Custom Amounts</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
                 <Controller control={form.control} name="splitWithMemberIds" render={({ field }) => ( <FormItem> <div className="mb-2 flex items-center justify-between"><div><FormLabel>Split With Whom?</FormLabel><FormDescription>Select members sharing this expense.</FormDescription></div><Button type="button" variant="outline" size="sm" onClick={() => handleSelectAllSplitMembers(!areAllMembersSelected)} disabled={availableMembersForSplitting.length === 0} className="ml-auto">{areAllMembersSelected ? <CheckSquare className="mr-2 h-4 w-4" /> : <Square className="mr-2 h-4 w-4" />}{areAllMembersSelected ? 'Deselect All' : 'Select All'}</Button></div> <ScrollArea className="h-32 w-full rounded-md border p-2">{availableMembersForSplitting.map((member) => ( <FormField key={member.id} control={form.control} name="splitWithMemberIds" render={({ field: checkboxField }) => ( <FormItem key={member.id} className="flex flex-row items-start space-x-3 space-y-0 py-2"><FormControl><Checkbox id={`split-${member.id}`} checked={checkboxField.value?.includes(member.id)} onCheckedChange={(checked) => checkboxField.onChange(checked ? [...(checkboxField.value || []), member.id] : (checkboxField.value || []).filter(id => id !== member.id))} /></FormControl><FormLabel htmlFor={`split-${member.id}`} className="text-sm font-normal cursor-pointer">{member.name}</FormLabel></FormItem> )} /> ))}</ScrollArea> <FormMessage /> {form.formState.errors.splitWithMemberIds?.message && <p className="text-sm font-medium text-destructive">{form.formState.errors.splitWithMemberIds?.message}</p>} </FormItem> )} />
                 
                 {watchedSplitType === 'custom' && customSplitFields.map((item, index) => (
@@ -450,15 +442,26 @@ export function TransactionForm({
                   )} />
                 ))}
                 {watchedSplitType === 'custom' && watchedCustomSplitAmounts && watchedCustomSplitAmounts.length > 0 && (
-                  <div className={cn("text-sm p-2 rounded-md", Math.abs(customSplitDifference) > 0.005 ? "bg-destructive/10 text-destructive" : "bg-accent/10 text-accent-foreground")}>
+                  <div className={cn(
+                      "text-sm p-2 rounded-md mt-2 border",
+                      Math.abs(customSplitDifference) > 0.005 ? "bg-destructive/10 border-destructive text-destructive" : "bg-accent/10 border-accent text-accent-foreground"
+                    )}
+                  >
                     <div className="flex justify-between">
                       <span>Total Custom Split:</span>
                       <span className="font-semibold">{DEFAULT_CURRENCY}{sumOfCustomSplits.toFixed(2)}</span>
                     </div>
                     {Math.abs(customSplitDifference) > 0.005 && (
                       <div className="flex justify-between items-center mt-1">
-                        <span className="flex items-center"><AlertCircle className="h-4 w-4 mr-1"/> Difference:</span>
-                        <span className="font-semibold">{DEFAULT_CURRENCY}{customSplitDifference.toFixed(2)}</span>
+                        <span className="flex items-center"><AlertCircle className="h-4 w-4 mr-1"/> 
+                          {customSplitDifference > 0 ? "Remaining to allocate:" : "Over-allocated by:"}
+                        </span>
+                        <span className="font-semibold">{DEFAULT_CURRENCY}{Math.abs(customSplitDifference).toFixed(2)}</span>
+                      </div>
+                    )}
+                    {Math.abs(customSplitDifference) <= 0.005 && (
+                       <div className="flex justify-between items-center mt-1 text-accent-foreground font-medium">
+                        <span className="flex items-center"><Check className="h-4 w-4 mr-1 text-green-600"/> Total matches transaction amount.</span>
                       </div>
                     )}
                   </div>
