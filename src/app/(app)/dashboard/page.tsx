@@ -6,16 +6,16 @@ import { SummaryCard } from '@/components/dashboard/summary-card';
 import { SpendingChart } from '@/components/dashboard/spending-chart';
 import { BudgetGoalPieChart } from '@/components/dashboard/budget-goal-pie-chart';
 import { DollarSign, TrendingUp, TrendingDown, ListChecks, Wallet } from 'lucide-react';
-import { usePersonalFinance } from '@/contexts/personal-finance-context'; // Changed context
+import { usePersonalFinance } from '@/contexts/personal-finance-context';
 import { DEFAULT_CURRENCY } from '@/lib/constants';
 import { useMemo, useState, useEffect } from 'react';
-import type { Expense } from '@/lib/types'; // Still use personal Expense type for this dashboard overview
+import type { Expense } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
 export default function DashboardPage() {
-  const { expenses, budgetGoals } = usePersonalFinance(); // Changed context
+  const { expenses, budgetGoals } = usePersonalFinance();
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -46,19 +46,20 @@ export default function DashboardPage() {
       const lastExpense = sortedExpenses[0];
       const secondLastExpense = sortedExpenses[1];
 
+      // Check if both lastExpense and secondLastExpense are defined before accessing amount
       if (lastExpense && secondLastExpense) {
         if (lastExpense.amount > secondLastExpense.amount) {
           setExpenseTrend({ value: "Spending up", icon: TrendingUp, color: "text-destructive" });
         } else if (lastExpense.amount < secondLastExpense.amount) {
           setExpenseTrend({ value: "Spending down", icon: TrendingDown, color: "text-accent" });
         } else {
-          setExpenseTrend(null);
+          setExpenseTrend(null); // Amounts are equal or other conditions not met
         }
       } else {
-        setExpenseTrend(null);
+        setExpenseTrend(null); // Not enough expenses to compare or objects are undefined
       }
     } else {
-      setExpenseTrend(null);
+      setExpenseTrend(null); // Not enough expenses to determine a trend
     }
   }, [expenses]);
 
