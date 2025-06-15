@@ -20,7 +20,7 @@ export function GoalList({ goals, onEditGoal, onDeleteGoal, onContributeToGoal }
         <Target className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
         <h3 className="text-xl font-semibold mb-2 text-muted-foreground">No Financial Goals Set Yet</h3>
         <p className="text-muted-foreground">Click "Set New Goal" to start planning for your future!</p>
-        <img src="https://placehold.co/400x250.png" data-ai-hint="mountain peak" alt="No goals illustration" className="mx-auto mt-8 rounded-lg opacity-70" />
+        
       </div>
     );
   }
@@ -63,3 +63,4 @@ export function GoalList({ goals, onEditGoal, onDeleteGoal, onContributeToGoal }
     </div>
   );
 }
+

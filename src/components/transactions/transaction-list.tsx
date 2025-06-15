@@ -16,7 +16,7 @@ export function TransactionList({ transactions, onEditTransaction, onDeleteTrans
   if (transactions.length === 0) {
     return (
       <div className="text-center py-10">
-        <img src="https://placehold.co/300x200.png" data-ai-hint="empty receipt" alt="Empty state" className="mx-auto mb-4 rounded-lg" />
+        
         <h3 className="text-xl font-semibold mb-2">No Transactions Yet</h3>
         <p className="text-muted-foreground">Start adding your transactions to see them here.</p>
       </div>

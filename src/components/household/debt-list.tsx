@@ -22,7 +22,7 @@ export function DebtList({ debts, title, emptyStateMessage, emptyStateImageHint 
         <DivideSquare className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
         <h3 className="text-xl font-semibold mb-2 text-muted-foreground">{title}</h3>
         <p className="text-muted-foreground">{emptyStateMessage}</p>
-        <img src={`https://placehold.co/300x200.png`} data-ai-hint={emptyStateImageHint} alt="Empty state for debts" className="mx-auto mt-6 rounded-lg opacity-70" />
+        
       </div>
     );
   }
@@ -65,3 +65,4 @@ export function DebtList({ debts, title, emptyStateMessage, emptyStateImageHint 
     </div>
   );
 }
+

@@ -20,7 +20,7 @@ export function DebtList({ debts, onEditDebt, onDeleteDebt, onLogPayment }: Debt
         <Landmark className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
         <h3 className="text-xl font-semibold mb-2 text-muted-foreground">No Personal Debts Added Yet</h3>
         <p className="text-muted-foreground">Click "Add New Debt" to start tracking your loans or credit cards.</p>
-        <img src="https://placehold.co/400x250.png" data-ai-hint="financial freedom piggybank" alt="No debts illustration" className="mx-auto mt-8 rounded-lg opacity-70" />
+        
       </div>
     );
   }
@@ -61,3 +61,4 @@ export function DebtList({ debts, onEditDebt, onDeleteDebt, onLogPayment }: Debt
     </div>
   );
 }
+

@@ -68,7 +68,7 @@ export function BudgetPerformanceReport() {
           <CardDescription>Compare your budgeted amounts against actual spending for the current month ({format(new Date(), 'MMMM yyyy')}).</CardDescription>
         </CardHeader>
         <CardContent className="h-[300px] flex flex-col items-center justify-center">
-          <img src="https://placehold.co/300x180.png" data-ai-hint="table document" alt="No budget data" className="mb-4 rounded-lg opacity-70" />
+          
           <p className="text-muted-foreground text-center">No monthly budget goals set yet. Add some in the Budgets section to see your performance!</p>
         </CardContent>
       </Card>

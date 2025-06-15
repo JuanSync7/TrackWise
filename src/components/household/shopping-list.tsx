@@ -20,7 +20,7 @@ export function ShoppingList({ items, onEditItem, onDeleteItem, onTogglePurchase
         <ClipboardList className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
         <h3 className="text-xl font-semibold mb-2 text-muted-foreground">Shopping List is Empty</h3>
         <p className="text-muted-foreground">Add items your household needs to purchase.</p>
-         <img src="https://placehold.co/300x200.png" data-ai-hint="shopping cart" alt="Empty shopping list" className="mx-auto mt-6 rounded-lg opacity-70" />
+         
       </div>
     );
   }
@@ -56,3 +56,4 @@ export function ShoppingList({ items, onEditItem, onDeleteItem, onTogglePurchase
     </div>
   );
 }
+

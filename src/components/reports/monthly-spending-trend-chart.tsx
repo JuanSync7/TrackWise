@@ -75,7 +75,7 @@ export function MonthlySpendingTrendChart() {
           <CardDescription>View your total expenses over selected periods.</CardDescription>
         </CardHeader>
         <CardContent className="h-[350px] flex flex-col items-center justify-center">
-           <img src="https://placehold.co/300x180.png" data-ai-hint="chart graph" alt="No expense data" className="mb-4 rounded-lg opacity-70" />
+           
           <p className="text-muted-foreground text-center">No expenses recorded yet. Add some expenses to see your spending trends!</p>
         </CardContent>
       </Card>
