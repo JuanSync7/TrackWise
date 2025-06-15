@@ -38,16 +38,29 @@ export const HouseholdProvider: React.FC<{ children: ReactNode }> = ({ children 
   const _manageDebtsForHouseholdTransaction = useCallback((transaction: HouseholdTransaction, currentDebts: Debt[]): Debt[] => { // Renamed
     let updatedDebts = currentDebts.filter(d => d.expenseId !== transaction.id);
     if (transaction.transactionType === 'expense' && transaction.isSplit && transaction.paidByMemberId && transaction.paidByMemberId !== POT_PAYER_ID && transaction.splitWithMemberIds && transaction.splitWithMemberIds.length > 0) {
-      const amountPerPerson = transaction.amount / transaction.splitWithMemberIds.length;
-      transaction.splitWithMemberIds.forEach(memberIdInSplit => {
-        if (memberIdInSplit !== transaction.paidByMemberId) {
-          updatedDebts.push({
-            id: uuidv4(), expenseId: transaction.id, expenseDescription: transaction.description,
-            amount: parseFloat(amountPerPerson.toFixed(2)), owedByMemberId: memberIdInSplit,
-            owedToMemberId: transaction.paidByMemberId!, isSettled: false, createdAt: formatISO(new Date()),
-          });
-        }
-      });
+      
+      if (transaction.splitType === 'custom' && transaction.customSplitAmounts && transaction.customSplitAmounts.length > 0) {
+        transaction.customSplitAmounts.forEach(customSplit => {
+          if (customSplit.memberId !== transaction.paidByMemberId && customSplit.amount > 0) {
+            updatedDebts.push({
+              id: uuidv4(), expenseId: transaction.id, expenseDescription: transaction.description,
+              amount: parseFloat(customSplit.amount.toFixed(2)), owedByMemberId: customSplit.memberId,
+              owedToMemberId: transaction.paidByMemberId!, isSettled: false, createdAt: formatISO(new Date()),
+            });
+          }
+        });
+      } else { // Even split
+        const amountPerPerson = transaction.amount / transaction.splitWithMemberIds!.length;
+        transaction.splitWithMemberIds.forEach(memberIdInSplit => {
+          if (memberIdInSplit !== transaction.paidByMemberId) {
+            updatedDebts.push({
+              id: uuidv4(), expenseId: transaction.id, expenseDescription: transaction.description,
+              amount: parseFloat(amountPerPerson.toFixed(2)), owedByMemberId: memberIdInSplit,
+              owedToMemberId: transaction.paidByMemberId!, isSettled: false, createdAt: formatISO(new Date()),
+            });
+          }
+        });
+      }
     }
     return updatedDebts;
   }, []);
@@ -83,14 +96,21 @@ export const HouseholdProvider: React.FC<{ children: ReactNode }> = ({ children 
     setContributions(prev => prev.filter(contrib => contrib.memberId !== memberId));
     setDebts(prevDebts => prevDebts.filter(debt => debt.owedByMemberId !== memberId && debt.owedToMemberId !== memberId));
     setHouseholdTransactions(prevTransactions => prevTransactions.map(trans => { // Renamed
-      if (trans.paidByMemberId === memberId) {
-        return { ...trans, paidByMemberId: POT_PAYER_ID };
+      let updatedTrans = { ...trans };
+      if (updatedTrans.paidByMemberId === memberId) {
+        updatedTrans.paidByMemberId = POT_PAYER_ID; // Default to pot payer if original payer deleted
       }
-      if (trans.splitWithMemberIds?.includes(memberId)) {
-        const newSplitWith = trans.splitWithMemberIds.filter(id => id !== memberId);
-        return { ...trans, splitWithMemberIds: newSplitWith, isSplit: newSplitWith.length > 0 ? trans.isSplit : false };
+      if (updatedTrans.splitWithMemberIds?.includes(memberId)) {
+        updatedTrans.splitWithMemberIds = updatedTrans.splitWithMemberIds.filter(id => id !== memberId);
+        if (updatedTrans.splitWithMemberIds.length === 0) updatedTrans.isSplit = false;
       }
-      return trans;
+      if (updatedTrans.customSplitAmounts?.some(cs => cs.memberId === memberId)) {
+        updatedTrans.customSplitAmounts = updatedTrans.customSplitAmounts.filter(cs => cs.memberId !== memberId);
+        if (updatedTrans.customSplitAmounts.length === 0 && updatedTrans.splitType === 'custom') {
+            updatedTrans.splitType = 'even'; // Fallback if all custom split members removed
+        }
+      }
+      return updatedTrans;
     }));
   }, [setMembers, setContributions, setDebts, setHouseholdTransactions]);
 
@@ -173,10 +193,14 @@ export const HouseholdProvider: React.FC<{ children: ReactNode }> = ({ children 
       directCashContribution: contributions.filter(c => c.memberId === m.id).reduce((s, c) => s + c.amount, 0),
     }));
 
-    const expenseTypeTransactions = householdTransactions.filter(t => t.transactionType === 'expense'); // Only consider expenses for settlement
+    const expenseTypeTransactions = householdTransactions.filter(t => t.transactionType === 'expense');
     const expenseInputs: ExpenseInput[] = expenseTypeTransactions.map(exp => ({
-      amount: exp.amount, isSplit: !!exp.isSplit,
-      splitWithTripMemberIds: exp.splitWithMemberIds || [], paidByMemberId: exp.paidByMemberId,
+      amount: exp.amount, 
+      isSplit: !!exp.isSplit,
+      splitWithTripMemberIds: exp.splitWithMemberIds || [], // Use this name for consistency with financial-utils
+      paidByMemberId: exp.paidByMemberId,
+      splitType: exp.splitType,
+      customSplitAmounts: exp.customSplitAmounts?.map(cs => ({memberId: cs.memberId, amount: cs.amount}))
     }));
 
     const householdMemberIds = members.map(m => m.id);
@@ -192,7 +216,7 @@ export const HouseholdProvider: React.FC<{ children: ReactNode }> = ({ children 
       id: uuidv4(), owedByTripMemberId: s.owedByMemberId, owedToTripMemberId: s.owedToTripMemberId, amount: s.amount,
     }));
     setHouseholdOverallSettlements(finalSettlements);
-  }, [members, contributions, householdTransactions, setHouseholdFinancialSummaries, setHouseholdOverallSettlements]); // Renamed
+  }, [members, contributions, householdTransactions, setHouseholdFinancialSummaries, setHouseholdOverallSettlements]);
 
   const triggerHouseholdSettlementCalculation = useCallback(() => {
     _calculateAndStoreHouseholdSettlements();
@@ -200,7 +224,7 @@ export const HouseholdProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   useEffect(() => {
     triggerHouseholdSettlementCalculation();
-  }, [members, contributions, householdTransactions, triggerHouseholdSettlementCalculation]); // Renamed
+  }, [members, contributions, householdTransactions, triggerHouseholdSettlementCalculation]); 
 
   const getHouseholdMemberNetData = useCallback((memberId: string): MemberDisplayFinancials => {
     const financials = householdFinancialSummaries[memberId];
@@ -216,10 +240,10 @@ export const HouseholdProvider: React.FC<{ children: ReactNode }> = ({ children 
   }, [householdFinancialSummaries]);
 
   const value: HouseholdContextType = {
-    members, householdTransactions, contributions, sharedBudgets, debts, shoppingListItems, // Renamed
+    members, householdTransactions, contributions, sharedBudgets, debts, shoppingListItems, 
     householdFinancialSummaries, householdOverallSettlements,
     addMember, deleteMember, getMemberById,
-    addHouseholdTransaction, updateHouseholdTransaction, deleteHouseholdTransaction, // Renamed
+    addHouseholdTransaction, updateHouseholdTransaction, deleteHouseholdTransaction, 
     addContribution, getMemberContributions, getMemberTotalContribution,
     addSharedBudget, updateSharedBudget, deleteSharedBudget,
     settleDebt, unsettleDebt, getDebtsOwedByMember, getDebtsOwedToMember, getAllDebts,
