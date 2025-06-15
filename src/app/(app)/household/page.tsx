@@ -26,7 +26,7 @@ import { ExpenseForm, type ExpenseFormValues as ExpenseFormValuesType } from '@/
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { format } from 'date-fns';
-import { DEFAULT_CURRENCY } from '@/lib/constants';
+import { DEFAULT_CURRENCY, HOUSEHOLD_EXPENSE_CATEGORY_ID } from '@/lib/constants';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
@@ -107,7 +107,20 @@ export default function HouseholdPage() {
 
   const handleSaveExpense = async (data: ExpenseFormValuesType) => {
     setIsSubmittingExpense(true);
-    const expenseData = { ...data, date: format(data.date, "yyyy-MM-dd") };
+    let expenseData = { ...data, date: format(data.date, "yyyy-MM-dd") };
+
+    // If added via Household page's "Add Shared Expense"
+    // and no specific category or shared budget is chosen, default to "Household Expenses" category.
+    if (!expenseData.categoryId && (!expenseData.sharedBudgetId || expenseData.sharedBudgetId === "__NONE__")) {
+      expenseData.categoryId = HOUSEHOLD_EXPENSE_CATEGORY_ID;
+    }
+    
+    // Ensure sharedBudgetId is undefined if "None" was selected.
+    if (expenseData.sharedBudgetId === "__NONE__") {
+      expenseData.sharedBudgetId = undefined;
+    }
+
+
     try {
       addExpense(expenseData);
       toast({ title: "Shared Expense Added", description: "Your new shared expense has been successfully recorded." });
@@ -186,7 +199,7 @@ export default function HouseholdPage() {
           <DialogHeader>
             <DialogTitle>Add New Shared Expense</DialogTitle>
             <DialogDescription>
-              Fill in the details for a new shared household expense.
+              Fill in the details for a new shared household expense. This will affect the Household Pot.
             </DialogDescription>
           </DialogHeader>
           <ExpenseForm
@@ -221,7 +234,7 @@ export default function HouseholdPage() {
                 <Users className="h-6 w-6 text-primary" />
                 Household Members ({members.length})
               </CardTitle>
-              <CardDescription>View and manage your household members and their contributions. Log shared expenses using the "Add Shared Expense" button above. Link them to a Shared Budget or categorize as 'Household Expenses'.</CardDescription>
+              <CardDescription>View and manage your household members and their contributions. Log shared expenses using the "Add Shared Expense" button above. These will automatically be categorized as 'Household Expenses' if no other category/shared budget is selected, and will affect the pot.</CardDescription>
             </CardHeader>
             <CardContent>
               <MemberList 
