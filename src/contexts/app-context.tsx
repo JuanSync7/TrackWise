@@ -3,23 +3,36 @@
 
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useCallback } from 'react';
-import type { Expense, Category, BudgetGoal, AppState, AppContextType, Member, Contribution, ShoppingListItem, SharedBudget, Debt } from '@/lib/types';
+import type { 
+  Expense, Category, BudgetGoal, AppState, AppContextType, 
+  Member, Contribution, ShoppingListItem, SharedBudget, Debt,
+  Trip, TripMember, TripContribution, TripExpense // Added Trip types
+} from '@/lib/types';
 import { INITIAL_CATEGORIES, HOUSEHOLD_EXPENSE_CATEGORY_ID } from '@/lib/constants';
 import useLocalStorage from '@/hooks/use-local-storage';
-import { v4 as uuidv4 } from 'uuid'; // For generating unique IDs
+import { v4 as uuidv4 } from 'uuid'; 
 import { formatISO, parseISO, subDays, isWithinInterval } from 'date-fns';
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  // Household specific states
   const [expenses, setExpenses] = useLocalStorage<Expense[]>('trackwise_expenses', []);
   const [categories, setCategories] = useLocalStorage<Category[]>('trackwise_categories', INITIAL_CATEGORIES);
   const [budgetGoals, setBudgetGoals] = useLocalStorage<BudgetGoal[]>('trackwise_budget_goals', []);
   const [members, setMembers] = useLocalStorage<Member[]>('trackwise_members', []);
   const [contributions, setContributions] = useLocalStorage<Contribution[]>('trackwise_contributions', []);
-  const [shoppingListItems, setShoppingListItems] = useLocalStorage<ShoppingListItem[]>('trackwise_shopping_list_items', []);
   const [sharedBudgets, setSharedBudgets] = useLocalStorage<SharedBudget[]>('trackwise_shared_budgets', []);
   const [debts, setDebts] = useLocalStorage<Debt[]>('trackwise_debts', []);
+  
+  // General / potentially shared states
+  const [shoppingListItems, setShoppingListItems] = useLocalStorage<ShoppingListItem[]>('trackwise_shopping_list_items', []);
+
+  // Trip specific states
+  const [trips, setTrips] = useLocalStorage<Trip[]>('trackwise_trips', []);
+  const [tripMembers, setTripMembers] = useLocalStorage<TripMember[]>('trackwise_trip_members', []);
+  const [tripContributions, setTripContributions] = useLocalStorage<TripContribution[]>('trackwise_trip_contributions', []);
+  // Future: tripExpenses, tripSharedBudgets, tripDebts
 
   const getMemberById = useCallback((memberId: string) => {
     return members.find(member => member.id === memberId);
@@ -73,7 +86,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const updateBudgetGoal = (updatedGoal: BudgetGoal) => {
     setBudgetGoals(prev => prev.map(goal => 
-        goal.id === updatedGoal.id ? { ...goal, ...updatedGoal } : goal // Keep goal's currentSpending as it's part of updatedGoal now
+        goal.id === updatedGoal.id ? { ...goal, ...updatedGoal } : goal 
     ));
   };
 
@@ -85,6 +98,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return categories.find(cat => cat.id === categoryId);
   }, [categories]);
 
+  // --- Household Member and Contribution ---
   const addMember = (member: Omit<Member, 'id'>) => {
     setMembers(prev => [...prev, { ...member, id: uuidv4() }]);
   };
@@ -113,6 +127,83 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       .reduce((sum, contrib) => sum + contrib.amount, 0);
   }, [contributions]);
 
+  const getTotalHouseholdSpending = useCallback((): number => {
+    let totalSpending = 0;
+    const spentOnSharedBudgetsIds = new Set<string>();
+
+    expenses.forEach(expense => {
+      if (expense.sharedBudgetId && sharedBudgets.some(sb => sb.id === expense.sharedBudgetId)) {
+        totalSpending += expense.amount;
+        spentOnSharedBudgetsIds.add(expense.id);
+      }
+    });
+    
+    expenses.forEach(expense => {
+      if (expense.categoryId === HOUSEHOLD_EXPENSE_CATEGORY_ID && !spentOnSharedBudgetsIds.has(expense.id)) {
+        totalSpending += expense.amount;
+      }
+    });
+    
+    return totalSpending;
+  }, [expenses, sharedBudgets]);
+
+  // --- Shared Budgets (Household) ---
+  const addSharedBudget = (budget: Omit<SharedBudget, 'id' | 'createdAt' | 'currentSpending'>) => {
+    const newSharedBudget: SharedBudget = {
+      ...budget,
+      id: uuidv4(),
+      createdAt: formatISO(new Date()),
+      currentSpending: 0,
+    };
+    setSharedBudgets(prev => [...prev, newSharedBudget]);
+  };
+
+  const updateSharedBudget = (updatedBudget: SharedBudget) => {
+    setSharedBudgets(prev =>
+      prev.map(budget => 
+        budget.id === updatedBudget.id ? 
+        { 
+          ...budget, 
+          name: updatedBudget.name, 
+          amount: updatedBudget.amount, 
+          period: updatedBudget.period,
+          description: updatedBudget.description
+        } : budget
+      )
+    );
+  };
+
+  const deleteSharedBudget = (budgetId: string) => {
+    setSharedBudgets(prev => prev.filter(budget => budget.id !== budgetId));
+    setExpenses(prevExpenses => 
+      prevExpenses.map(exp => 
+        exp.sharedBudgetId === budgetId ? { ...exp, sharedBudgetId: undefined } : exp
+      )
+    );
+  };
+  
+  // --- Debts (Household) ---
+  const settleDebt = (debtId: string) => {
+    setDebts(prev => prev.map(d => d.id === debtId ? { ...d, isSettled: true, settledAt: formatISO(new Date()) } : d));
+  };
+  const unsettleDebt = (debtId: string) => {
+     setDebts(prev => prev.map(d => d.id === debtId ? { ...d, isSettled: false, settledAt: undefined } : d));
+  };
+
+  const getDebtsOwedByMember = useCallback((memberId: string, includeSettled: boolean = false) => {
+    return debts.filter(d => d.owedByMemberId === memberId && (includeSettled || !d.isSettled));
+  }, [debts]);
+
+  const getDebtsOwedToMember = useCallback((memberId: string, includeSettled: boolean = false) => {
+    return debts.filter(d => d.owedToMemberId === memberId && (includeSettled || !d.isSettled));
+  }, [debts]);
+
+  const getAllDebts = useCallback((includeSettled: boolean = false) => {
+    return includeSettled ? debts : debts.filter(d => !d.isSettled);
+  }, [debts]);
+
+
+  // --- Shopping List ---
   const addShoppingListItem = (item: Omit<ShoppingListItem, 'id' | 'isPurchased' | 'addedAt'>) => {
     const newItem: ShoppingListItem = {
       ...item,
@@ -179,88 +270,77 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, [shoppingListItems, setShoppingListItems]);
 
 
-  const addSharedBudget = (budget: Omit<SharedBudget, 'id' | 'createdAt' | 'currentSpending'>) => {
-    const newSharedBudget: SharedBudget = {
-      ...budget,
+  // --- Trip Functions ---
+  const addTrip = (tripData: Omit<Trip, 'id' | 'createdAt'>) => {
+    const newTrip: Trip = {
+      ...tripData,
       id: uuidv4(),
       createdAt: formatISO(new Date()),
-      currentSpending: 0,
     };
-    setSharedBudgets(prev => [...prev, newSharedBudget]);
+    setTrips(prev => [...prev, newTrip]);
   };
 
-  const updateSharedBudget = (updatedBudget: SharedBudget) => {
-    setSharedBudgets(prev =>
-      prev.map(budget => 
-        budget.id === updatedBudget.id ? 
-        { 
-          ...budget, // Preserve existing fields like createdAt
-          name: updatedBudget.name, 
-          amount: updatedBudget.amount, 
-          period: updatedBudget.period,
-          description: updatedBudget.description
-          // currentSpending will be preserved from the passed updatedBudget if it's there,
-          // or updated by the useEffect for shared budgets
-        } : budget
-      )
-    );
+  const getTripById = useCallback((tripId: string): Trip | undefined => {
+    return trips.find(trip => trip.id === tripId);
+  }, [trips]);
+
+  const getTrips = useCallback((): Trip[] => {
+    return trips;
+  }, [trips]);
+
+  // Trip Member Functions
+  const addTripMember = (tripId: string, memberData: Omit<TripMember, 'id' | 'tripId'>) => {
+    const newTripMember: TripMember = {
+      ...memberData,
+      id: uuidv4(),
+      tripId,
+    };
+    setTripMembers(prev => [...prev, newTripMember]);
   };
 
-  const deleteSharedBudget = (budgetId: string) => {
-    setSharedBudgets(prev => prev.filter(budget => budget.id !== budgetId));
-    setExpenses(prevExpenses => 
-      prevExpenses.map(exp => 
-        exp.sharedBudgetId === budgetId ? { ...exp, sharedBudgetId: undefined } : exp
-      )
-    );
+  const getTripMembers = useCallback((tripId: string): TripMember[] => {
+    return tripMembers.filter(member => member.tripId === tripId);
+  }, [tripMembers]);
+
+  const deleteTripMember = (tripMemberId: string) => {
+    // Also delete associated contributions for this trip member
+    setTripContributions(prev => prev.filter(contrib => contrib.tripMemberId !== tripMemberId));
+    // Future: also delete associated trip debts for this member
+    setTripMembers(prev => prev.filter(member => member.id !== tripMemberId));
   };
 
-  const settleDebt = (debtId: string) => {
-    setDebts(prev => prev.map(d => d.id === debtId ? { ...d, isSettled: true, settledAt: formatISO(new Date()) } : d));
+  const getTripMemberById = useCallback((tripMemberId: string): TripMember | undefined => {
+    return tripMembers.find(member => member.id === tripMemberId);
+  }, [tripMembers]);
+
+  // Trip Contribution Functions
+  const addTripContribution = (tripId: string, tripMemberId: string, contributionData: Omit<TripContribution, 'id' | 'tripId' | 'tripMemberId'>) => {
+    const newTripContribution: TripContribution = {
+      ...contributionData,
+      id: uuidv4(),
+      tripId,
+      tripMemberId,
+    };
+    setTripContributions(prev => [...prev, newTripContribution]);
   };
-  const unsettleDebt = (debtId: string) => {
-     setDebts(prev => prev.map(d => d.id === debtId ? { ...d, isSettled: false, settledAt: undefined } : d));
-  };
 
-  const getDebtsOwedByMember = useCallback((memberId: string, includeSettled: boolean = false) => {
-    return debts.filter(d => d.owedByMemberId === memberId && (includeSettled || !d.isSettled));
-  }, [debts]);
+  const getTripContributionsForMember = useCallback((tripMemberId: string): TripContribution[] => {
+    return tripContributions.filter(contrib => contrib.tripMemberId === tripMemberId);
+  }, [tripContributions]);
 
-  const getDebtsOwedToMember = useCallback((memberId: string, includeSettled: boolean = false) => {
-    return debts.filter(d => d.owedToMemberId === memberId && (includeSettled || !d.isSettled));
-  }, [debts]);
-
-  const getAllDebts = useCallback((includeSettled: boolean = false) => {
-    return includeSettled ? debts : debts.filter(d => !d.isSettled);
-  }, [debts]);
-
-  const getTotalHouseholdSpending = useCallback((): number => {
-    let totalSpending = 0;
-    const spentOnSharedBudgetsIds = new Set<string>();
-
-    expenses.forEach(expense => {
-      if (expense.sharedBudgetId && sharedBudgets.some(sb => sb.id === expense.sharedBudgetId)) {
-        totalSpending += expense.amount;
-        spentOnSharedBudgetsIds.add(expense.id);
-      }
-    });
-    
-    expenses.forEach(expense => {
-      if (expense.categoryId === HOUSEHOLD_EXPENSE_CATEGORY_ID && !spentOnSharedBudgetsIds.has(expense.id)) {
-        totalSpending += expense.amount;
-      }
-    });
-    
-    return totalSpending;
-  }, [expenses, sharedBudgets]);
+  const getTripMemberTotalDirectContribution = useCallback((tripMemberId: string): number => {
+    return tripContributions
+      .filter(contrib => contrib.tripMemberId === tripMemberId)
+      .reduce((sum, contrib) => sum + contrib.amount, 0);
+  }, [tripContributions]);
 
 
+  // --- Effects for dynamic calculations ---
   React.useEffect(() => {
     setBudgetGoals(prevGoals => 
       prevGoals.map(goal => {
         const relevantExpenses = expenses.filter(exp => {
           if (exp.categoryId !== goal.categoryId) return false;
-          // TODO: Add period filtering logic here if needed (e.g. only sum expenses from goal's current period)
           return true; 
         });
         const currentSpending = relevantExpenses.reduce((sum, exp) => sum + exp.amount, 0);
@@ -288,41 +368,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
 
   const value: AppContextType = {
-    expenses,
-    categories,
-    budgetGoals,
-    members,
-    contributions,
+    expenses, categories, budgetGoals, members, contributions, sharedBudgets, debts,
     shoppingListItems,
-    sharedBudgets,
-    debts,
-    addExpense,
-    updateExpense,
-    deleteExpense,
-    addBudgetGoal,
-    updateBudgetGoal,
-    deleteBudgetGoal,
-    getCategoryById,
-    addMember,
-    deleteMember,
-    addContribution,
-    getMemberContributions,
-    getMemberTotalContribution,
+    trips, tripMembers, tripContributions,
+    addExpense, updateExpense, deleteExpense,
+    addBudgetGoal, updateBudgetGoal, deleteBudgetGoal, getCategoryById,
+    addMember, deleteMember, getMemberById,
+    addContribution, getMemberContributions, getMemberTotalContribution,
     getTotalHouseholdSpending,
-    addShoppingListItem,
-    editShoppingListItem,
-    toggleShoppingListItemPurchased,
-    deleteShoppingListItem,
-    copyLastWeeksPurchasedItems,
-    addSharedBudget,
-    updateSharedBudget,
-    deleteSharedBudget,
-    settleDebt,
-    unsettleDebt,
-    getDebtsOwedByMember,
-    getDebtsOwedToMember,
-    getAllDebts,
-    getMemberById,
+    addSharedBudget, updateSharedBudget, deleteSharedBudget,
+    settleDebt, unsettleDebt, getDebtsOwedByMember, getDebtsOwedToMember, getAllDebts,
+    addShoppingListItem, editShoppingListItem, toggleShoppingListItemPurchased, deleteShoppingListItem, copyLastWeeksPurchasedItems,
+    addTrip, getTripById, getTrips,
+    addTripMember, getTripMembers, deleteTripMember, getTripMemberById,
+    addTripContribution, getTripContributionsForMember, getTripMemberTotalDirectContribution,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
@@ -335,4 +394,3 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
-
