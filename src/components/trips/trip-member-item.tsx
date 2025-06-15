@@ -14,24 +14,35 @@ interface TripMemberItemProps {
   tripMember: TripMember;
   onDelete: (tripMemberId: string) => void;
   onAddContribution: (tripMemberId: string) => void;
-  totalTripContributions: number; // Total contributions for *this* trip by all trip members
-  remainingTripPot: number; // Remaining pot for *this* trip
+  totalTripContributions: number;
+  remainingTripPot: number;
+  numberOfTripMembers: number; // Added to calculate equal share of deficit
 }
 
-export function TripMemberItem({ 
-  tripMember, 
-  onDelete, 
+export function TripMemberItem({
+  tripMember,
+  onDelete,
   onAddContribution,
   totalTripContributions,
-  remainingTripPot 
+  remainingTripPot,
+  numberOfTripMembers
 }: TripMemberItemProps) {
   const { getTripMemberTotalDirectContribution } = useAppContext();
   const directContribution = getTripMemberTotalDirectContribution(tripMember.id);
 
-  const memberShareOfTripPot = 
-    totalTripContributions > 0 
-    ? (directContribution / totalTripContributions) * remainingTripPot 
-    : 0;
+  let memberShareOfTripPot: number;
+  if (totalTripContributions > 0) {
+    memberShareOfTripPot = (directContribution / totalTripContributions) * remainingTripPot;
+  } else {
+    // If total contributions are 0
+    if (remainingTripPot < 0 && numberOfTripMembers > 0) {
+      // Share the deficit equally if pot is negative
+      memberShareOfTripPot = remainingTripPot / numberOfTripMembers;
+    } else {
+      // Pot is 0 or positive, or no members
+      memberShareOfTripPot = 0;
+    }
+  }
 
   return (
     <Card className="overflow-hidden transition-shadow hover:shadow-lg">

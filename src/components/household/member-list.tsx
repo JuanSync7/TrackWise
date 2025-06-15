@@ -14,12 +14,12 @@ interface MemberListProps {
   remainingHouseholdPot: number;
 }
 
-export function MemberList({ 
-  members, 
-  onDeleteMember, 
+export function MemberList({
+  members,
+  onDeleteMember,
   onAddContribution,
   totalHouseholdContributions,
-  remainingHouseholdPot 
+  remainingHouseholdPot
 }: MemberListProps) {
   if (members.length === 0) {
     return (
@@ -49,6 +49,7 @@ export function MemberList({
               onAddContribution={onAddContribution}
               totalHouseholdContributions={totalHouseholdContributions}
               remainingHouseholdPot={remainingHouseholdPot}
+              numberOfHouseholdMembers={members.length} // Pass the total number of members
             />
           </motion.div>
         ))}
@@ -57,4 +58,4 @@ export function MemberList({
   );
 }
 
-    
+

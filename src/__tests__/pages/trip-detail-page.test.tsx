@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -70,7 +71,7 @@ const mockAppContextBase: Partial<AppContextType> = {
   tripContributions: mockTripContributionsBase, // Global list
   tripExpenses: mockTripExpensesBase, // Global list
   getTripMemberById: jest.fn((id) => mockTripMembersBase.find(tm => tm.id === id)),
-  getTripMemberTotalDirectContribution: jest.fn((memberId) => 
+  getTripMemberTotalDirectContribution: jest.fn((memberId) =>
     mockTripContributionsBase.filter(tc => tc.tripMemberId === memberId).reduce((sum, tc) => sum + tc.amount, 0)
   ),
   getTripExpenses: jest.fn().mockReturnValue(mockTripExpensesBase),
@@ -87,24 +88,29 @@ describe('TripDetailPage', () => {
   const user = userEvent.setup();
 
   const renderPage = (appContextOverrides: Partial<AppContextType> = {}) => {
+    const currentTripMembers = appContextOverrides.tripMembers || [...mockTripMembersBase];
+    const currentTripContributions = appContextOverrides.tripContributions || [...mockTripContributionsBase];
+    const currentTripExpenses = appContextOverrides.tripExpenses || [...mockTripExpensesBase];
+
+
     // Reset mocks for each test
-    (mockAppContextBase.getTripById as jest.Mock).mockReturnValue(mockTripBase);
-    (mockAppContextBase.getTripMembers as jest.Mock).mockReturnValue([...mockTripMembersBase]);
-    (mockAppContextBase.getTripMemberTotalDirectContribution as jest.Mock).mockImplementation((memberId) => 
-        (appContextOverrides.tripContributions || mockTripContributionsBase)
+    (mockAppContextBase.getTripById as jest.Mock).mockReturnValue(appContextOverrides.getTripById ? appContextOverrides.getTripById('trip-123') : mockTripBase);
+    (mockAppContextBase.getTripMembers as jest.Mock).mockReturnValue(currentTripMembers);
+    (mockAppContextBase.getTripMemberTotalDirectContribution as jest.Mock).mockImplementation((memberId) =>
+        currentTripContributions
         .filter(tc => tc.tripMemberId === memberId)
         .reduce((sum, tc) => sum + tc.amount, 0)
     );
-    (mockAppContextBase.getTripExpenses as jest.Mock).mockReturnValue(appContextOverrides.tripExpenses || [...mockTripExpensesBase]);
+    (mockAppContextBase.getTripExpenses as jest.Mock).mockReturnValue(currentTripExpenses);
 
     const finalAppContext: AppContextType = {
       ...mockAppContextBase,
       ...appContextOverrides,
-      tripMembers: appContextOverrides.tripMembers || [...mockTripMembersBase],
-      tripContributions: appContextOverrides.tripContributions || [...mockTripContributionsBase],
-      tripExpenses: appContextOverrides.tripExpenses || [...mockTripExpensesBase],
+      tripMembers: currentTripMembers,
+      tripContributions: currentTripContributions,
+      tripExpenses: currentTripExpenses,
     } as AppContextType;
-    
+
     return render(
       <AuthContext.Provider value={{ user: mockAuthUser, loading: false, loginWithEmail: jest.fn(), signupWithEmail: jest.fn(), logout: jest.fn() }}>
         <AppContext.Provider value={finalAppContext}>
@@ -141,7 +147,7 @@ describe('TripDetailPage', () => {
     renderPage();
     await user.click(screen.getByRole('button', { name: /add trip member/i }));
     expect(screen.getByRole('dialog', { name: /add new trip member/i })).toBeInTheDocument();
-    
+
     await user.type(screen.getByLabelText(/member name/i), 'Charlie');
     await user.click(screen.getByRole('button', { name: /add trip member/i }));
 
@@ -153,7 +159,7 @@ describe('TripDetailPage', () => {
     renderPage();
     const aliceCard = screen.getByText('Alice').closest('div[class*="card"]');
     if (!aliceCard) throw new Error("Alice card not found");
-    
+
     const optionsButton = aliceCard.querySelector('button[aria-haspopup="menu"]');
     if (!optionsButton) throw new Error("Options button for Alice not found");
     await user.click(optionsButton);
@@ -164,7 +170,7 @@ describe('TripDetailPage', () => {
     expect(screen.getByRole('dialog', { name: /add contribution for alice/i })).toBeInTheDocument();
     await user.clear(screen.getByLabelText(/contribution amount/i));
     await user.type(screen.getByLabelText(/contribution amount/i), '50');
-    
+
     await user.click(screen.getByRole('button', { name: /save trip contribution/i }));
 
     expect(mockAppContextBase.addTripContribution).toHaveBeenCalledWith(mockTripBase.id, 'tm-1', expect.objectContaining({
@@ -184,6 +190,14 @@ describe('TripDetailPage', () => {
     // Select category
     await user.click(screen.getByRole('combobox', { name: /select category/i }));
     await user.click(screen.getByText(INITIAL_CATEGORIES.find(c=>c.id === 'entertainment')!.name));
+    
+    // Check default split behavior
+    expect(screen.getByLabelText(/split this expense/i)).toBeChecked();
+    // Assuming Alice, Bob, Auth User are currentTripMembers
+    expect(screen.getByRole('checkbox', { name: 'Alice'})).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Bob'})).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Auth User'})).toBeChecked();
+
 
     await user.click(screen.getByRole('button', { name: /add expense/i }));
 
@@ -192,12 +206,15 @@ describe('TripDetailPage', () => {
       description: 'Park Tickets',
       amount: 120,
       categoryId: 'entertainment',
+      isSplit: true,
+      paidByTripMemberId: 'tm-auth-user', // Defaulted to current user if member
+      splitWithTripMemberIds: ['tm-1', 'tm-2', 'tm-auth-user']
     }));
     expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ title: "Trip Expense Added" }));
   });
-  
+
   it('calculates and displays correct trip pot summary (positive balance)', () => {
-    // Alice: 100, Bob: 150. Total Contributions: 250
+    // Alice: 100, Bob: 150. Auth User: 0. Total Contributions: 250
     // Shared Tent Expense: 50. Total Spending: 50
     // Remaining in Pot: 250 - 50 = 200
     renderPage(); // Uses mockAppContextBase defaults
@@ -236,10 +253,37 @@ describe('TripDetailPage', () => {
     expect(screen.getByText(`${DEFAULT_CURRENCY}300.00`)).toBeInTheDocument(); // Total Trip Spending
     expect(screen.getByText(`-${DEFAULT_CURRENCY}50.00`)).toBeInTheDocument(); // Remaining in Pot (negative)
     expect(screen.getByText(/100% of pot used/i)).toBeInTheDocument(); // (300/250)*100, capped at 100 if spending > contributions
-    
+
     const remainingPotElement = screen.getByText(`-${DEFAULT_CURRENCY}50.00`);
     expect(remainingPotElement).toHaveClass('text-destructive');
   });
+
+  it('calculates "Net Share in Trip Pot" as equally shared deficit when total contributions are zero and pot is negative', () => {
+    const tripMembers: TripMember[] = [
+      { id: 'tm1', tripId: 'trip-123', name: 'Member1' },
+      { id: 'tm2', tripId: 'trip-123', name: 'Member2' },
+    ];
+    const tripExpenses: TripExpense[] = [
+      { id: 'te-deficit', tripId: 'trip-123', description: 'Unexpected Fee', amount: 100, date: formatISO(new Date()), categoryId: 'other' },
+    ];
+    // Total Contributions: 0
+    // Total Spending: 100
+    // Remaining in Pot: -100
+    // Each member's share: -100 / 2 = -50
+    renderPage({
+      tripMembers: tripMembers,
+      tripContributions: [], // No contributions
+      tripExpenses: tripExpenses,
+      getTripMemberTotalDirectContribution: () => 0, // Ensure this returns 0 for all members
+    });
+
+    const member1Card = screen.getByText('Member1').closest('div[class*="card"]');
+    const member2Card = screen.getByText('Member2').closest('div[class*="card"]');
+
+    expect(member1Card).toHaveTextContent(`Net Share in Trip Pot:-${DEFAULT_CURRENCY}50.00`);
+    expect(member2Card).toHaveTextContent(`Net Share in Trip Pot:-${DEFAULT_CURRENCY}50.00`);
+  });
+
 
   it('calculates and displays correct "Net Share in Trip Pot" for each member (negative pot balance)', () => {
     const highExpenses: TripExpense[] = [
@@ -258,7 +302,7 @@ describe('TripDetailPage', () => {
     expect(aliceCard).toHaveTextContent(`Net Share in Trip Pot:-${DEFAULT_CURRENCY}20.00`);
     expect(bobCard).toHaveTextContent(`Net Share in Trip Pot:-${DEFAULT_CURRENCY}30.00`);
     expect(authUserCard).toHaveTextContent(`Net Share in Trip Pot:${DEFAULT_CURRENCY}0.00`);
-    
+
     const aliceShareElement = within(aliceCard!).getByText(`-${DEFAULT_CURRENCY}20.00`);
     expect(aliceShareElement).toHaveClass('text-destructive');
     const bobShareElement = within(bobCard!).getByText(`-${DEFAULT_CURRENCY}30.00`);
@@ -272,7 +316,7 @@ describe('TripDetailPage', () => {
     renderPage();
     const bobCard = screen.getByText('Bob').closest('div[class*="card"]');
     if (!bobCard) throw new Error("Bob card not found");
-    
+
     const optionsButton = bobCard.querySelector('button[aria-haspopup="menu"]');
     if (!optionsButton) throw new Error("Options button for Bob not found");
     await user.click(optionsButton);
@@ -283,20 +327,22 @@ describe('TripDetailPage', () => {
     expect(screen.getByRole('alertdialog', { name: /are you sure/i })).toBeInTheDocument();
     expect(screen.getByText(/this will remove the member and their contributions/i)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /delete/i }));
-    
+
     expect(mockAppContextBase.deleteTripMember).toHaveBeenCalledWith('tm-2'); // Bob's ID
     expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ title: "Trip Member Deleted" }));
   });
-  
+
   it('correctly determines current logged-in user as trip member for default payer in expense form', async () => {
     // Ensure 'Auth User' is a trip member (tm-auth-user)
     renderPage();
-    
+
     await user.click(screen.getByRole('button', { name: /add trip expense/i }));
-    
+
     // Click the "Split this expense" checkbox
     const splitCheckbox = screen.getByLabelText(/split this expense/i);
-    await user.click(splitCheckbox);
+    // It should already be checked by default for new expenses
+    expect(splitCheckbox).toBeChecked();
+
 
     // Check if "Auth User" is selected as the payer by default
     await waitFor(() => {

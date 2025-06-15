@@ -14,12 +14,12 @@ interface TripMemberListProps {
   remainingTripPot: number;
 }
 
-export function TripMemberList({ 
-  tripMembers, 
-  onDeleteTripMember, 
+export function TripMemberList({
+  tripMembers,
+  onDeleteTripMember,
   onAddTripContribution,
   totalTripContributions,
-  remainingTripPot 
+  remainingTripPot
 }: TripMemberListProps) {
   if (tripMembers.length === 0) {
     return (
@@ -49,6 +49,7 @@ export function TripMemberList({
               onAddContribution={onAddTripContribution}
               totalTripContributions={totalTripContributions}
               remainingTripPot={remainingTripPot}
+              numberOfTripMembers={tripMembers.length} // Pass the total number of trip members
             />
           </motion.div>
         ))}

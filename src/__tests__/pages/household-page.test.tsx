@@ -46,7 +46,7 @@ const mockAppContextBase: Partial<AppContextType> = {
   members: mockMembersBase,
   contributions: mockContributionsBase,
   expenses: mockExpensesBase,
-  sharedBudgets: mockSharedBudgetsBase, 
+  sharedBudgets: mockSharedBudgetsBase,
   categories: [{id: HOUSEHOLD_EXPENSE_CATEGORY_ID, name: "Household Expenses", iconName: "ReceiptText", color: "#ccc"}], // Ensure HOUSEHOLD_EXPENSE_CATEGORY_ID is defined
   getCategoryById: (id) => id === HOUSEHOLD_EXPENSE_CATEGORY_ID ? {id: HOUSEHOLD_EXPENSE_CATEGORY_ID, name: "Household Expenses", iconName: "ReceiptText", color: "#ccc"} : undefined,
   addMember: jest.fn(),
@@ -68,7 +68,7 @@ const mockAppContextBase: Partial<AppContextType> = {
         spentOnSharedBudgetsIds.add(expense.id);
       }
     });
-    
+
     mockExpensesBase.forEach(expense => {
       if (expense.categoryId === HOUSEHOLD_EXPENSE_CATEGORY_ID && !spentOnSharedBudgetsIds.has(expense.id)) {
         totalSpending += expense.amount;
@@ -110,7 +110,7 @@ describe('HouseholdPage', () => {
             spentOnSharedBudgetsIds.add(expense.id);
           }
         });
-        
+
         currentExpenses.forEach(expense => {
           if (expense.categoryId === HOUSEHOLD_EXPENSE_CATEGORY_ID && !spentOnSharedBudgetsIds.has(expense.id)) {
             totalSpending += expense.amount;
@@ -119,7 +119,7 @@ describe('HouseholdPage', () => {
         return totalSpending;
       },
     };
-    
+
     return render(
       <AuthContext.Provider value={{ user: mockUser, loading: false, loginWithEmail: jest.fn(), signupWithEmail: jest.fn(), logout: jest.fn() }}>
         <AppContext.Provider value={finalAppContext as AppContextType}>
@@ -160,7 +160,7 @@ describe('HouseholdPage', () => {
     renderPage();
     await user.click(screen.getByRole('button', { name: /add new member/i }));
     expect(screen.getByRole('dialog', { name: /add new household member/i })).toBeInTheDocument();
-    
+
     await user.type(screen.getByLabelText(/member name/i), 'Charlie');
     await user.click(screen.getByRole('button', { name: /add member/i }));
 
@@ -172,7 +172,7 @@ describe('HouseholdPage', () => {
     renderPage();
     const aliceCard = screen.getByText('Alice').closest('div[class*="card"]');
     if (!aliceCard) throw new Error("Alice card not found");
-    
+
     const optionsButton = aliceCard.querySelector('button[aria-haspopup="menu"]');
     if (!optionsButton) throw new Error("Options button for Alice not found");
     await user.click(optionsButton);
@@ -192,7 +192,7 @@ describe('HouseholdPage', () => {
     }));
     expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ title: "Contribution Added" }));
   });
-  
+
   it('opens "Add Shared Expense" dialog and calls addExpense on save, defaulting to household category', async () => {
     renderPage();
     await user.click(screen.getByRole('button', { name: /add shared expense/i }));
@@ -202,12 +202,21 @@ describe('HouseholdPage', () => {
     await user.clear(screen.getByLabelText(/amount/i));
     await user.type(screen.getByLabelText(/amount/i), '120');
     // Not selecting a category or shared budget explicitly
+    // Check default split behavior
+    expect(screen.getByLabelText(/split this expense/i)).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Alice'})).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Bob'})).toBeChecked();
+
+
     await user.click(screen.getByRole('button', { name: /add expense/i }));
 
     expect(mockAppContextBase.addExpense).toHaveBeenCalledWith(expect.objectContaining({
       description: 'Team Lunch',
       amount: 120,
       categoryId: HOUSEHOLD_EXPENSE_CATEGORY_ID, // Should default here
+      isSplit: true,
+      // paidByMemberId would be current user if set, or empty
+      splitWithMemberIds: ['member-1', 'member-2'] // Assuming Alice and Bob are the mockMembersBase
     }));
     expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ title: "Shared Expense Added" }));
   });
@@ -263,18 +272,44 @@ describe('HouseholdPage', () => {
 
     expect(aliceCard).toHaveTextContent(`Net Share in Pot:-${DEFAULT_CURRENCY}20.00`);
     expect(bobCard).toHaveTextContent(`Net Share in Pot:-${DEFAULT_CURRENCY}30.00`);
-    
+
     const aliceShareElement = screen.getByText(`-${DEFAULT_CURRENCY}20.00`);
     expect(aliceShareElement).toHaveClass('text-destructive');
     const bobShareElement = screen.getByText(`-${DEFAULT_CURRENCY}30.00`);
     expect(bobShareElement).toHaveClass('text-destructive');
   });
-  
+
+  it('calculates "Net Share in Pot" as equally shared deficit when total contributions are zero and pot is negative', () => {
+    const members: Member[] = [{ id: 'm1', name: 'Member1' }, { id: 'm2', name: 'Member2' }];
+    const expenses: Expense[] = [
+      { id: 'exp-deficit', description: 'Unexpected Bill', amount: 100, date: formatISO(new Date()), categoryId: HOUSEHOLD_EXPENSE_CATEGORY_ID },
+    ];
+    // Total Contributions: 0
+    // Total Spending: 100
+    // Remaining in Pot: -100
+    // Each member's share: -100 / 2 = -50
+    renderPage({
+      members: members,
+      contributions: [], // No contributions
+      expenses: expenses,
+      sharedBudgets: [],
+      getMemberTotalContribution: () => 0, // Ensure this returns 0 for all members
+      getTotalHouseholdSpending: () => expenses.reduce((sum, e) => sum + e.amount, 0),
+    });
+
+    const member1Card = screen.getByText('Member1').closest('div[class*="card"]');
+    const member2Card = screen.getByText('Member2').closest('div[class*="card"]');
+
+    expect(member1Card).toHaveTextContent(`Net Share in Pot:-${DEFAULT_CURRENCY}50.00`);
+    expect(member2Card).toHaveTextContent(`Net Share in Pot:-${DEFAULT_CURRENCY}50.00`);
+  });
+
+
   it('handles deletion of a member', async () => {
     renderPage();
     const bobCard = screen.getByText('Bob').closest('div[class*="card"]');
     if (!bobCard) throw new Error("Bob card not found");
-    
+
     const optionsButton = bobCard.querySelector('button[aria-haspopup="menu"]');
     if (!optionsButton) throw new Error("Options button for Bob not found");
     await user.click(optionsButton);
@@ -284,7 +319,7 @@ describe('HouseholdPage', () => {
 
     expect(screen.getByRole('alertdialog', { name: /are you sure/i })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /delete/i }));
-    
+
     expect(mockAppContextBase.deleteMember).toHaveBeenCalledWith('member-2'); // Bob's ID
     expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ title: "Member Deleted" }));
   });
@@ -298,7 +333,7 @@ describe('HouseholdPage', () => {
     const testMembers: Member[] = [{ id: 'm1', name: 'Tester1' }];
     const testContributions: Contribution[] = [{ id: 'c1', memberId: 'm1', amount: 200, date: '2023-01-01', notes: 'Initial' }];
     const testExpenses: Expense[] = [{ id: 'e1', description: 'Test Shared Item', amount: 50, date: '2023-01-02', categoryId: HOUSEHOLD_EXPENSE_CATEGORY_ID }];
-    
+
     renderPage({
       members: testMembers,
       contributions: testContributions,
@@ -309,9 +344,9 @@ describe('HouseholdPage', () => {
     });
 
     await user.click(screen.getByRole('button', { name: /export household data/i }));
-    
+
     expect(mockExportToCsv).toHaveBeenCalledTimes(1);
-    
+
     const expectedFilename = `trackwise_household_data_${formatDateFns(new Date(), 'yyyy-MM-dd')}.csv`;
     const capturedArgs = mockExportToCsv.mock.calls[0];
     const csvData = capturedArgs[1]; // This is the array of arrays
@@ -341,7 +376,7 @@ describe('HouseholdPage', () => {
       ["Member Name", `Amount (${DEFAULT_CURRENCY})`, "Date", "Notes"],
       ["Tester1", "200.00", "2023-01-01", "Initial"],
     ]));
-    
+
     // Check Shared Expenses Affecting Pot
     expect(csvData).toEqual(expect.arrayContaining([
       ["Shared Expenses Affecting Pot"],
@@ -350,10 +385,11 @@ describe('HouseholdPage', () => {
     ]));
 
     expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ title: "Household Data Exported" }));
-    
+
     jest.restoreAllMocks(); // Clean up spy
   });
 
 });
 
-    
+
+
