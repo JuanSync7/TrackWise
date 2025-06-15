@@ -19,8 +19,9 @@ export function TripSettlementItem({ settlement }: TripSettlementItemProps) {
 
   if (!owedByMember || !owedToMember) {
     return (
-      <div className="p-3 rounded-md bg-destructive/10 text-destructive text-sm">
-        Error: Could not display settlement due to missing member data.
+      <div className="flex items-center justify-between p-3 rounded-md border bg-destructive/10 text-destructive text-sm">
+        <User className="h-4 w-4 mr-2 text-destructive-foreground" />
+        <span>Settlement error: Member data missing.</span>
       </div>
     );
   }
