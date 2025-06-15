@@ -72,9 +72,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const updateBudgetGoal = (updatedGoal: BudgetGoal) => {
-    // currentSpending is dynamically calculated by useEffect, so we mainly update other fields
     setBudgetGoals(prev => prev.map(goal => 
-        goal.id === updatedGoal.id ? { ...goal, categoryId: updatedGoal.categoryId, amount: updatedGoal.amount, period: updatedGoal.period } : goal
+        goal.id === updatedGoal.id ? { ...goal, ...updatedGoal } : goal // Keep goal's currentSpending as it's part of updatedGoal now
     ));
   };
 
@@ -195,11 +194,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       prev.map(budget => 
         budget.id === updatedBudget.id ? 
         { 
-          ...budget,
+          ...budget, // Preserve existing fields like createdAt
           name: updatedBudget.name, 
           amount: updatedBudget.amount, 
           period: updatedBudget.period,
           description: updatedBudget.description
+          // currentSpending will be preserved from the passed updatedBudget if it's there,
+          // or updated by the useEffect for shared budgets
         } : budget
       )
     );
@@ -259,6 +260,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       prevGoals.map(goal => {
         const relevantExpenses = expenses.filter(exp => {
           if (exp.categoryId !== goal.categoryId) return false;
+          // TODO: Add period filtering logic here if needed (e.g. only sum expenses from goal's current period)
           return true; 
         });
         const currentSpending = relevantExpenses.reduce((sum, exp) => sum + exp.amount, 0);
@@ -333,3 +335,4 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
+

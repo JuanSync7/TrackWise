@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { BudgetGoal } from '@/lib/types';
@@ -46,7 +47,7 @@ export function BudgetItem({ budgetGoal, onEdit, onDelete }: BudgetItemProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => onEdit(budgetGoal)} disabled> {/* Edit not fully implemented */}
+              <DropdownMenuItem onClick={() => onEdit(budgetGoal)}>
                 <Edit2 className="mr-2 h-4 w-4" />
                 Edit
               </DropdownMenuItem>
@@ -81,3 +82,4 @@ export function BudgetItem({ budgetGoal, onEdit, onDelete }: BudgetItemProps) {
     </Card>
   );
 }
+

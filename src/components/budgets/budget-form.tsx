@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 import type { BudgetGoal } from '@/lib/types';
 import { useAppContext } from '@/contexts/app-context';
 import { CategoryIcon } from '@/components/shared/category-icon';
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const budgetFormSchema = z.object({
   categoryId: z.string({ required_error: "Please select a category." }),
@@ -45,14 +45,31 @@ export function BudgetForm({ budgetGoal, onSave, onCancel, isSubmitting }: Budge
 
   const form = useForm<BudgetFormValues>({
     resolver: zodResolver(budgetFormSchema),
-    defaultValues: budgetGoal 
-      ? { categoryId: budgetGoal.categoryId, amount: budgetGoal.amount, period: budgetGoal.period }
-      : { categoryId: "", amount: 0, period: "monthly" },
+    // defaultValues are set in useEffect to handle dynamic budgetGoal prop
   });
+
+  useEffect(() => {
+    if (budgetGoal) {
+      form.reset({
+        categoryId: budgetGoal.categoryId,
+        amount: budgetGoal.amount,
+        period: budgetGoal.period,
+      });
+    } else {
+      form.reset({
+        categoryId: "",
+        amount: 0,
+        period: "monthly",
+      });
+    }
+  }, [budgetGoal, form]);
+
 
   function onSubmit(data: BudgetFormValues) {
     onSave(data);
-    form.reset();
+    if (!budgetGoal) { // Reset only if it's a new item form
+        form.reset({ categoryId: "", amount: 0, period: "monthly" });
+    }
   }
 
   const selectedCategory = getCategoryById(form.watch("categoryId"));
@@ -98,7 +115,7 @@ export function BudgetForm({ budgetGoal, onSave, onCancel, isSubmitting }: Budge
                           value={category.name}
                           key={category.id}
                           onSelect={() => {
-                            form.setValue("categoryId", category.id);
+                            form.setValue("categoryId", category.id, { shouldValidate: true });
                             setCategoryPopoverOpen(false);
                           }}
                         >
@@ -133,7 +150,7 @@ export function BudgetForm({ budgetGoal, onSave, onCancel, isSubmitting }: Budge
             <FormItem>
               <FormLabel>Budget Amount</FormLabel>
               <FormControl>
-                <Input type="number" placeholder="0.00" {...field} />
+                <Input type="number" placeholder="0.00" {...field} step="0.01" />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -146,7 +163,7 @@ export function BudgetForm({ budgetGoal, onSave, onCancel, isSubmitting }: Budge
           render={({ field }) => (
             <FormItem>
               <FormLabel>Period</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select onValueChange={field.onChange} value={field.value || "monthly"}>
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Select a budget period" />
@@ -177,3 +194,4 @@ export function BudgetForm({ budgetGoal, onSave, onCancel, isSubmitting }: Budge
     </Form>
   );
 }
+

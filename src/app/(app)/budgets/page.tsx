@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { PageHeader } from '@/components/shared/page-header';
 import { BudgetForm } from '@/components/budgets/budget-form';
 import { BudgetList } from '@/components/budgets/budget-list';
@@ -37,16 +37,23 @@ export default function BudgetsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [budgetToDelete, setBudgetToDelete] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!isFormOpen) {
+      setEditingBudget(undefined);
+    }
+  }, [isFormOpen]);
+
 
   const handleSaveBudget = async (data: Omit<BudgetGoal, 'id' | 'currentSpending'>) => {
     setIsSubmitting(true);
     try {
       if (editingBudget) {
-        // updateBudgetGoal({ ...editingBudget, ...data }); // Implement update if needed
-        toast({ title: "Budget Updated", description: "Your budget goal has been successfully updated." });
+        // The updateBudgetGoal function in AppContext will handle preserving currentSpending and id
+        updateBudgetGoal({ ...editingBudget, ...data }); 
+        toast({ title: "Budget Updated", description: `Budget goal for "${getCategoryById(data.categoryId)?.name || 'Category'}" has been successfully updated.` });
       } else {
         addBudgetGoal(data);
-        toast({ title: "Budget Goal Set", description: "Your new budget goal has been successfully set." });
+        toast({ title: "Budget Goal Set", description: `New budget goal for "${getCategoryById(data.categoryId)?.name || 'Category'}" has been successfully set.` });
       }
       setIsFormOpen(false);
       setEditingBudget(undefined);
@@ -58,10 +65,8 @@ export default function BudgetsPage() {
   };
 
   const handleEditBudget = (budget: BudgetGoal) => {
-    // For future implementation
-    // setEditingBudget(budget);
-    // setIsFormOpen(true);
-    toast({title: "Edit Not Implemented", description: "Editing budget goals will be available in a future update."});
+    setEditingBudget(budget);
+    setIsFormOpen(true);
   };
 
   const handleDeleteBudget = (budgetId: string) => {
@@ -70,8 +75,9 @@ export default function BudgetsPage() {
 
   const confirmDeleteBudget = () => {
     if (budgetToDelete) {
+      const budgetName = getCategoryById(budgetGoals.find(b => b.id === budgetToDelete)?.categoryId || "")?.name || "The budget";
       contextDeleteBudget(budgetToDelete);
-      toast({ title: "Budget Goal Deleted", description: "The budget goal has been successfully deleted." });
+      toast({ title: "Budget Goal Deleted", description: `"${budgetName}" goal has been successfully deleted.` });
       setBudgetToDelete(null);
     }
   };
@@ -121,12 +127,7 @@ export default function BudgetsPage() {
         }
       />
       
-      <Dialog open={isFormOpen} onOpenChange={(isOpen) => {
-         if (!isOpen) {
-          setEditingBudget(undefined);
-        }
-        setIsFormOpen(isOpen);
-      }}>
+      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="sm:max-w-[425px] md:max-w-md">
           <DialogHeader>
             <DialogTitle>{editingBudget ? 'Edit Budget Goal' : 'Set New Budget Goal'}</DialogTitle>
@@ -137,7 +138,7 @@ export default function BudgetsPage() {
           <BudgetForm
             budgetGoal={editingBudget}
             onSave={handleSaveBudget}
-            onCancel={() => { setIsFormOpen(false); setEditingBudget(undefined);}}
+            onCancel={() => { setIsFormOpen(false);}}
             isSubmitting={isSubmitting}
           />
         </DialogContent>
@@ -148,7 +149,7 @@ export default function BudgetsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the selected budget goal.
+              This action cannot be undone. This will permanently delete the budget goal for <span className="font-semibold">{getCategoryById(budgetGoals.find(b=>b.id === budgetToDelete)?.categoryId || "")?.name || 'this category'}</span>.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -172,3 +173,4 @@ export default function BudgetsPage() {
     </div>
   );
 }
+
