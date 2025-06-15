@@ -19,9 +19,10 @@ import {
 import { useHousehold } from '@/contexts/household-context';
 import { useToast } from "@/hooks/use-toast";
 import type { SharedBudget } from '@/lib/types';
-import { SharedBudgetList } from '@/components/household/shared-budget-list';
+// import { SharedBudgetList } from '@/components/household/shared-budget-list'; // Lazy load
 
 const SharedBudgetForm = React.lazy(() => import('@/components/household/shared-budget-form').then(module => ({ default: module.SharedBudgetForm })));
+const SharedBudgetList = React.lazy(() => import('@/components/household/shared-budget-list').then(module => ({ default: module.SharedBudgetList })));
 type SharedBudgetFormValues = Omit<SharedBudget, 'id' | 'createdAt' | 'currentSpending'>;
 
 export default function SharedBudgetsPage() {
@@ -51,7 +52,7 @@ export default function SharedBudgetsPage() {
         toast({ title: "Shared Budget Created", description: `New shared budget "${data.name}" has been successfully created.` });
       }
       setIsFormOpen(false);
-      // setEditingBudget(undefined); // Already handled by onOpenChange
+      setEditingBudget(undefined); 
     } catch (error) {
       toast({ variant: "destructive", title: "Save Failed", description: "Could not save shared budget. Please try again." });
     } finally {
@@ -133,11 +134,13 @@ export default function SharedBudgetsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <SharedBudgetList
-        sharedBudgets={sharedBudgets}
-        onDeleteSharedBudget={handleDeleteBudget}
-        onEditSharedBudget={handleEditBudget}
-      />
+      <Suspense fallback={<div className="flex justify-center items-center h-60"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+        <SharedBudgetList
+          sharedBudgets={sharedBudgets}
+          onDeleteSharedBudget={handleDeleteBudget}
+          onEditSharedBudget={handleEditBudget}
+        />
+      </Suspense>
     </div>
   );
 }

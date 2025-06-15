@@ -11,11 +11,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useHousehold } from '@/contexts/household-context';
 import { useToast } from "@/hooks/use-toast";
 import type { ShoppingListItem } from '@/lib/types';
-import { ShoppingList } from '@/components/household/shopping-list';
+// import { ShoppingList } from '@/components/household/shopping-list'; // Lazy load
 import { exportToCsv } from '@/lib/utils';
 import { format as formatDate, parseISO } from 'date-fns';
 
 const ShoppingListItemForm = React.lazy(() => import('@/components/household/shopping-list-item-form').then(module => ({ default: module.ShoppingListItemForm })));
+const ShoppingList = React.lazy(() => import('@/components/household/shopping-list').then(module => ({ default: module.ShoppingList })));
 
 
 export default function ShoppingListPage() {
@@ -61,7 +62,7 @@ export default function ShoppingListPage() {
         toast({ title: "Item Added", description: "New item added to the shopping list." });
       }
       setIsFormOpen(false);
-      // setEditingItem(undefined); // Already handled by onOpenChange
+      setEditingItem(undefined); 
     } catch (error) {
       toast({ variant: "destructive", title: "Save Failed", description: "Could not save shopping list item. Please try again." });
     } finally {
@@ -173,12 +174,14 @@ export default function ShoppingListPage() {
           </CardContent>
         </Card>
 
-        <ShoppingList
-          items={shoppingListItems}
-          onEditItem={handleEditItemModal}
-          onDeleteItem={handleDeleteItem}
-          onTogglePurchased={handleTogglePurchased}
-        />
+        <Suspense fallback={<div className="flex justify-center items-center h-60"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+          <ShoppingList
+            items={shoppingListItems}
+            onEditItem={handleEditItemModal}
+            onDeleteItem={handleDeleteItem}
+            onTogglePurchased={handleTogglePurchased}
+          />
+        </Suspense>
       </div>
 
 

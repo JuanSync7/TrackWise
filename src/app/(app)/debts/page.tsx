@@ -19,10 +19,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { DebtList } from '@/components/debts/debt-list';
-import { Input } from '@/components/ui/input'; // For contribution amount
+// import { DebtList } from '@/components/debts/debt-list'; // Lazy load
+import { Input } from '@/components/ui/input'; 
 
 const DebtForm = React.lazy(() => import('@/components/debts/debt-form').then(module => ({ default: module.DebtForm })));
+const DebtList = React.lazy(() => import('@/components/debts/debt-list').then(module => ({ default: module.DebtList })));
 
 export default function PersonalDebtsPage() {
   const { personalDebts, addPersonalDebt, updatePersonalDebt, deletePersonalDebt, logPaymentToPersonalDebt } = usePersonalFinance();
@@ -115,7 +116,10 @@ export default function PersonalDebtsPage() {
         }
       />
 
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+      <Dialog open={isFormOpen} onOpenChange={(isOpen) => {
+        if(!isOpen) setEditingDebt(undefined);
+        setIsFormOpen(isOpen);
+      }}>
         <DialogContent className="sm:max-w-[425px] md:max-w-md">
           <DialogHeader>
             <DialogTitle>{editingDebt ? 'Edit Personal Debt' : 'Add New Personal Debt'}</DialogTitle>
@@ -144,7 +148,9 @@ export default function PersonalDebtsPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setDebtToDelete(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeleteDebt} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"><Trash2 className="mr-2 h-4 w-4"/>Delete</AlertDialogAction>
+            <AlertDialogAction onClick={confirmDeleteDebt} variant="destructive">
+              <Trash2 className="mr-2 h-4 w-4"/>Delete
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -175,12 +181,14 @@ export default function PersonalDebtsPage() {
       </AlertDialog>
 
 
-      <DebtList
-        debts={personalDebts}
-        onEditDebt={handleEditDebt}
-        onDeleteDebt={handleDeleteDebtRequest}
-        onLogPayment={handleOpenLogPaymentModal}
-      />
+      <Suspense fallback={<div className="flex justify-center items-center h-60"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+        <DebtList
+          debts={personalDebts}
+          onEditDebt={handleEditDebt}
+          onDeleteDebt={handleDeleteDebtRequest}
+          onLogPayment={handleOpenLogPaymentModal}
+        />
+      </Suspense>
     </div>
   );
 }

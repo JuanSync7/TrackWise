@@ -20,12 +20,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { BudgetGoalPieChart } from '@/components/dashboard/budget-goal-pie-chart';
-import { BudgetList } from '@/components/budgets/budget-list';
+// import { BudgetList } from '@/components/budgets/budget-list'; // Lazy load this
 import { exportToCsv } from '@/lib/utils';
 import { format as formatDate } from 'date-fns';
 import { DEFAULT_CURRENCY } from '@/lib/constants';
 
 const BudgetForm = React.lazy(() => import('@/components/budgets/budget-form').then(module => ({ default: module.BudgetForm })));
+const BudgetList = React.lazy(() => import('@/components/budgets/budget-list').then(module => ({ default: module.BudgetList })));
 
 
 export default function BudgetsPage() {
@@ -55,7 +56,7 @@ export default function BudgetsPage() {
         toast({ title: "Budget Goal Set", description: `New budget goal for "${getCategoryById(data.categoryId)?.name || 'Category'}" has been successfully set.` });
       }
       setIsFormOpen(false);
-      // setEditingBudget(undefined); // Already handled by useEffect and Dialog onOpenChange
+      setEditingBudget(undefined); 
     } catch (error) {
       toast({ variant: "destructive", title: "Save Failed", description: "Could not save budget goal. Please try again." });
     } finally {
@@ -127,7 +128,7 @@ export default function BudgetsPage() {
       />
 
       <Dialog open={isFormOpen} onOpenChange={(isOpen) => {
-        if (!isOpen) setEditingBudget(undefined); // Clear editing state when dialog closes
+        if (!isOpen) setEditingBudget(undefined); 
         setIsFormOpen(isOpen);
       }}>
         <DialogContent className="sm:max-w-[425px] md:max-w-md">
@@ -171,11 +172,13 @@ export default function BudgetsPage() {
         </div>
       )}
 
-      <BudgetList
-        budgetGoals={budgetGoals}
-        onEditBudget={handleEditBudget}
-        onDeleteBudget={handleDeleteBudget}
-      />
+      <Suspense fallback={<div className="flex justify-center items-center h-60"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+        <BudgetList
+          budgetGoals={budgetGoals}
+          onEditBudget={handleEditBudget}
+          onDeleteBudget={handleDeleteBudget}
+        />
+      </Suspense>
     </div>
   );
 }

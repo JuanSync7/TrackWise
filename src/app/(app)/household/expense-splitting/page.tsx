@@ -1,19 +1,21 @@
 
 "use client";
 
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo, Suspense } from 'react';
 import { PageHeader } from '@/components/shared/page-header';
-import { useHousehold } from '@/contexts/household-context'; // Changed context
-import { DebtList } from '@/components/household/debt-list';
+import { useHousehold } from '@/contexts/household-context';
+// import { DebtList } from '@/components/household/debt-list'; // Lazy load
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Debt, Member } from '@/lib/types';
 import { useAuth } from '@/contexts/auth-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DEFAULT_CURRENCY } from '@/lib/constants';
-import { ArrowDownCircle, ArrowUpCircle, Users, DivideSquare, Scale } from 'lucide-react';
+import { ArrowDownCircle, ArrowUpCircle, Users, DivideSquare, Scale, Loader2 } from 'lucide-react';
+
+const DebtList = React.lazy(() => import('@/components/household/debt-list').then(module => ({ default: module.DebtList })));
 
 export default function ExpenseSplittingPage() {
-  const { getAllDebts, getMemberById, members, getDebtsOwedByMember, getDebtsOwedToMember } = useHousehold(); // Changed context
+  const { getAllDebts, getMemberById, members, getDebtsOwedByMember, getDebtsOwedToMember } = useHousehold();
   const { user } = useAuth();
 
   const currentUserMember = useMemo(() => {
@@ -121,30 +123,36 @@ export default function ExpenseSplittingPage() {
           {currentUserMember && <TabsTrigger value="owed_to_me" className="flex items-center gap-1"><ArrowUpCircle className="h-4 w-4"/>Owed To Me</TabsTrigger>}
         </TabsList>
         <TabsContent value="all_debts">
-          <DebtList
-            debts={allDebtsForDisplay}
-            title="All Household Debts"
-            emptyStateMessage="No debts in the household. Great job staying on top of things!"
-            emptyStateImageHint="agreement handshake"
-          />
+          <Suspense fallback={<div className="flex justify-center items-center h-60"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+            <DebtList
+              debts={allDebtsForDisplay}
+              title="All Household Debts"
+              emptyStateMessage="No debts in the household. Great job staying on top of things!"
+              emptyStateImageHint="agreement handshake"
+            />
+          </Suspense>
         </TabsContent>
         {currentUserMember && (
             <>
                 <TabsContent value="owed_by_me">
-                <DebtList
-                    debts={debtsOwedByCurrentUserForList}
-                    title={`Debts You Owe (${currentUserMember.name})`}
-                    emptyStateMessage="You currently don't owe anyone anything. Nice!"
-                    emptyStateImageHint="empty wallet"
-                />
+                  <Suspense fallback={<div className="flex justify-center items-center h-60"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+                    <DebtList
+                        debts={debtsOwedByCurrentUserForList}
+                        title={`Debts You Owe (${currentUserMember.name})`}
+                        emptyStateMessage="You currently don't owe anyone anything. Nice!"
+                        emptyStateImageHint="empty wallet"
+                    />
+                  </Suspense>
                 </TabsContent>
                 <TabsContent value="owed_to_me">
-                <DebtList
-                    debts={debtsOwedToCurrentUserForList}
-                    title={`Debts Owed To You (${currentUserMember.name})`}
-                    emptyStateMessage="No one currently owes you anything."
-                    emptyStateImageHint="money bag"
-                />
+                  <Suspense fallback={<div className="flex justify-center items-center h-60"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+                    <DebtList
+                        debts={debtsOwedToCurrentUserForList}
+                        title={`Debts Owed To You (${currentUserMember.name})`}
+                        emptyStateMessage="No one currently owes you anything."
+                        emptyStateImageHint="money bag"
+                    />
+                  </Suspense>
                 </TabsContent>
             </>
         )}

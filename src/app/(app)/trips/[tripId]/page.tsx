@@ -15,8 +15,8 @@ import { usePersonalFinance } from '@/contexts/personal-finance-context';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from "@/hooks/use-toast";
 import type { Trip, TripMember, TripContribution, TripTransaction, TripSettlement, CalculatedMemberFinancials, MemberDisplayFinancials } from '@/lib/types';
-import { TripMemberList } from '@/components/trips/trip-member-list';
-import { TripSettlementList } from '@/components/trips/trip-settlement-list';
+// import { TripMemberList } from '@/components/trips/trip-member-list'; // Lazy load
+// import { TripSettlementList } from '@/components/trips/trip-settlement-list'; // Lazy load
 import { DEFAULT_CURRENCY, POT_PAYER_ID } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -28,6 +28,8 @@ const TripContributionForm = React.lazy(() => import('@/components/trips/trip-co
 type TripContributionFormValues = import('@/components/trips/trip-contribution-form').TripContributionFormValues;
 const TransactionForm = React.lazy(() => import('@/components/transactions/transaction-form').then(module => ({ default: module.TransactionForm })));
 type GenericTransactionFormValues = import('@/components/transactions/transaction-form').TransactionFormValues;
+const TripMemberList = React.lazy(() => import('@/components/trips/trip-member-list').then(module => ({ default: module.TripMemberList })));
+const TripSettlementList = React.lazy(() => import('@/components/trips/trip-settlement-list').then(module => ({ default: module.TripSettlementList })));
 
 
 export default function TripDetailPage() {
@@ -218,7 +220,8 @@ export default function TripDetailPage() {
   if (!trip) {
     return (
       <div className="container mx-auto flex justify-center items-center h-full">
-        <p>Loading trip details or trip not found...</p>
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="ml-2">Loading trip details...</p>
       </div>
     );
   }
@@ -336,11 +339,13 @@ export default function TripDetailPage() {
               <CardDescription>Manage trip members, their cash contributions, personal payments for the group, share of all expenses, and overall net position.</CardDescription>
             </CardHeader>
             <CardContent>
-              <TripMemberList
-                tripMembers={memoizedTripMembers}
-                onDeleteTripMember={handleDeleteTripMemberRequest}
-                onAddTripContribution={handleAddTripContributionClick}
-              />
+              <Suspense fallback={<div className="flex justify-center items-center h-40"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+                <TripMemberList
+                  tripMembers={memoizedTripMembers}
+                  onDeleteTripMember={handleDeleteTripMemberRequest}
+                  onAddTripContribution={handleAddTripContributionClick}
+                />
+              </Suspense>
             </CardContent>
           </Card>
 
@@ -353,12 +358,14 @@ export default function TripDetailPage() {
               <CardDescription>Who owes whom to balance all trip finances (contributions, pot expenses, and member-paid shared expenses).</CardDescription>
             </CardHeader>
             <CardContent>
-                <TripSettlementList
-                    settlements={validSettlements}
-                    tripId={tripId}
-                    finalMemberFinancials={currentTripFinancials}
-                    remainingCashInPot={tripFinancialSummary.remainingCashInPot}
-                />
+              <Suspense fallback={<div className="flex justify-center items-center h-32"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+                  <TripSettlementList
+                      settlements={validSettlements}
+                      tripId={tripId}
+                      finalMemberFinancials={currentTripFinancials}
+                      remainingCashInPot={tripFinancialSummary.remainingCashInPot}
+                  />
+              </Suspense>
             </CardContent>
           </Card>
         </div>

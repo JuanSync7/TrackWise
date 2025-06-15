@@ -21,20 +21,22 @@ import { usePersonalFinance } from '@/contexts/personal-finance-context';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from "@/hooks/use-toast";
 import type { Member, Contribution, HouseholdTransaction, HouseholdSettlement, MemberDisplayFinancials, TransactionType } from '@/lib/types';
-import { MemberList } from '@/components/household/member-list';
+// import { MemberList } from '@/components/household/member-list'; // Lazy load
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { format } from 'date-fns';
 import { DEFAULT_CURRENCY, HOUSEHOLD_EXPENSE_CATEGORY_ID, POT_PAYER_ID } from '@/lib/constants';
 import Link from 'next/link';
 import { cn, exportToCsv } from '@/lib/utils';
-import { TripSettlementList } from '@/components/trips/trip-settlement-list';
+// import { TripSettlementList } from '@/components/trips/trip-settlement-list'; // Lazy load
 
 const MemberForm = React.lazy(() => import('@/components/household/member-form').then(module => ({ default: module.MemberForm })));
 const ContributionForm = React.lazy(() => import('@/components/household/contribution-form').then(module => ({ default: module.ContributionForm })));
 type ContributionFormValues = import('@/components/household/contribution-form').ContributionFormValues;
 const TransactionForm = React.lazy(() => import('@/components/transactions/transaction-form').then(module => ({ default: module.TransactionForm })));
 type TransactionFormValuesType = import('@/components/transactions/transaction-form').TransactionFormValues;
+const MemberList = React.lazy(() => import('@/components/household/member-list').then(module => ({ default: module.MemberList })));
+const TripSettlementList = React.lazy(() => import('@/components/trips/trip-settlement-list').then(module => ({ default: module.TripSettlementList })));
 
 
 export default function HouseholdPage() {
@@ -375,11 +377,13 @@ export default function HouseholdPage() {
               <CardDescription>View members, their cash contributions to the pot, personal payments for group items, share of all expenses, and overall net position.</CardDescription>
             </CardHeader>
             <CardContent>
-              <MemberList
-                members={members}
-                onDeleteMember={handleDeleteMemberRequest}
-                onAddContribution={handleAddContributionClick}
-              />
+              <Suspense fallback={<div className="flex justify-center items-center h-40"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+                <MemberList
+                  members={members}
+                  onDeleteMember={handleDeleteMemberRequest}
+                  onAddContribution={handleAddContributionClick}
+                />
+              </Suspense>
             </CardContent>
           </Card>
 
@@ -392,12 +396,14 @@ export default function HouseholdPage() {
               <CardDescription>Who owes whom to balance all household finances (cash contributions, pot-paid expenses, and member-paid shared expenses).</CardDescription>
             </CardHeader>
             <CardContent>
-                <TripSettlementList
-                    settlements={householdOverallSettlements}
-                    tripId="household_pot_settlement" 
-                    finalMemberFinancials={householdFinancialSummaries}
-                    remainingCashInPot={householdFinancialSummary.remainingCashInPot}
-                />
+              <Suspense fallback={<div className="flex justify-center items-center h-32"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+                  <TripSettlementList
+                      settlements={householdOverallSettlements}
+                      tripId="household_pot_settlement" 
+                      finalMemberFinancials={householdFinancialSummaries}
+                      remainingCashInPot={householdFinancialSummary.remainingCashInPot}
+                  />
+              </Suspense>
             </CardContent>
           </Card>
         </div>

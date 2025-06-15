@@ -63,7 +63,7 @@ export default function TransactionsPage() {
         toast({ title: "Transaction Added", description: "Your new transaction has been successfully recorded." });
       }
       setIsFormOpen(false);
-      // setEditingTransaction(undefined); // Already handled by onOpenChange
+      setEditingTransaction(undefined); 
     } catch (error) {
       toast({ variant: "destructive", title: "Save Failed", description: "Could not save transaction. Please try again." });
     } finally {

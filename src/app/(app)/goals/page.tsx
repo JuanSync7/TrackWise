@@ -19,9 +19,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { GoalList } from '@/components/goals/goal-list';
+// import { GoalList } from '@/components/goals/goal-list'; // Lazy load
 
 const GoalForm = React.lazy(() => import('@/components/goals/goal-form').then(module => ({ default: module.GoalForm })));
+const GoalList = React.lazy(() => import('@/components/goals/goal-list').then(module => ({ default: module.GoalList })));
 
 export default function FinancialGoalsPage() {
   const { financialGoals, addFinancialGoal, updateFinancialGoal, deleteFinancialGoal, contributeToFinancialGoal } = usePersonalFinance();
@@ -114,7 +115,10 @@ export default function FinancialGoalsPage() {
         }
       />
 
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+      <Dialog open={isFormOpen} onOpenChange={(isOpen) => {
+        if(!isOpen) setEditingGoal(undefined);
+        setIsFormOpen(isOpen);
+      }}>
         <DialogContent className="sm:max-w-[425px] md:max-w-md">
           <DialogHeader>
             <DialogTitle>{editingGoal ? 'Edit Financial Goal' : 'Set New Financial Goal'}</DialogTitle>
@@ -143,7 +147,9 @@ export default function FinancialGoalsPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setGoalToDelete(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeleteGoal} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"><Trash2 className="mr-2 h-4 w-4"/>Delete</AlertDialogAction>
+            <AlertDialogAction onClick={confirmDeleteGoal} variant="destructive">
+                <Trash2 className="mr-2 h-4 w-4"/>Delete
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -173,12 +179,14 @@ export default function FinancialGoalsPage() {
       </AlertDialog>
 
 
-      <GoalList
-        goals={financialGoals}
-        onEditGoal={handleEditGoal}
-        onDeleteGoal={handleDeleteGoalRequest}
-        onContributeToGoal={handleOpenContributeModal}
-      />
+      <Suspense fallback={<div className="flex justify-center items-center h-60"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+        <GoalList
+          goals={financialGoals}
+          onEditGoal={handleEditGoal}
+          onDeleteGoal={handleDeleteGoalRequest}
+          onContributeToGoal={handleOpenContributeModal}
+        />
+      </Suspense>
     </div>
   );
 }
