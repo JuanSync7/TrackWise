@@ -10,14 +10,17 @@ import type { Debt, Member } from '@/lib/types';
 import { useAuth } from '@/contexts/auth-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DEFAULT_CURRENCY } from '@/lib/constants';
-import { ArrowDownCircle, ArrowUpCircle, Users, DivideSquare } from 'lucide-react';
+import { ArrowDownCircle, ArrowUpCircle, Users, DivideSquare, Scale } from 'lucide-react'; // Added Scale for Net Balance
 
 export default function ExpenseSplittingPage() {
   const { getAllUnsettledDebts, getMemberById, members, getDebtsOwedByMember, getDebtsOwedToMember } = useAppContext();
   const { user } = useAuth(); 
 
   const currentUserMember = useMemo(() => {
-    if (!user || !user.email) return null;
+    if (!user || !members || members.length === 0) return null;
+    // Prioritize matching by a stored member ID if available, otherwise by name/email part
+    // This part assumes you might store a direct link between Firebase user and household member
+    // For now, we'll stick to name/email matching as per previous logic.
     return members.find(m => 
       (user.displayName && m.name.toLowerCase().includes(user.displayName.toLowerCase())) ||
       (user.email && m.name.toLowerCase().includes(user.email.split('@')[0].toLowerCase()))
@@ -53,7 +56,7 @@ export default function ExpenseSplittingPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">You Owe</CardTitle>
-              <ArrowDownCircle className="h-4 w-4 text-destructive" />
+              <ArrowDownCircle className="h-5 w-5 text-destructive" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-destructive">{DEFAULT_CURRENCY}{totalOwedByCurrentUser.toFixed(2)}</div>
@@ -65,7 +68,7 @@ export default function ExpenseSplittingPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">You Are Owed</CardTitle>
-              <ArrowUpCircle className="h-4 w-4 text-accent" />
+              <ArrowUpCircle className="h-5 w-5 text-accent" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-accent">{DEFAULT_CURRENCY}{totalOwedToCurrentUser.toFixed(2)}</div>
@@ -77,7 +80,7 @@ export default function ExpenseSplittingPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Net Balance</CardTitle>
-              <Users className="h-4 w-4 text-primary" />
+              <Scale className="h-5 w-5 text-primary" />
             </CardHeader>
             <CardContent>
               <div className={`text-2xl font-bold ${netBalance >= 0 ? 'text-accent' : 'text-destructive'}`}>
@@ -141,4 +144,3 @@ export default function ExpenseSplittingPage() {
     </div>
   );
 }
-

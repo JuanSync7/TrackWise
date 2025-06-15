@@ -38,14 +38,7 @@ interface SharedBudgetFormProps {
 export function SharedBudgetForm({ sharedBudget, onSave, onCancel, isSubmitting }: SharedBudgetFormProps) {
   const form = useForm<SharedBudgetFormValues>({
     resolver: zodResolver(sharedBudgetFormSchema),
-    defaultValues: sharedBudget 
-      ? { 
-          name: sharedBudget.name, 
-          amount: sharedBudget.amount, 
-          period: sharedBudget.period, 
-          description: sharedBudget.description || "" 
-        }
-      : { name: "", amount: 0, period: "monthly", description: "" },
+    // Default values are set in useEffect to correctly handle pre-population for editing
   });
 
   useEffect(() => {
@@ -57,15 +50,14 @@ export function SharedBudgetForm({ sharedBudget, onSave, onCancel, isSubmitting 
         description: sharedBudget.description || "",
       });
     } else {
+      // Default values for a new budget
       form.reset({ name: "", amount: 0, period: "monthly", description: "" });
     }
   }, [sharedBudget, form]);
 
   function onSubmit(data: SharedBudgetFormValues) {
     onSave(data);
-    if (!sharedBudget) { // Only reset for new creations, not edits
-        form.reset({ name: "", amount: 0, period: "monthly", description: "" });
-    }
+    // No automatic reset here, parent component (page) handles closing dialog which should clear/reset state
   }
 
   return (
@@ -92,7 +84,7 @@ export function SharedBudgetForm({ sharedBudget, onSave, onCancel, isSubmitting 
             <FormItem>
               <FormLabel>Budget Amount</FormLabel>
               <FormControl>
-                <Input type="number" placeholder="0.00" {...field} />
+                <Input type="number" placeholder="0.00" {...field} step="0.01" />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -105,7 +97,7 @@ export function SharedBudgetForm({ sharedBudget, onSave, onCancel, isSubmitting 
           render={({ field }) => (
             <FormItem>
               <FormLabel>Period</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value}>
+              <Select onValueChange={field.onChange} value={field.value || "monthly"}>
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Select a budget period" />

@@ -12,6 +12,7 @@ import { useMemo, useState, useEffect } from 'react';
 import type { Expense } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
 export default function DashboardPage() {
   const { expenses, budgetGoals } = useAppContext();
@@ -42,11 +43,19 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (expenses.length > 1) {
-      const lastTwoExpenses = expenses.slice(-2);
-      if (lastTwoExpenses[1]?.amount > lastTwoExpenses[0]?.amount) {
-        setExpenseTrend({ value: "Spending up", icon: TrendingUp, color: "text-red-500" });
-      } else if (lastTwoExpenses[1]?.amount < lastTwoExpenses[0]?.amount) {
-        setExpenseTrend({ value: "Spending down", icon: TrendingDown, color: "text-green-500" });
+      // Sort expenses by date to ensure correct comparison, newest first
+      const sortedExpenses = [...expenses].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      const lastExpense = sortedExpenses[0];
+      const secondLastExpense = sortedExpenses[1];
+
+      if (lastExpense && secondLastExpense) {
+        if (lastExpense.amount > secondLastExpense.amount) {
+          setExpenseTrend({ value: "Spending up", icon: TrendingUp, color: "text-destructive" });
+        } else if (lastExpense.amount < secondLastExpense.amount) {
+          setExpenseTrend({ value: "Spending down", icon: TrendingDown, color: "text-accent" });
+        } else {
+          setExpenseTrend(null); // No change or not enough data
+        }
       } else {
         setExpenseTrend(null);
       }
@@ -80,17 +89,17 @@ export default function DashboardPage() {
           trendColor={expenseTrend?.color as any}
         />
         <SummaryCard 
-          title="Total Budget" 
+          title="Total Personal Budget" 
           value={`${DEFAULT_CURRENCY}${totalBudget.toFixed(2)}`}
           icon={Wallet}
           isLoading={isLoading}
         />
          <SummaryCard 
-          title="Remaining Budget" 
+          title="Remaining Personal Budget" 
           value={`${DEFAULT_CURRENCY}${remainingBudget.toFixed(2)}`}
           icon={Wallet} 
           isLoading={isLoading}
-          trendColor={remainingBudget >=0 ? "text-green-500" : "text-red-500"}
+          trendColor={remainingBudget >=0 ? "text-accent" : "text-destructive"}
         />
         <SummaryCard 
           title="Average Transaction" 

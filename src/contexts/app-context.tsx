@@ -72,7 +72,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const updateBudgetGoal = (updatedGoal: BudgetGoal) => {
-    setBudgetGoals(prev => prev.map(goal => goal.id === updatedGoal.id ? updatedGoal : goal));
+    // currentSpending is dynamically calculated by useEffect, so we mainly update other fields
+    setBudgetGoals(prev => prev.map(goal => 
+        goal.id === updatedGoal.id ? { ...goal, categoryId: updatedGoal.categoryId, amount: updatedGoal.amount, period: updatedGoal.period } : goal
+    ));
   };
 
   const deleteBudgetGoal = (goalId: string) => {
@@ -188,13 +191,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const updateSharedBudget = (updatedBudget: SharedBudget) => {
+    // When updating, ensure `currentSpending` and `createdAt` are preserved from the existing budget
+    // The form only submits name, amount, period, description.
     setSharedBudgets(prev =>
-      prev.map(budget => (budget.id === updatedBudget.id ? updatedBudget : budget))
+      prev.map(budget => 
+        budget.id === updatedBudget.id ? 
+        { 
+          ...budget, // Keeps existing currentSpending and createdAt
+          name: updatedBudget.name, 
+          amount: updatedBudget.amount, 
+          period: updatedBudget.period,
+          description: updatedBudget.description
+        } : budget
+      )
     );
   };
 
   const deleteSharedBudget = (budgetId: string) => {
     setSharedBudgets(prev => prev.filter(budget => budget.id !== budgetId));
+    // Also unlink expenses from this deleted shared budget
     setExpenses(prevExpenses => 
       prevExpenses.map(exp => 
         exp.sharedBudgetId === budgetId ? { ...exp, sharedBudgetId: undefined } : exp

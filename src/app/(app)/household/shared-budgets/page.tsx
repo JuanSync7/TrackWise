@@ -37,6 +37,7 @@ export default function SharedBudgetsPage() {
     setIsSubmitting(true);
     try {
       if (editingBudget) {
+        // Ensure currentSpending and createdAt are preserved for updates
         const budgetToUpdate: SharedBudget = {
             ...editingBudget, // This includes id, createdAt, and importantly currentSpending
             name: data.name,
@@ -45,10 +46,10 @@ export default function SharedBudgetsPage() {
             description: data.description,
         };
         updateSharedBudget(budgetToUpdate); 
-        toast({ title: "Shared Budget Updated", description: "The shared budget has been successfully updated." });
+        toast({ title: "Shared Budget Updated", description: `The shared budget "${budgetToUpdate.name}" has been successfully updated.` });
       } else {
         addSharedBudget(data);
-        toast({ title: "Shared Budget Created", description: "New shared budget has been successfully created." });
+        toast({ title: "Shared Budget Created", description: `New shared budget "${data.name}" has been successfully created.` });
       }
       setIsFormOpen(false);
       setEditingBudget(undefined);
@@ -72,7 +73,7 @@ export default function SharedBudgetsPage() {
     if (budgetToDelete) {
       const budget = sharedBudgets.find(b => b.id === budgetToDelete);
       contextDeleteSharedBudget(budgetToDelete);
-      toast({ title: "Shared Budget Deleted", description: `"${budget?.name || 'The budget'}" has been successfully deleted.` });
+      toast({ title: "Shared Budget Deleted", description: `The shared budget "${budget?.name || 'The budget'}" has been successfully deleted.` });
       setBudgetToDelete(null);
     }
   };
@@ -119,7 +120,7 @@ export default function SharedBudgetsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the selected shared budget.
+              This action cannot be undone. This will permanently delete the selected shared budget: <span className="font-semibold">{sharedBudgets.find(b => b.id === budgetToDelete)?.name || 'this budget'}</span>.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
