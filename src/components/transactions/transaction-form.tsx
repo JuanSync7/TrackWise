@@ -365,7 +365,36 @@ export function TransactionForm({
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <FormField control={form.control} name="transactionType" render={({ field }) => ( <FormItem className="space-y-3"> <FormLabel>Transaction Type</FormLabel> <FormControl> <RadioGroup onValueChange={field.onChange} value={field.value} className="flex space-x-4"> <FormItem className="flex items-center space-x-2 space-y-0"> <FormControl><RadioGroupItem value="expense" /></FormControl> <FormLabel className="font-normal flex items-center gap-1"><TrendingDown className="h-4 w-4 text-destructive"/>Expense</FormLabel> </FormItem> <FormItem className="flex items-center space-x-2 space-y-0"> <FormControl><RadioGroupItem value="income" /></FormControl> <FormLabel className="font-normal flex items-center gap-1"><TrendingUp className="h-4 w-4 text-accent"/>Income</FormLabel> </FormItem> </RadioGroup> </FormControl> <FormMessage /> </FormItem> )} />
+        <FormField
+          control={form.control}
+          name="transactionType"
+          render={({ field }) => (
+            <FormItem className="space-y-3">
+              <FormLabel>Transaction Type</FormLabel>
+              <FormControl>
+                <RadioGroup
+                  onValueChange={field.onChange}
+                  value={field.value}
+                  className="flex space-x-4"
+                >
+                  <FormItem className="flex items-center space-x-2 space-y-0">
+                    <RadioGroupItem value="expense" id="type-expense" />
+                    <FormLabel htmlFor="type-expense" className="font-normal flex items-center gap-1 cursor-pointer">
+                      <TrendingDown className="h-4 w-4 text-destructive"/>Expense
+                    </FormLabel>
+                  </FormItem>
+                  <FormItem className="flex items-center space-x-2 space-y-0">
+                    <RadioGroupItem value="income" id="type-income" />
+                    <FormLabel htmlFor="type-income" className="font-normal flex items-center gap-1 cursor-pointer">
+                      <TrendingUp className="h-4 w-4 text-accent"/>Income
+                    </FormLabel>
+                  </FormItem>
+                </RadioGroup>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
         <FormField control={form.control} name="description" render={({ field }) => ( <FormItem> <FormLabel>Description</FormLabel> <FormControl><Input placeholder={watchedTransactionType === 'income' ? "e.g., Monthly Salary" : "e.g., Coffee run"} {...field} /></FormControl> <FormMessage /> </FormItem> )} />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormField control={form.control} name="amount" render={({ field }) => ( <FormItem> <FormLabel>Amount</FormLabel> <FormControl><Input type="number" placeholder="0.00" {...field} step="0.01" /></FormControl> <FormMessage /> </FormItem> )} />
@@ -384,8 +413,8 @@ export function TransactionForm({
             {watchedIsSplit && (
               <>
                 <FormField control={form.control} name="paidByMemberId" render={({ field }) => ( <FormItem> <FormLabel>Who Paid?</FormLabel> <Select onValueChange={field.onChange} value={field.value || ""}> <FormControl><SelectTrigger><SelectValue placeholder="Select payer" /></SelectTrigger></FormControl> <SelectContent>{allowPotPayer && <SelectItem value={POT_PAYER_ID}><div className="flex items-center gap-2"><CircleDollarSign className="h-4 w-4 text-primary"/>Paid from Pot</div></SelectItem>}{availableMembersForSplitting.map((member) => ( <SelectItem key={member.id} value={member.id}>{member.name}</SelectItem>))}</SelectContent> </Select> <FormMessage /> </FormItem> )} />
-                <FormField control={form.control} name="splitType" render={({ field }) => ( <FormItem className="space-y-2"><FormLabel>Split Method</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex space-x-4"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="even" /></FormControl><FormLabel className="font-normal">Split Evenly</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="custom" /></FormControl><FormLabel className="font-normal">Custom Amounts</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
-                <Controller control={form.control} name="splitWithMemberIds" render={({ field }) => ( <FormItem> <div className="mb-2 flex items-center justify-between"><div><FormLabel>Split With Whom?</FormLabel><FormDescription>Select members sharing this expense.</FormDescription></div><Button type="button" variant="outline" size="sm" onClick={() => handleSelectAllSplitMembers(!areAllMembersSelected)} disabled={availableMembersForSplitting.length === 0} className="ml-auto">{areAllMembersSelected ? <CheckSquare className="mr-2 h-4 w-4" /> : <Square className="mr-2 h-4 w-4" />}{areAllMembersSelected ? 'Deselect All' : 'Select All'}</Button></div> <ScrollArea className="h-32 w-full rounded-md border p-2">{availableMembersForSplitting.map((member) => ( <FormField key={member.id} control={form.control} name="splitWithMemberIds" render={({ field: checkboxField }) => ( <FormItem key={member.id} className="flex flex-row items-start space-x-3 space-y-0 py-2"><FormControl><Checkbox checked={checkboxField.value?.includes(member.id)} onCheckedChange={(checked) => checkboxField.onChange(checked ? [...(checkboxField.value || []), member.id] : (checkboxField.value || []).filter(id => id !== member.id))} /></FormControl><FormLabel className="text-sm font-normal cursor-pointer">{member.name}</FormLabel></FormItem> )} /> ))}</ScrollArea> <FormMessage /> {form.formState.errors.splitWithMemberIds?.message && <p className="text-sm font-medium text-destructive">{form.formState.errors.splitWithMemberIds?.message}</p>} </FormItem> )} />
+                <FormField control={form.control} name="splitType" render={({ field }) => ( <FormItem className="space-y-2"><FormLabel>Split Method</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex space-x-4"><FormItem className="flex items-center space-x-2 space-y-0"><RadioGroupItem value="even" id="split-even"/><FormLabel htmlFor="split-even" className="font-normal cursor-pointer">Split Evenly</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><RadioGroupItem value="custom" id="split-custom"/><FormLabel htmlFor="split-custom" className="font-normal cursor-pointer">Custom Amounts</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
+                <Controller control={form.control} name="splitWithMemberIds" render={({ field }) => ( <FormItem> <div className="mb-2 flex items-center justify-between"><div><FormLabel>Split With Whom?</FormLabel><FormDescription>Select members sharing this expense.</FormDescription></div><Button type="button" variant="outline" size="sm" onClick={() => handleSelectAllSplitMembers(!areAllMembersSelected)} disabled={availableMembersForSplitting.length === 0} className="ml-auto">{areAllMembersSelected ? <CheckSquare className="mr-2 h-4 w-4" /> : <Square className="mr-2 h-4 w-4" />}{areAllMembersSelected ? 'Deselect All' : 'Select All'}</Button></div> <ScrollArea className="h-32 w-full rounded-md border p-2">{availableMembersForSplitting.map((member) => ( <FormField key={member.id} control={form.control} name="splitWithMemberIds" render={({ field: checkboxField }) => ( <FormItem key={member.id} className="flex flex-row items-start space-x-3 space-y-0 py-2"><FormControl><Checkbox checked={checkboxField.value?.includes(member.id)} onCheckedChange={(checked) => checkboxField.onChange(checked ? [...(checkboxField.value || []), member.id] : (checkboxField.value || []).filter(id => id !== member.id))} /></FormControl><FormLabel htmlFor={`split-${member.id}`} className="text-sm font-normal cursor-pointer">{member.name}</FormLabel></FormItem> )} /> ))}</ScrollArea> <FormMessage /> {form.formState.errors.splitWithMemberIds?.message && <p className="text-sm font-medium text-destructive">{form.formState.errors.splitWithMemberIds?.message}</p>} </FormItem> )} />
                 
                 {watchedSplitType === 'custom' && customSplitFields.map((item, index) => (
                   <FormField key={item.fieldId} control={form.control} name={`customSplitAmounts.${index}.amount`} render={({ field }) => (
@@ -426,5 +455,4 @@ export function TransactionForm({
     </Form>
   );
 }
-
     
