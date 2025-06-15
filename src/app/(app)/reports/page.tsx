@@ -1,8 +1,11 @@
+
 "use client";
 
 import { PageHeader } from '@/components/shared/page-header';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart3 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { LineChart, TableIcon } from 'lucide-react';
+import { MonthlySpendingTrendChart } from '@/components/reports/monthly-spending-trend-chart';
+import { BudgetPerformanceReport } from '@/components/reports/budget-performance-report';
 
 export default function ReportsPage() {
   return (
@@ -11,25 +14,22 @@ export default function ReportsPage() {
         title="Financial Reports"
         description="Analyze your spending habits and financial health over time."
       />
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="h-6 w-6 text-primary" />
-            Coming Soon!
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col items-center justify-center h-64 text-center">
-            <img src="https://placehold.co/400x250.png" alt="Coming soon" data-ai-hint="chart graph" className="mb-6 rounded-lg opacity-70" />
-            <p className="text-xl font-semibold text-muted-foreground">
-              Detailed financial reports and analytics are under development.
-            </p>
-            <p className="text-muted-foreground mt-2">
-              Stay tuned for powerful insights into your spending patterns, category breakdowns, and progress towards financial goals.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      <Tabs defaultValue="spending_trends" className="w-full mt-6">
+        <TabsList className="grid w-full grid-cols-2 md:max-w-md">
+          <TabsTrigger value="spending_trends" className="flex items-center gap-2">
+            <LineChart className="h-4 w-4" /> Spending Trends
+          </TabsTrigger>
+          <TabsTrigger value="budget_performance" className="flex items-center gap-2">
+            <TableIcon className="h-4 w-4" /> Budget Performance
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="spending_trends">
+          <MonthlySpendingTrendChart />
+        </TabsContent>
+        <TabsContent value="budget_performance">
+          <BudgetPerformanceReport />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
