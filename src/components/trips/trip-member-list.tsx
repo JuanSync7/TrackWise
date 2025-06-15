@@ -10,16 +10,14 @@ interface TripMemberListProps {
   tripMembers: TripMember[];
   onDeleteTripMember: (tripMemberId: string) => void;
   onAddTripContribution: (tripMemberId: string) => void;
-  totalTripContributions: number;
-  remainingTripPot: number;
+  // totalTripContributions and remainingTripPot are no longer needed here
+  // as TripMemberItem will fetch its own net data
 }
 
 export function TripMemberList({
   tripMembers,
   onDeleteTripMember,
   onAddTripContribution,
-  totalTripContributions,
-  remainingTripPot
 }: TripMemberListProps) {
   if (tripMembers.length === 0) {
     return (
@@ -47,9 +45,6 @@ export function TripMemberList({
               tripMember={member}
               onDelete={onDeleteTripMember}
               onAddContribution={onAddTripContribution}
-              totalTripContributions={totalTripContributions}
-              remainingTripPot={remainingTripPot}
-              numberOfTripMembers={tripMembers.length} // Pass the total number of trip members
             />
           </motion.div>
         ))}

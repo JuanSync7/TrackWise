@@ -1,7 +1,7 @@
 
 "use client";
 
-import type { TripMember } from '@/lib/types';
+import type { TripMember, TripMemberNetData } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { User, Trash2, MoreVertical, DollarSign, Scale } from 'lucide-react';
@@ -9,45 +9,33 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useAppContext } from '@/contexts/app-context';
 import { DEFAULT_CURRENCY } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+import { useEffect, useState } from 'react';
 
 interface TripMemberItemProps {
   tripMember: TripMember;
   onDelete: (tripMemberId: string) => void;
   onAddContribution: (tripMemberId: string) => void;
-  totalTripContributions: number;
-  remainingTripPot: number;
-  numberOfTripMembers: number; 
+  // No longer need totalTripContributions, remainingTripPot, numberOfTripMembers
+  // as calculations will be more direct using getTripMemberNetData
 }
 
 export function TripMemberItem({
   tripMember,
   onDelete,
   onAddContribution,
-  totalTripContributions,
-  remainingTripPot,
-  numberOfTripMembers
 }: TripMemberItemProps) {
-  const { getTripMemberTotalDirectContribution } = useAppContext();
-  const directContribution = getTripMemberTotalDirectContribution(tripMember.id);
+  const { getTripMemberNetData, tripContributions, tripExpenses } = useAppContext(); // Add tripExpenses to dependencies
+  const [memberNetData, setMemberNetData] = useState<TripMemberNetData>({
+    directContribution: 0,
+    shareOfExpenses: 0,
+    netShare: 0,
+  });
 
-  let memberShareOfTripPot: number;
-
-  if (remainingTripPot < 0) {
-    // If the pot is negative, the deficit is shared equally among all current members.
-    if (numberOfTripMembers > 0) {
-      memberShareOfTripPot = remainingTripPot / numberOfTripMembers;
-    } else {
-      memberShareOfTripPot = 0; // Should ideally not happen if a member exists
+  useEffect(() => {
+    if (tripMember && tripMember.tripId) {
+      setMemberNetData(getTripMemberNetData(tripMember.tripId, tripMember.id));
     }
-  } else { // Pot is zero or positive
-    if (totalTripContributions > 0) {
-      // Distribute positive pot proportionally to contributions
-      memberShareOfTripPot = (directContribution / totalTripContributions) * remainingTripPot;
-    } else {
-      // Pot is zero (or positive but no contributions, which is rare)
-      memberShareOfTripPot = 0;
-    }
-  }
+  }, [tripMember, getTripMemberNetData, tripContributions, tripExpenses]); // Add tripContributions and tripExpenses
 
   return (
     <Card className="overflow-hidden transition-shadow hover:shadow-lg">
@@ -57,7 +45,10 @@ export function TripMemberItem({
           <div>
             <CardTitle className="text-lg">{tripMember.name}</CardTitle>
             <CardDescription className="text-xs text-muted-foreground">
-              Directly Contributed to Trip: {DEFAULT_CURRENCY}{directContribution.toFixed(2)}
+              Directly Contributed: {DEFAULT_CURRENCY}{memberNetData.directContribution.toFixed(2)}
+            </CardDescription>
+            <CardDescription className="text-xs text-muted-foreground">
+              Share of Expenses: {DEFAULT_CURRENCY}{memberNetData.shareOfExpenses.toFixed(2)}
             </CardDescription>
           </div>
         </div>
@@ -82,16 +73,16 @@ export function TripMemberItem({
       </CardHeader>
       <CardContent className="p-4 pt-0">
         <div className="flex items-center gap-2">
-          <Scale className={cn("h-5 w-5", memberShareOfTripPot >=0 ? "text-accent" : "text-destructive")} />
+          <Scale className={cn("h-5 w-5", memberNetData.netShare >=0 ? "text-accent" : "text-destructive")} />
           <div>
-            <p className="text-sm font-medium">Net Share in Trip Pot:</p>
-            <p className={cn("text-xl font-bold", memberShareOfTripPot >=0 ? "text-accent" : "text-destructive")}>
-                {DEFAULT_CURRENCY}{memberShareOfTripPot.toFixed(2)}
+            <p className="text-sm font-medium">Net Share in Trip:</p>
+            <p className={cn("text-xl font-bold", memberNetData.netShare >=0 ? "text-accent" : "text-destructive")}>
+                {DEFAULT_CURRENCY}{memberNetData.netShare.toFixed(2)}
             </p>
           </div>
         </div>
         <p className="text-xs text-muted-foreground mt-1">
-          This is their share of the current trip pot balance.
+          Contributions minus their share of expenses.
         </p>
       </CardContent>
     </Card>

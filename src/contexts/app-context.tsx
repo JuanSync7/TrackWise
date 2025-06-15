@@ -6,7 +6,7 @@ import React, { createContext, useContext, useCallback } from 'react';
 import type { 
   Expense, Category, BudgetGoal, AppState, AppContextType, 
   Member, Contribution, ShoppingListItem, SharedBudget, Debt,
-  Trip, TripMember, TripContribution, TripExpense
+  Trip, TripMember, TripContribution, TripExpense, TripMemberNetData
 } from '@/lib/types';
 import { INITIAL_CATEGORIES, HOUSEHOLD_EXPENSE_CATEGORY_ID } from '@/lib/constants';
 import useLocalStorage from '@/hooks/use-local-storage';
@@ -347,6 +347,32 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return tripExpenses.filter(expense => expense.tripId === tripIdToFilter);
   }, [tripExpenses]);
 
+  const getTripMemberNetData = useCallback((tripId: string, tripMemberId: string): TripMemberNetData => {
+    const member = tripMembers.find(tm => tm.id === tripMemberId && tm.tripId === tripId);
+    // Ensure we only proceed if the member actually belongs to the trip
+    if (!member) return { directContribution: 0, shareOfExpenses: 0, netShare: 0 };
+
+    const directContribution = getTripMemberTotalDirectContribution(tripMemberId);
+
+    let shareOfExpenses = 0;
+    const expensesForThisTrip = tripExpenses.filter(te => te.tripId === tripId);
+    const currentMembersOfThisTrip = tripMembers.filter(tm => tm.tripId === tripId); // Re-filter for accuracy within this scope
+    const numMembersInTrip = currentMembersOfThisTrip.length;
+
+    expensesForThisTrip.forEach(expense => {
+      if (expense.isSplit && expense.splitWithTripMemberIds && expense.splitWithTripMemberIds.length > 0) {
+        if (expense.splitWithTripMemberIds.includes(tripMemberId)) {
+          shareOfExpenses += expense.amount / expense.splitWithTripMemberIds.length;
+        }
+      } else if (numMembersInTrip > 0) { // Not explicitly split, assume shared equally by all in *this* trip
+        shareOfExpenses += expense.amount / numMembersInTrip;
+      }
+    });
+
+    const netShare = directContribution - shareOfExpenses;
+    return { directContribution, shareOfExpenses, netShare };
+  }, [tripMembers, tripExpenses, getTripMemberTotalDirectContribution]);
+
 
   // --- Effects for dynamic calculations ---
   React.useEffect(() => {
@@ -395,7 +421,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addShoppingListItem, editShoppingListItem, toggleShoppingListItemPurchased, deleteShoppingListItem, copyLastWeeksPurchasedItems,
     addTrip, getTripById, getTrips,
     addTripMember, getTripMembers, deleteTripMember, getTripMemberById,
-    addTripContribution, getTripContributionsForMember, getTripMemberTotalDirectContribution,
+    addTripContribution, getTripContributionsForMember, getTripMemberTotalDirectContribution, getTripMemberNetData,
     addTripExpense, getTripExpenses,
   };
 

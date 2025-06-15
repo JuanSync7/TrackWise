@@ -146,6 +146,12 @@ export interface AppState {
   tripExpenses: TripExpense[]; 
 }
 
+export interface TripMemberNetData {
+  directContribution: number;
+  shareOfExpenses: number;
+  netShare: number;
+}
+
 export type AppContextType = AppState & {
   // Expense functions
   addExpense: (expense: Omit<Expense, 'id'>) => void;
@@ -205,6 +211,7 @@ export type AppContextType = AppState & {
   addTripContribution: (tripId: string, tripMemberId: string, contributionData: Omit<TripContribution, 'id' | 'tripId' | 'tripMemberId'>) => void;
   getTripContributionsForMember: (tripMemberId: string) => TripContribution[];
   getTripMemberTotalDirectContribution: (tripMemberId: string) => number;
+  getTripMemberNetData: (tripId: string, tripMemberId: string) => TripMemberNetData;
   
   // Trip Expense functions
   addTripExpense: (expenseData: Omit<TripExpense, 'id'>) => void; 
