@@ -7,10 +7,12 @@ import type { Transaction } from '@/lib/types';
 import { usePersonalFinance } from '@/contexts/personal-finance-context';
 import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Download, Loader2, TrendingDown, TrendingUp, ArrowRightLeft, Repeat, Trash2 } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { PlusCircle, Download, Loader2, TrendingDown, TrendingUp, ArrowRightLeft, Repeat, Trash2, CalendarIcon, XIcon } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useToast } from "@/hooks/use-toast";
-import { format as formatDate, parseISO, addDays, addWeeks, addMonths, addYears, isBefore, isEqual } from 'date-fns';
+import { format as formatDate, parseISO, addDays, addWeeks, addMonths, addYears, isBefore, isEqual, isValid } from 'date-fns';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,7 +25,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { exportToCsv } from '@/lib/utils';
 import { DEFAULT_CURRENCY } from '@/lib/constants';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 
 
 const TransactionForm = React.lazy(() => import('@/components/transactions/transaction-form').then(module => ({ default: module.TransactionForm })));
@@ -39,6 +42,10 @@ export default function TransactionsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'all' | 'expenses' | 'income'>('all');
+  
+  const [filterStartDate, setFilterStartDate] = useState<Date | undefined>(undefined);
+  const [filterEndDate, setFilterEndDate] = useState<Date | undefined>(undefined);
+
 
   const handleSaveTransaction = async (data: any) => { // data is TransactionFormValues & { nextRecurrenceDate?: string }
     setIsSubmitting(true);
@@ -99,9 +106,8 @@ export default function TransactionsPage() {
     transactions.forEach(t => {
       if (t.isRecurring && t.nextRecurrenceDate && (isBefore(parseISO(t.nextRecurrenceDate), today) || isEqual(parseISO(t.nextRecurrenceDate), today)) ) {
         if(t.recurrenceEndDate && isBefore(parseISO(t.recurrenceEndDate), parseISO(t.nextRecurrenceDate))) {
-            // If end date is past, effectively stop recurrence by clearing nextRecurrenceDate on template
             updateTransaction({ ...t, nextRecurrenceDate: undefined });
-            return; // Skip creating this instance
+            return; 
         }
         const newInstanceDate = parseISO(t.nextRecurrenceDate);
         addTransaction({
@@ -139,7 +145,27 @@ export default function TransactionsPage() {
         toast({ title: "No Due Recurring Transactions", description: "No recurring transactions were due to be logged today." });
     }
   };
-
+  
+  const filteredTransactions = useMemo(() => {
+    let baseTransactions = transactions.filter(t => !t.isRecurring); 
+    if (activeTab !== 'all') {
+        baseTransactions = baseTransactions.filter(t => t.transactionType === activeTab);
+    }
+    if (filterStartDate) {
+      baseTransactions = baseTransactions.filter(t => {
+        const transactionDate = parseISO(t.date);
+        return isValid(transactionDate) && (isEqual(transactionDate, filterStartDate) || isBefore(filterStartDate, transactionDate));
+      });
+    }
+    if (filterEndDate) {
+      baseTransactions = baseTransactions.filter(t => {
+        const transactionDate = parseISO(t.date);
+        return isValid(transactionDate) && (isEqual(transactionDate, filterEndDate) || isBefore(transactionDate, filterEndDate));
+      });
+    }
+    return baseTransactions;
+  }, [transactions, activeTab, filterStartDate, filterEndDate]);
+  
   const handleExportTransactions = () => {
     const headerRow = [
       "ID", "Description", "Amount", "Currency", "Date",
@@ -168,21 +194,17 @@ export default function TransactionsPage() {
     exportToCsv(filename, [headerRow, ...dataRows]);
     toast({ title: "Transactions Exported", description: `Transactions have been exported to ${filename}` });
   };
-  
-  const filteredTransactions = useMemo(() => {
-    let baseTransactions = transactions.filter(t => !t.isRecurring); 
-    if (activeTab !== 'all') {
-        baseTransactions = baseTransactions.filter(t => t.transactionType === activeTab);
-    }
-    return baseTransactions;
-  }, [transactions, activeTab]);
 
   const recurringTemplates = useMemo(() => transactions.filter(t => t.isRecurring), [transactions]);
   const dueRecurringTemplatesCount = useMemo(() => {
     const today = new Date();
-    return recurringTemplates.filter(t => t.nextRecurrenceDate && (isBefore(parseISO(t.nextRecurrenceDate), today) || isEqual(parseISO(t.nextRecurrenceDate), today))).length;
+    return recurringTemplates.filter(t => t.nextRecurrenceDate && (isBefore(parseISO(t.nextRecurrenceDate), today) || isEqual(parseISO(t.nextRecurrenceDate), today)) && (!t.recurrenceEndDate || !isBefore(parseISO(t.recurrenceEndDate), parseISO(t.nextRecurrenceDate)))).length;
   }, [recurringTemplates]);
 
+  const clearDateFilters = () => {
+    setFilterStartDate(undefined);
+    setFilterEndDate(undefined);
+  };
 
   return (
     <div className="container mx-auto">
@@ -190,16 +212,53 @@ export default function TransactionsPage() {
         title="Manage Your Transactions"
         description="Keep track of your income and expenses. Log recurring transactions as they occur."
         actions={
-          <div className="flex gap-2 flex-wrap">
-             <Button onClick={handleLogUpcomingRecurring} variant="outline" disabled={dueRecurringTemplatesCount === 0}>
-              <Repeat className="mr-2 h-4 w-4" /> Log Upcoming ({dueRecurringTemplatesCount})
-            </Button>
-            <Button onClick={handleExportTransactions} variant="outline" disabled={filteredTransactions.length === 0}>
-              <Download className="mr-2 h-4 w-4" /> Export View
-            </Button>
-            <Button onClick={openFormForNew}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Add New Transaction
-            </Button>
+          <div className="flex flex-col sm:flex-row gap-2 flex-wrap items-center">
+            <div className="flex gap-2 flex-wrap">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn("w-[150px] justify-start text-left font-normal", !filterStartDate && "text-muted-foreground")}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {filterStartDate ? formatDate(filterStartDate, "PPP") : <span>Start Date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar mode="single" selected={filterStartDate} onSelect={setFilterStartDate} initialFocus />
+                </PopoverContent>
+              </Popover>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn("w-[150px] justify-start text-left font-normal", !filterEndDate && "text-muted-foreground")}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {filterEndDate ? formatDate(filterEndDate, "PPP") : <span>End Date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar mode="single" selected={filterEndDate} onSelect={setFilterEndDate} initialFocus disabled={(date) => filterStartDate ? date < filterStartDate : false} />
+                </PopoverContent>
+              </Popover>
+               {(filterStartDate || filterEndDate) && (
+                <Button variant="ghost" onClick={clearDateFilters} size="sm">
+                  <XIcon className="mr-1 h-4 w-4"/> Clear
+                </Button>
+              )}
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <Button onClick={handleLogUpcomingRecurring} variant="outline" disabled={dueRecurringTemplatesCount === 0}>
+                <Repeat className="mr-2 h-4 w-4" /> Log Upcoming ({dueRecurringTemplatesCount})
+              </Button>
+              <Button onClick={handleExportTransactions} variant="outline" disabled={filteredTransactions.length === 0}>
+                <Download className="mr-2 h-4 w-4" /> Export View
+              </Button>
+              <Button onClick={openFormForNew}>
+                <PlusCircle className="mr-2 h-4 w-4" /> Add New
+              </Button>
+            </div>
           </div>
         }
       />
@@ -284,3 +343,6 @@ export default function TransactionsPage() {
     </div>
   );
 }
+
+
+    
