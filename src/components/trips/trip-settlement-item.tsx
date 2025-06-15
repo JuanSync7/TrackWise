@@ -17,16 +17,22 @@ export function TripSettlementItem({ settlement }: TripSettlementItemProps) {
   const owedByMember = getTripMemberById(settlement.owedByTripMemberId);
   const owedToMember = getTripMemberById(settlement.owedToTripMemberId);
 
+  // If either member is not found (e.g., deleted but settlement list is stale),
+  // we simply don't render this item or render a placeholder.
+  // This check should ideally be done before passing to this component.
   if (!owedByMember || !owedToMember) {
+    // This specific item will not be rendered if filtered out by parent.
+    // If it does reach here due to some race condition, this is a fallback.
     return (
-      <div className="flex items-center justify-between p-3 rounded-md border bg-destructive/10 text-destructive text-sm">
-        <User className="h-4 w-4 mr-2 text-destructive-foreground" />
-        <span>Settlement error: Member data missing.</span>
-      </div>
+        <div className="flex items-center justify-between p-3 rounded-md border bg-destructive/10 text-destructive text-sm">
+             <User className="h-4 w-4 mr-2 text-destructive-foreground" />
+            <span>Settlement involves a deleted member.</span>
+        </div>
     );
   }
 
   const getInitials = (name: string) => {
+    if (!name) return "?";
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   }
 

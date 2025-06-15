@@ -13,7 +13,7 @@ import { Progress } from '@/components/ui/progress';
 import { useAppContext } from '@/contexts/app-context';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from "@/hooks/use-toast";
-import type { Trip, TripMember, TripContribution, TripExpense, TripSettlement } from '@/lib/types';
+import type { Trip, TripMember, TripContribution, TripExpense, TripSettlement, MemberDisplayFinancials } from '@/lib/types';
 import { TripMemberForm, type TripMemberFormValues } from '@/components/trips/trip-member-form';
 import { TripMemberList } from '@/components/trips/trip-member-list';
 import { TripContributionForm, type TripContributionFormValues } from '@/components/trips/trip-contribution-form';
@@ -33,15 +33,15 @@ export default function TripDetailPage() {
     getTripById,
     addTripMember, deleteTripMember: contextDeleteTripMember, getTripMemberById,
     addTripContribution, 
-    tripMembers: globalTripMembers, 
-    tripContributions: globalTripContributions, 
+    tripMembers: globalTripMembers, // For useEffect dependency
+    tripContributions: globalTripContributions, // For useEffect dependency
     addTripExpense,
-    tripExpenses: globalTripExpenses, 
+    tripExpenses: globalTripExpenses, // For useEffect dependency
     getTripMembers, 
     getTripExpenses, 
     getTripSettlements, 
     triggerTripSettlementCalculation,
-    getTripMemberNetData, // For calculating summary card totals
+    getTripMemberNetData,
   } = useAppContext();
   const { user: authUser } = useAuth();
   const { toast } = useToast();
@@ -56,6 +56,7 @@ export default function TripDetailPage() {
   const [isSubmittingExpense, setIsSubmittingExpense] = useState(false);
   const [tripMemberToDelete, setTripMemberToDelete] = useState<string | null>(null);
 
+
   const memoizedTripMembers = useMemo(() => {
     return tripId ? getTripMembers(tripId) : [];
   }, [tripId, getTripMembers]);
@@ -64,21 +65,31 @@ export default function TripDetailPage() {
     return tripId ? getTripExpenses(tripId) : [];
   }, [tripId, getTripExpenses]);
 
-  const memoizedSettlements = useMemo(() => {
+  const rawSettlements = useMemo(() => {
     return tripId ? getTripSettlements(tripId) : [];
   }, [tripId, getTripSettlements]);
+
+  // Filter settlements to ensure all referenced members exist
+  const validSettlements = useMemo(() => {
+    const memberIds = new Set(memoizedTripMembers.map(m => m.id));
+    return rawSettlements.filter(
+      s => memberIds.has(s.owedByTripMemberId) && memberIds.has(s.owedToTripMemberId)
+    );
+  }, [rawSettlements, memoizedTripMembers]);
+
 
   useEffect(() => {
     if (tripId) {
       const foundTrip = getTripById(tripId);
       if (foundTrip) {
         setTrip(foundTrip);
+        triggerTripSettlementCalculation(tripId); // Initial calculation on load
       } else {
         toast({ variant: "destructive", title: "Trip Not Found", description: "The requested trip could not be found." });
         router.push('/trips');
       }
     }
-  }, [tripId, getTripById, router, toast]);
+  }, [tripId, getTripById, router, toast, triggerTripSettlementCalculation]);
 
   useEffect(() => {
     if (tripId) {
@@ -172,12 +183,12 @@ export default function TripDetailPage() {
   }, [tripId, addTripExpense, toast]);
 
   // --- Summary Card Calculations ---
-  const tripFinancialSummary = useMemo(() => {
+ const tripFinancialSummary = useMemo(() => {
     let totalCashInPot = 0;
     let totalMemberPaidExpenses = 0;
     
     memoizedTripMembers.forEach(member => {
-      const memberData = getTripMemberNetData(tripId, member.id);
+      const memberData: MemberDisplayFinancials = getTripMemberNetData(tripId, member.id);
       totalCashInPot += memberData.directCashContribution;
       totalMemberPaidExpenses += memberData.amountPersonallyPaidForGroup;
     });
@@ -330,7 +341,7 @@ export default function TripDetailPage() {
               <CardDescription>Who owes whom to balance all trip finances (contributions, pot expenses, and member-paid shared expenses).</CardDescription>
             </CardHeader>
             <CardContent>
-                <TripSettlementList settlements={memoizedSettlements} tripId={tripId} />
+                <TripSettlementList settlements={validSettlements} tripId={tripId} />
             </CardContent>
           </Card>
         </div>
