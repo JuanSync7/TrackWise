@@ -41,6 +41,15 @@ interface DebtFormProps {
 export function DebtForm({ debt, onSave, onCancel, isSubmitting }: DebtFormProps) {
   const form = useForm<DebtFormValues>({
     resolver: zodResolver(debtFormSchema),
+    defaultValues: { // Initialize all fields, especially optional numeric ones, to prevent uncontrolled -> controlled switch
+      name: "",
+      lender: "",
+      initialAmount: 0,
+      interestRate: "" as any, // Start as empty string; Zod will coerce. `as any` to satisfy TS with Zod coercion.
+      minimumPayment: "" as any, // Start as empty string
+      dueDate: "",
+      notes: "",
+    },
   });
 
   useEffect(() => {
@@ -49,26 +58,31 @@ export function DebtForm({ debt, onSave, onCancel, isSubmitting }: DebtFormProps
         name: debt.name,
         lender: debt.lender || "",
         initialAmount: debt.initialAmount,
-        interestRate: debt.interestRate === undefined ? "" : debt.interestRate,
-        minimumPayment: debt.minimumPayment === undefined ? "" : debt.minimumPayment,
+        // Ensure string for form, coercion will handle it for RHF.
+        // If debt.interestRate is a number, convert to string for reset, or use ""
+        interestRate: debt.interestRate === undefined || debt.interestRate === null ? "" : String(debt.interestRate),
+        minimumPayment: debt.minimumPayment === undefined || debt.minimumPayment === null ? "" : String(debt.minimumPayment),
         dueDate: debt.dueDate || "",
         notes: debt.notes || "",
       });
     } else {
+      // For a new form, ensure optional numeric fields are reset to empty strings
+      // This is also covered by defaultValues now, but good for explicit reset.
       form.reset({
         name: "",
         lender: "",
         initialAmount: 0,
-        interestRate: "", // Initialize with empty string for controlled input
-        minimumPayment: "", // Initialize with empty string
+        interestRate: "",
+        minimumPayment: "",
         dueDate: "",
         notes: "",
       });
     }
   }, [debt, form]);
 
-  function onSubmit(values: DebtFormValues) {
-    onSave(values);
+  function onSubmit(values: z.infer<typeof debtFormSchema>) { // Use inferred type from schema for values
+    // Zod has already coerced interestRate and minimumPayment to numbers if they were strings
+    onSave(values as DebtFormValues);
     if (!debt) {
         form.reset({ name: "", lender: "", initialAmount: 0, interestRate: "", minimumPayment: "", dueDate: "", notes: "" });
     }
@@ -123,11 +137,11 @@ export function DebtForm({ debt, onSave, onCancel, isSubmitting }: DebtFormProps
             <FormField
             control={form.control}
             name="interestRate"
-            render={({ field }) => (
+            render={({ field }) => ( // field.value will be a number (e.g. 0 if "" was passed and coerced)
                 <FormItem>
                 <FormLabel>Interest Rate (APR %)</FormLabel>
                 <FormControl>
-                    <Input type="number" placeholder="e.g., 5.25" {...field} step="0.01" value={field.value === undefined ? "" : field.value} />
+                    <Input type="number" placeholder="e.g., 5.25" {...field} step="0.01" />
                 </FormControl>
                 <FormMessage />
                 </FormItem>
@@ -136,11 +150,11 @@ export function DebtForm({ debt, onSave, onCancel, isSubmitting }: DebtFormProps
             <FormField
             control={form.control}
             name="minimumPayment"
-            render={({ field }) => (
+            render={({ field }) => ( // field.value will be a number
                 <FormItem>
                 <FormLabel>Minimum Payment (Optional)</FormLabel>
                 <FormControl>
-                    <Input type="number" placeholder="e.g., 150.00" {...field} step="0.01" value={field.value === undefined ? "" : field.value} />
+                    <Input type="number" placeholder="e.g., 150.00" {...field} step="0.01" />
                 </FormControl>
                 <FormMessage />
                 </FormItem>
