@@ -5,7 +5,7 @@ import React, { useMemo } from 'react';
 import type { Member, HouseholdMemberNetData } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { User, Trash2, MoreVertical, DollarSign, Scale, TrendingUp, TrendingDown } from 'lucide-react';
+import { User, Trash2, MoreVertical, DollarSign, Scale, TrendingUp, TrendingDown, Landmark } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAppContext } from '@/contexts/app-context';
 import { DEFAULT_CURRENCY } from '@/lib/constants';
@@ -25,10 +25,7 @@ const MemberItem = React.memo(function MemberItem({
   const { getHouseholdMemberNetPotData } = useAppContext();
 
   const calculatedNetData: HouseholdMemberNetData = useMemo(() => {
-    if (member && member.id) {
-      return getHouseholdMemberNetPotData(member.id);
-    }
-    return { directContributionToPot: 0, shareOfPotExpenses: 0, netPotShare: 0 };
+    return getHouseholdMemberNetPotData(member.id);
   }, [member.id, getHouseholdMemberNetPotData]);
 
 
@@ -39,11 +36,14 @@ const MemberItem = React.memo(function MemberItem({
           <User className="h-10 w-10 text-primary p-1.5 bg-primary/10 rounded-full" />
           <div>
             <CardTitle className="text-lg">{member.name}</CardTitle>
-            <CardDescription className="text-xs text-muted-foreground flex items-center gap-1">
-                <TrendingUp className="h-3 w-3 text-accent"/> Directly Contributed to Pot: {DEFAULT_CURRENCY}{calculatedNetData.directContributionToPot.toFixed(2)}
+            <CardDescription className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                <Landmark className="h-3 w-3 text-teal-500"/> Cash to Pot: {DEFAULT_CURRENCY}{calculatedNetData.directCashContribution.toFixed(2)}
             </CardDescription>
             <CardDescription className="text-xs text-muted-foreground flex items-center gap-1">
-                 <TrendingDown className="h-3 w-3 text-destructive"/> Share of Pot-Paid Expenses: {DEFAULT_CURRENCY}{calculatedNetData.shareOfPotExpenses.toFixed(2)}
+                <TrendingUp className="h-3 w-3 text-accent"/> Paid for Group (Personal): {DEFAULT_CURRENCY}{calculatedNetData.amountPersonallyPaidForGroup.toFixed(2)}
+            </CardDescription>
+            <CardDescription className="text-xs text-muted-foreground flex items-center gap-1">
+                 <TrendingDown className="h-3 w-3 text-destructive"/> Share of All Expenses: {DEFAULT_CURRENCY}{calculatedNetData.totalShareOfAllGroupExpenses.toFixed(2)}
             </CardDescription>
           </div>
         </div>
@@ -65,18 +65,18 @@ const MemberItem = React.memo(function MemberItem({
           </DropdownMenuContent>
         </DropdownMenu>
       </CardHeader>
-      <CardContent className="p-4 pt-0">
+      <CardContent className="p-4 pt-1">
         <div className="flex items-center gap-2">
-          <Scale className={cn("h-5 w-5", calculatedNetData.netPotShare >=0 ? "text-accent" : "text-destructive")} />
+          <Scale className={cn("h-5 w-5", calculatedNetData.netOverallPosition >=0 ? "text-accent" : "text-destructive")} />
           <div>
-            <p className="text-sm font-medium">Net Share in Pot:</p>
-            <p className={cn("text-xl font-bold", calculatedNetData.netPotShare >=0 ? "text-accent" : "text-destructive")}>
-                {DEFAULT_CURRENCY}{calculatedNetData.netPotShare.toFixed(2)}
+            <p className="text-sm font-medium">Net Position:</p>
+            <p className={cn("text-xl font-bold", calculatedNetData.netOverallPosition >=0 ? "text-accent" : "text-destructive")}>
+                {DEFAULT_CURRENCY}{calculatedNetData.netOverallPosition.toFixed(2)}
             </p>
           </div>
         </div>
-        <p className="text-xs text-muted-foreground mt-1">
-          Their claim on the pot's cash based on direct contributions and share of pot-paid expenses.
+         <p className="text-xs text-muted-foreground mt-1">
+          Overall financial standing considering all contributions and expense shares.
         </p>
       </CardContent>
     </Card>

@@ -44,11 +44,14 @@ export interface Contribution {
   notes?: string;
 }
 
-export interface HouseholdMemberNetData {
-  directContributionToPot: number;
-  shareOfPotExpenses: number;
-  netPotShare: number;
+// Updated: Data structure for displaying member's financial details on cards
+export interface MemberDisplayFinancials {
+  directCashContribution: number;
+  amountPersonallyPaidForGroup: number;
+  totalShareOfAllGroupExpenses: number;
+  netOverallPosition: number; // (Cash Contrib + Personally Paid) - Share of All Expenses
 }
+export type HouseholdMemberNetData = MemberDisplayFinancials; // Alias for consistency
 
 // Using TripSettlement type for household settlements as structure is identical
 export type HouseholdSettlement = TripSettlement;
@@ -149,7 +152,7 @@ export interface AppState {
   contributions: Contribution[];
   sharedBudgets: SharedBudget[];
   debts: Debt[];
-  householdOverallSettlements: HouseholdSettlement[]; // New state for household settlements
+  householdOverallSettlements: HouseholdSettlement[]; 
   
   shoppingListItems: ShoppingListItem[];
 
@@ -161,11 +164,7 @@ export interface AppState {
   tripSettlementsMap: Record<string, TripSettlement[]>;
 }
 
-export interface TripMemberNetData {
-  directContribution: number;
-  shareOfExpenses: number;
-  netShare: number;
-}
+export type TripMemberNetData = MemberDisplayFinancials; // Alias for consistency with household
 
 export type AppContextType = Omit<AppState, 'tripSettlementsMap' | 'householdOverallSettlements'> & {
   // Expense functions
@@ -189,11 +188,11 @@ export type AppContextType = Omit<AppState, 'tripSettlementsMap' | 'householdOve
   // Household Contribution functions
   addContribution: (contribution: Omit<Contribution, 'id'>) => void;
   getMemberContributions: (memberId: string) => Contribution[];
-  getMemberTotalContribution: (memberId: string) => number;
+  getMemberTotalContribution: (memberId: string) => number; // Total direct cash contributions
   
   // Household Pot & Net Data functions
-  getTotalHouseholdSpending: () => number;
-  getHouseholdMemberNetPotData: (memberId: string) => HouseholdMemberNetData;
+  getTotalHouseholdSpending: () => number; // Total spent from the pot
+  getHouseholdMemberNetPotData: (memberId: string) => HouseholdMemberNetData; // Updated return type
   getHouseholdOverallSettlements: () => HouseholdSettlement[];
   triggerHouseholdSettlementCalculation: () => void;
 
@@ -231,14 +230,14 @@ export type AppContextType = Omit<AppState, 'tripSettlementsMap' | 'householdOve
   // Trip Contribution functions
   addTripContribution: (tripId: string, tripMemberId: string, contributionData: Omit<TripContribution, 'id' | 'tripId' | 'tripMemberId'>) => void;
   getTripContributionsForMember: (tripMemberId: string) => TripContribution[];
-  getTripMemberTotalDirectContribution: (tripMemberId: string, tripIdToFilter?: string) => number;
+  getTripMemberTotalDirectContribution: (tripMemberId: string, tripIdToFilter?: string) => number; // Total direct cash contributions
   
   // Trip Expense functions
   addTripExpense: (expenseData: Omit<TripExpense, 'id'>) => void; 
   getTripExpenses: (tripId: string) => TripExpense[];
 
   // Trip Net Data & Settlement functions
-  getTripMemberNetData: (tripId: string, tripMemberId: string) => TripMemberNetData;
+  getTripMemberNetData: (tripId: string, tripMemberId: string) => TripMemberNetData; // Updated return type
   getTripSettlements: (tripId: string) => TripSettlement[];
   triggerTripSettlementCalculation: (tripId: string) => void;
 };
@@ -250,4 +249,3 @@ export interface NavItem {
   label?: string;
   variant?: 'default' | 'ghost';
 }
-

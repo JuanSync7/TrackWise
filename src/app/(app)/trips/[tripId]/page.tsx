@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/shared/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Users, Banknote, ListChecks, ArrowLeft, HandCoins, CircleDollarSign, Shuffle } from 'lucide-react';
+import { PlusCircle, Users, Banknote, ListChecks, ArrowLeft, HandCoins, CircleDollarSign, Shuffle, Wallet, Receipt } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -32,15 +32,16 @@ export default function TripDetailPage() {
   const {
     getTripById,
     addTripMember, deleteTripMember: contextDeleteTripMember, getTripMemberById,
-    addTripContribution, getTripMemberTotalDirectContribution,
-    tripMembers: globalTripMembers, // Raw global state for dependency
-    tripContributions: globalTripContributions, // Raw global state for dependency
+    addTripContribution, 
+    tripMembers: globalTripMembers, 
+    tripContributions: globalTripContributions, 
     addTripExpense,
-    tripExpenses: globalTripExpenses, // Raw global state for dependency
-    getTripMembers, // Context getter function
-    getTripExpenses, // Context getter function
-    getTripSettlements, // Context getter function
+    tripExpenses: globalTripExpenses, 
+    getTripMembers, 
+    getTripExpenses, 
+    getTripSettlements, 
     triggerTripSettlementCalculation,
+    getTripMemberNetData, // For calculating summary card totals
   } = useAppContext();
   const { user: authUser } = useAuth();
   const { toast } = useToast();
@@ -55,7 +56,6 @@ export default function TripDetailPage() {
   const [isSubmittingExpense, setIsSubmittingExpense] = useState(false);
   const [tripMemberToDelete, setTripMemberToDelete] = useState<string | null>(null);
 
-  // Derive lists directly from context using useMemo
   const memoizedTripMembers = useMemo(() => {
     return tripId ? getTripMembers(tripId) : [];
   }, [tripId, getTripMembers]);
@@ -68,13 +68,11 @@ export default function TripDetailPage() {
     return tripId ? getTripSettlements(tripId) : [];
   }, [tripId, getTripSettlements]);
 
-  // Effect for initial trip loading
   useEffect(() => {
     if (tripId) {
       const foundTrip = getTripById(tripId);
       if (foundTrip) {
         setTrip(foundTrip);
-        // Initial settlement calculation happens after global data dependencies trigger the other useEffect
       } else {
         toast({ variant: "destructive", title: "Trip Not Found", description: "The requested trip could not be found." });
         router.push('/trips');
@@ -82,7 +80,6 @@ export default function TripDetailPage() {
     }
   }, [tripId, getTripById, router, toast]);
 
-  // Effect to re-calculate settlements when relevant global data changes or tripId changes
   useEffect(() => {
     if (tripId) {
       triggerTripSettlementCalculation(tripId);
@@ -127,7 +124,7 @@ export default function TripDetailPage() {
   }, [tripMemberToDelete, tripId, contextDeleteTripMember, getTripMemberById, toast]);
 
   const handleAddTripContributionClick = useCallback((memberId: string) => {
-    const member = getTripMemberById(memberId); // getTripMemberById should be stable
+    const member = getTripMemberById(memberId); 
     if (member) {
       setSelectedTripMemberForContribution(member);
       setIsContributionFormOpen(true);
@@ -174,18 +171,32 @@ export default function TripDetailPage() {
     }
   }, [tripId, addTripExpense, toast]);
 
-  const totalTripContributions = useMemo(() => {
-    return memoizedTripMembers.reduce((sum, member) => sum + getTripMemberTotalDirectContribution(member.id, tripId), 0);
-  }, [memoizedTripMembers, getTripMemberTotalDirectContribution, tripId]);
+  // --- Summary Card Calculations ---
+  const tripFinancialSummary = useMemo(() => {
+    let totalCashInPot = 0;
+    let totalMemberPaidExpenses = 0;
+    
+    memoizedTripMembers.forEach(member => {
+      const memberData = getTripMemberNetData(tripId, member.id);
+      totalCashInPot += memberData.directCashContribution;
+      totalMemberPaidExpenses += memberData.amountPersonallyPaidForGroup;
+    });
 
-  const totalTripPotSpending = useMemo(() => {
-    return memoizedTripExpensesList
+    const totalPotPaidExpenses = memoizedTripExpensesList
       .filter(exp => exp.paidByTripMemberId === POT_PAYER_ID)
       .reduce((sum, exp) => sum + exp.amount, 0);
-  }, [memoizedTripExpensesList]);
+    
+    const remainingCashInPot = totalCashInPot - totalPotPaidExpenses;
+    const potUsagePercentage = totalCashInPot > 0 ? Math.min((totalPotPaidExpenses / totalCashInPot) * 100, 100) : 0;
 
-  const remainingTripPot = totalTripContributions - totalTripPotSpending;
-  const tripPotUsagePercentage = totalTripContributions > 0 ? Math.min((totalTripPotSpending / totalTripContributions) * 100, 100) : 0;
+    return {
+      totalCashInPot,
+      totalMemberPaidExpenses,
+      totalPotPaidExpenses,
+      remainingCashInPot,
+      potUsagePercentage,
+    };
+  }, [memoizedTripMembers, memoizedTripExpensesList, tripId, getTripMemberNetData]);
 
 
   if (!trip) {
@@ -298,7 +309,7 @@ export default function TripDetailPage() {
                 <Users className="h-6 w-6 text-primary" />
                 Trip Members ({memoizedTripMembers.length})
               </CardTitle>
-              <CardDescription>Manage trip members, their contributions to the trip pot, and their net financial position within the trip pot.</CardDescription>
+              <CardDescription>Manage trip members, their cash contributions, personal payments for the group, share of all expenses, and overall net position.</CardDescription>
             </CardHeader>
             <CardContent>
               <TripMemberList
@@ -328,33 +339,45 @@ export default function TripDetailPage() {
            <Card>
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                    <CircleDollarSign className="h-6 w-6 text-primary" />
-                    Trip Pot Summary
+                    <Wallet className="h-6 w-6 text-primary" />
+                    Trip Pot Cash Summary
                 </CardTitle>
-                <CardDescription>Overall financial status of the communal trip pot.</CardDescription>
+                <CardDescription>Cash flow of the communal trip pot.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
                 <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Total Pot Contributions:</span>
-                    <span className="font-semibold text-accent">{DEFAULT_CURRENCY}{totalTripContributions.toFixed(2)}</span>
+                    <span className="text-sm text-muted-foreground">Total Cash in Pot:</span>
+                    <span className="font-semibold text-accent">{DEFAULT_CURRENCY}{tripFinancialSummary.totalCashInPot.toFixed(2)}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Total Pot Spending:</span>
-                    <span className="font-semibold text-destructive">{DEFAULT_CURRENCY}{totalTripPotSpending.toFixed(2)}</span>
+                    <span className="text-sm text-muted-foreground">Total Spent from Pot:</span>
+                    <span className="font-semibold text-destructive">{DEFAULT_CURRENCY}{tripFinancialSummary.totalPotPaidExpenses.toFixed(2)}</span>
                 </div>
                  <hr className="my-1 border-border"/>
                 <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold">Remaining in Trip Pot:</span>
-                    <span className={cn("font-bold text-lg", remainingTripPot >=0 ? "text-primary" : "text-destructive")}>{DEFAULT_CURRENCY}{remainingTripPot.toFixed(2)}</span>
+                    <span className="text-sm font-semibold">Remaining Cash in Pot:</span>
+                    <span className={cn("font-bold text-lg", tripFinancialSummary.remainingCashInPot >=0 ? "text-primary" : "text-destructive")}>{DEFAULT_CURRENCY}{tripFinancialSummary.remainingCashInPot.toFixed(2)}</span>
                 </div>
-                {totalTripContributions > 0 && (
+                {tripFinancialSummary.totalCashInPot > 0 && (
                     <div>
-                        <Progress value={tripPotUsagePercentage} className="h-2 mt-1" aria-label={`Trip pot usage ${tripPotUsagePercentage.toFixed(0)}%`}/>
-                        <p className="text-xs text-muted-foreground mt-1 text-right">{tripPotUsagePercentage.toFixed(0)}% of pot used.</p>
+                        <Progress value={tripFinancialSummary.potUsagePercentage} className="h-2 mt-1" aria-label={`Trip pot usage ${tripFinancialSummary.potUsagePercentage.toFixed(0)}%`}/>
+                        <p className="text-xs text-muted-foreground mt-1 text-right">{tripFinancialSummary.potUsagePercentage.toFixed(0)}% of cash pot used.</p>
                     </div>
                 )}
-                 <p className="text-xs text-muted-foreground pt-1">This is the collective balance of the trip's funds. Only expenses explicitly paid from the pot are deducted here.</p>
             </CardContent>
+           </Card>
+           <Card>
+             <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <Receipt className="h-6 w-6 text-primary" />
+                    Member-Paid Expenses
+                </CardTitle>
+                <CardDescription>Total expenses paid personally by members for the group.</CardDescription>
+             </CardHeader>
+             <CardContent>
+                <p className="text-2xl font-bold">{DEFAULT_CURRENCY}{tripFinancialSummary.totalMemberPaidExpenses.toFixed(2)}</p>
+                <p className="text-xs text-muted-foreground">This amount is factored into the overall settlement.</p>
+             </CardContent>
            </Card>
         </div>
       </div>

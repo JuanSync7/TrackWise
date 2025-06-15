@@ -4,7 +4,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { PageHeader } from '@/components/shared/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Users, DollarSign, ClipboardList, WalletCards, DivideSquare, TrendingDown, TrendingUp, Banknote, ListChecks, Download, Shuffle } from 'lucide-react';
+import { PlusCircle, Users, DollarSign, ClipboardList, WalletCards, DivideSquare, TrendingDown, TrendingUp, Banknote, ListChecks, Download, Shuffle, Wallet, Receipt } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -36,10 +36,12 @@ import { TripSettlementList } from '@/components/trips/trip-settlement-list';
 export default function HouseholdPage() {
   const {
     members, addMember, deleteMember: contextDeleteMember,
-    contributions, addContribution, getMemberTotalContribution,
+    contributions, addContribution, 
     expenses, addExpense, sharedBudgets, getCategoryById,
-    getTotalHouseholdSpending,
-    getHouseholdOverallSettlements, triggerHouseholdSettlementCalculation, getHouseholdMemberNetPotData
+    getHouseholdOverallSettlements, triggerHouseholdSettlementCalculation, getHouseholdMemberNetPotData,
+    members: globalMembers, // for useEffect dependency
+    contributions: globalContributions, // for useEffect dependency
+    expenses: globalExpenses, // for useEffect dependency
   } = useAppContext();
   const { user: authUser } = useAuth();
   const { toast } = useToast();
@@ -53,11 +55,13 @@ export default function HouseholdPage() {
   const [isSubmittingExpense, setIsSubmittingExpense] = useState(false);
   const [memberToDelete, setMemberToDelete] = useState<string | null>(null);
 
-  const householdSettlements = getHouseholdOverallSettlements();
+  const memoizedHouseholdSettlements = useMemo(() => {
+    return getHouseholdOverallSettlements();
+  }, [getHouseholdOverallSettlements]);
 
   useEffect(() => {
     triggerHouseholdSettlementCalculation();
-  }, [members, contributions, expenses, sharedBudgets, triggerHouseholdSettlementCalculation]);
+  }, [globalMembers, globalContributions, globalExpenses, triggerHouseholdSettlementCalculation]);
 
 
   const currentUserAsHouseholdMember = useMemo(() => {
@@ -152,16 +156,33 @@ export default function HouseholdPage() {
     }
   }, [addExpense, toast]);
 
-  const totalHouseholdContributions = useMemo(() => {
-    return members.reduce((sum, member) => sum + getMemberTotalContribution(member.id), 0);
-  }, [members, getMemberTotalContribution, contributions]);
 
-  const totalPotSpending = useMemo(() => {
-    return getTotalHouseholdSpending(); 
-  }, [getTotalHouseholdSpending, expenses, sharedBudgets]);
+  const householdFinancialSummary = useMemo(() => {
+    let totalCashInPot = 0;
+    let totalMemberPaidExpenses = 0;
+    
+    members.forEach(member => {
+      const memberData = getHouseholdMemberNetPotData(member.id);
+      totalCashInPot += memberData.directCashContribution;
+      totalMemberPaidExpenses += memberData.amountPersonallyPaidForGroup;
+    });
 
-  const remainingInPot = totalHouseholdContributions - totalPotSpending;
-  const potUsagePercentage = totalHouseholdContributions > 0 ? Math.min((totalPotSpending / totalHouseholdContributions) * 100, 100) : 0;
+    const totalPotPaidExpenses = expenses
+      .filter(exp => exp.paidByMemberId === POT_PAYER_ID)
+      .reduce((sum, exp) => sum + exp.amount, 0);
+    
+    const remainingCashInPot = totalCashInPot - totalPotPaidExpenses;
+    const potUsagePercentage = totalCashInPot > 0 ? Math.min((totalPotPaidExpenses / totalCashInPot) * 100, 100) : 0;
+
+    return {
+      totalCashInPot,
+      totalMemberPaidExpenses,
+      totalPotPaidExpenses,
+      remainingCashInPot,
+      potUsagePercentage,
+    };
+  }, [members, expenses, getHouseholdMemberNetPotData]);
+
 
   const handleExportHouseholdData = useCallback(() => {
     const csvRows: (string | number | undefined)[][] = [];
@@ -171,37 +192,44 @@ export default function HouseholdPage() {
     csvRows.push([`Trackwise Household Data - ${currentDate}`]);
     csvRows.push([]);
 
-    csvRows.push(["Household Pot Summary"]);
+    csvRows.push(["Household Pot Cash Summary"]);
     csvRows.push(["Metric", "Amount"]);
-    csvRows.push([`Total Household Contributions (${DEFAULT_CURRENCY})`, totalHouseholdContributions.toFixed(2)]);
-    csvRows.push([`Total Shared Household Spending (from Pot) (${DEFAULT_CURRENCY})`, totalPotSpending.toFixed(2)]);
-    csvRows.push([`Remaining in Pot (${DEFAULT_CURRENCY})`, remainingInPot.toFixed(2)]);
+    csvRows.push([`Total Cash Contributions to Pot (${DEFAULT_CURRENCY})`, householdFinancialSummary.totalCashInPot.toFixed(2)]);
+    csvRows.push([`Total Expenses Paid Directly from Pot (${DEFAULT_CURRENCY})`, householdFinancialSummary.totalPotPaidExpenses.toFixed(2)]);
+    csvRows.push([`Remaining Cash in Pot (${DEFAULT_CURRENCY})`, householdFinancialSummary.remainingCashInPot.toFixed(2)]);
+    csvRows.push([`Total Expenses Paid by Members (Personal Funds for Group) (${DEFAULT_CURRENCY})`, householdFinancialSummary.totalMemberPaidExpenses.toFixed(2)]);
     csvRows.push([]);
 
-    csvRows.push(["Member Overview (Pot Share)"]);
-    csvRows.push(["Member Name", `Total Direct Contributions to Pot (${DEFAULT_CURRENCY})`, `Share of Pot Expenses (${DEFAULT_CURRENCY})`, `Net Share in Pot (${DEFAULT_CURRENCY})`]);
+    csvRows.push(["Member Overview (Overall Position)"]);
+    csvRows.push(["Member Name", `Cash to Pot (${DEFAULT_CURRENCY})`, `Paid for Group (Personal) (${DEFAULT_CURRENCY})`, `Share of All Expenses (${DEFAULT_CURRENCY})`, `Net Position (${DEFAULT_CURRENCY})`]);
     members.forEach(member => {
       const netData = getHouseholdMemberNetPotData(member.id);
-      csvRows.push([member.name, netData.directContributionToPot.toFixed(2), netData.shareOfPotExpenses.toFixed(2), netData.netPotShare.toFixed(2)]);
+      csvRows.push([
+          member.name, 
+          netData.directCashContribution.toFixed(2), 
+          netData.amountPersonallyPaidForGroup.toFixed(2), 
+          netData.totalShareOfAllGroupExpenses.toFixed(2),
+          netData.netOverallPosition.toFixed(2)
+        ]);
     });
     csvRows.push([]);
 
-    if (householdSettlements.length > 0) {
-        csvRows.push(["Household Pot Settlements (Who Owes Whom for Pot Balance)"]);
+    if (memoizedHouseholdSettlements.length > 0) {
+        csvRows.push(["Household Overall Settlements (Who Owes Whom)"]);
         csvRows.push(["Owed By", "Owes To", `Amount (${DEFAULT_CURRENCY})`]);
-        householdSettlements.forEach(settlement => {
+        memoizedHouseholdSettlements.forEach(settlement => {
             const owedByName = members.find(m => m.id === settlement.owedByTripMemberId)?.name || 'Unknown'; 
             const owedToName = members.find(m => m.id === settlement.owedToTripMemberId)?.name || 'Unknown';
             csvRows.push([owedByName, owedToName, settlement.amount.toFixed(2)]);
         });
     } else {
-        csvRows.push(["Household Pot Settlements (Who Owes Whom for Pot Balance)"]);
-        csvRows.push(["All Square! No settlements needed for the pot."]);
+        csvRows.push(["Household Overall Settlements (Who Owes Whom)"]);
+        csvRows.push(["All Square! No settlements needed."]);
     }
     csvRows.push([]);
 
 
-    csvRows.push(["Individual Contributions to Pot"]);
+    csvRows.push(["Individual Cash Contributions to Pot"]);
     csvRows.push(["Member Name", `Amount (${DEFAULT_CURRENCY})`, "Date", "Notes"]);
     contributions.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).forEach(contrib => {
       const memberName = members.find(m => m.id === contrib.memberId)?.name || 'Unknown Member';
@@ -209,12 +237,10 @@ export default function HouseholdPage() {
     });
     csvRows.push([]);
 
-    csvRows.push(["Expenses Paid From Household Pot"]);
-    csvRows.push(["Description", `Amount (${DEFAULT_CURRENCY})`, "Date", "Category/Linked Budget"]);
-    const potPaidExpenses = expenses.filter(exp => exp.paidByMemberId === POT_PAYER_ID)
-        .sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-    potPaidExpenses.forEach(exp => {
+    csvRows.push(["Expenses (All Payers)"]);
+    csvRows.push(["Description", `Amount (${DEFAULT_CURRENCY})`, "Date", "Category/Linked Budget", "Paid By"]);
+    expenses.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .forEach(exp => {
       let source = "Unknown";
       if (exp.sharedBudgetId) {
         const budget = sharedBudgets.find(sb => sb.id === exp.sharedBudgetId);
@@ -223,12 +249,13 @@ export default function HouseholdPage() {
         const category = getCategoryById(exp.categoryId);
         source = category ? `Category: ${category.name}` : `Category: ID ${exp.categoryId}`;
       }
-      csvRows.push([exp.description, exp.amount.toFixed(2), exp.date, source]);
+      const payerName = exp.paidByMemberId === POT_PAYER_ID ? "Household Pot" : (members.find(m=>m.id === exp.paidByMemberId)?.name || "Unknown Member");
+      csvRows.push([exp.description, exp.amount.toFixed(2), exp.date, source, payerName]);
     });
 
     exportToCsv(filename, csvRows);
     toast({ title: "Household Data Exported", description: `Data exported to ${filename}` });
-  }, [members, contributions, expenses, sharedBudgets, householdSettlements, totalHouseholdContributions, totalPotSpending, remainingInPot, getHouseholdMemberNetPotData, getCategoryById, toast]);
+  }, [members, contributions, expenses, sharedBudgets, memoizedHouseholdSettlements, householdFinancialSummary, getHouseholdMemberNetPotData, getCategoryById, toast]);
 
 
   return (
@@ -275,7 +302,7 @@ export default function HouseholdPage() {
           <DialogHeader>
             <DialogTitle>Add Contribution for {selectedMemberForContribution?.name}</DialogTitle>
             <DialogDescription>
-              Record a new contribution from this household member to the communal pot.
+              Record a new cash contribution from this household member to the communal pot.
             </DialogDescription>
           </DialogHeader>
           <ContributionForm
@@ -334,7 +361,7 @@ export default function HouseholdPage() {
                 <Users className="h-6 w-6 text-primary" />
                 Household Members ({members.length})
               </CardTitle>
-              <CardDescription>View members, their contributions to the pot, and their net share of household pot finances.</CardDescription>
+              <CardDescription>View members, their cash contributions to the pot, personal payments for group items, share of all expenses, and overall net position.</CardDescription>
             </CardHeader>
             <CardContent>
               <MemberList
@@ -349,12 +376,12 @@ export default function HouseholdPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Shuffle className="h-6 w-6 text-primary" />
-                Household Pot Settlement
+                Household Overall Settlement
               </CardTitle>
-              <CardDescription>Who owes whom to balance the household pot based on contributions and pot-paid expenses.</CardDescription>
+              <CardDescription>Who owes whom to balance all household finances (cash contributions, pot-paid expenses, and member-paid shared expenses).</CardDescription>
             </CardHeader>
             <CardContent>
-                <TripSettlementList settlements={householdSettlements} tripId="household_pot_settlement" />
+                <TripSettlementList settlements={memoizedHouseholdSettlements} tripId="household_pot_settlement" />
             </CardContent>
           </Card>
         </div>
@@ -363,33 +390,45 @@ export default function HouseholdPage() {
            <Card>
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                    <Banknote className="h-6 w-6 text-primary" />
-                    Household Pot Summary
+                    <Wallet className="h-6 w-6 text-primary" />
+                    Household Pot Cash Summary
                 </CardTitle>
-                <CardDescription>Overview of the collective household funds and their usage.</CardDescription>
+                <CardDescription>Cash flow of the collective household funds.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
                 <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground flex items-center gap-1.5"><TrendingUp className="h-4 w-4 text-accent"/>Total Pot Contributions:</span>
-                    <span className="font-semibold text-accent">{DEFAULT_CURRENCY}{totalHouseholdContributions.toFixed(2)}</span>
+                    <span className="text-sm text-muted-foreground">Total Cash in Pot:</span>
+                    <span className="font-semibold text-accent">{DEFAULT_CURRENCY}{householdFinancialSummary.totalCashInPot.toFixed(2)}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground flex items-center gap-1.5"><TrendingDown className="h-4 w-4 text-destructive"/>Total Pot Spending:</span>
-                    <span className="font-semibold text-destructive">{DEFAULT_CURRENCY}{totalPotSpending.toFixed(2)}</span>
+                    <span className="text-sm text-muted-foreground">Total Spent from Pot:</span>
+                    <span className="font-semibold text-destructive">{DEFAULT_CURRENCY}{householdFinancialSummary.totalPotPaidExpenses.toFixed(2)}</span>
                 </div>
                  <hr className="my-1 border-border"/>
                 <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold">Remaining in Pot:</span>
-                    <span className={cn("font-bold text-lg", remainingInPot >=0 ? "text-primary" : "text-destructive")}>{DEFAULT_CURRENCY}{remainingInPot.toFixed(2)}</span>
+                    <span className="text-sm font-semibold">Remaining Cash in Pot:</span>
+                    <span className={cn("font-bold text-lg", householdFinancialSummary.remainingCashInPot >=0 ? "text-primary" : "text-destructive")}>{DEFAULT_CURRENCY}{householdFinancialSummary.remainingCashInPot.toFixed(2)}</span>
                 </div>
-                {totalHouseholdContributions > 0 && (
+                {householdFinancialSummary.totalCashInPot > 0 && (
                     <div>
-                        <Progress value={potUsagePercentage} className="h-2 mt-1" aria-label={`Pot usage ${potUsagePercentage.toFixed(0)}%`}/>
-                        <p className="text-xs text-muted-foreground mt-1 text-right">{potUsagePercentage.toFixed(0)}% of pot used.</p>
+                        <Progress value={householdFinancialSummary.potUsagePercentage} className="h-2 mt-1" aria-label={`Pot usage ${householdFinancialSummary.potUsagePercentage.toFixed(0)}%`}/>
+                        <p className="text-xs text-muted-foreground mt-1 text-right">{householdFinancialSummary.potUsagePercentage.toFixed(0)}% of cash pot used.</p>
                     </div>
                 )}
-                <p className="text-xs text-muted-foreground pt-1">Pot spending includes expenses explicitly paid from the pot.</p>
             </CardContent>
+           </Card>
+           <Card>
+             <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <Receipt className="h-6 w-6 text-primary" />
+                    Member-Paid Expenses
+                </CardTitle>
+                <CardDescription>Total expenses paid personally by members for the group.</CardDescription>
+             </CardHeader>
+             <CardContent>
+                <p className="text-2xl font-bold">{DEFAULT_CURRENCY}{householdFinancialSummary.totalMemberPaidExpenses.toFixed(2)}</p>
+                <p className="text-xs text-muted-foreground">This amount is factored into the overall settlement.</p>
+             </CardContent>
            </Card>
 
            <Card>

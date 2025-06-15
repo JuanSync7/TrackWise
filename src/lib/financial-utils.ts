@@ -3,23 +3,25 @@ import { POT_PAYER_ID } from '@/lib/constants';
 
 export interface MemberInput {
   id: string;
-  directContribution: number; // Explicit cash/value contributed by the member
+  directCashContribution: number; 
 }
 
 export interface ExpenseInput {
   amount: number;
   isSplit: boolean;
-  splitWithMemberIds: string[]; // IDs of members who benefited from/shared this expense
-  paidByMemberId?: string; // ID of the member who paid, or POT_PAYER_ID if paid from communal funds
+  splitWithMemberIds: string[]; 
+  paidByMemberId?: string; 
 }
 
-export interface NetPosition {
+// Updated: Represents the comprehensive financial breakdown for a member
+export interface CalculatedMemberFinancials {
   memberId: string;
-  netShare: number; // Overall net: (contributions + paid_for_others) - (share_of_pot_expenses + share_of_member_paid_expenses)
-  // Optional: include these for display on Net Share in Pot cards if needed, or calculate separately
-  directContribution?: number;
-  shareOfPotPaidExpenses?: number;
+  directCashContribution: number;        // Sum of explicit cash contributions
+  amountPersonallyPaidForGroup: number; // Sum of expenses this member paid personally for the group
+  totalShareOfAllGroupExpenses: number; // Their share of ALL expenses (pot-paid or member-paid)
+  finalNetShareForSettlement: number;   // (Direct Cash + Personally Paid) - Share of All Group Expenses
 }
+
 
 export interface RawSettlement {
   owedByMemberId: string;
@@ -27,28 +29,27 @@ export interface RawSettlement {
   amount: number;
 }
 
-const EPSILON = 0.005; // For floating point comparisons (e.g., half a cent)
+const EPSILON = 0.005; 
 
 /**
- * Calculates the net financial position for each member in a group,
- * considering direct contributions, who paid for expenses, and how expenses were split.
- * This is used for the overall "Who Owes Whom" settlement.
+ * Calculates the comprehensive financial position for each member.
  */
 export function calculateNetFinancialPositions(
-  memberInputs: MemberInput[], // Explicit cash contributions
+  memberInputs: MemberInput[],
   allGroupExpenses: ExpenseInput[],
   allMemberIdsInGroup: string[]
-): Map<string, NetPosition> {
-  const netPositions = new Map<string, NetPosition>();
+): Map<string, CalculatedMemberFinancials> {
+  const results = new Map<string, CalculatedMemberFinancials>();
 
-  // Initialize net positions with direct contributions
+  // Initialize results for all members
   allMemberIdsInGroup.forEach(memberId => {
     const memberInput = memberInputs.find(m => m.id === memberId);
-    netPositions.set(memberId, {
+    results.set(memberId, {
       memberId: memberId,
-      netShare: memberInput ? memberInput.directContribution : 0,
-      directContribution: memberInput ? memberInput.directContribution : 0, // Store for reference
-      shareOfPotPaidExpenses: 0, // Will be accumulated specifically for pot-paid expenses
+      directCashContribution: parseFloat((memberInput?.directCashContribution || 0).toFixed(2)),
+      amountPersonallyPaidForGroup: 0,
+      totalShareOfAllGroupExpenses: 0,
+      finalNetShareForSettlement: parseFloat((memberInput?.directCashContribution || 0).toFixed(2)), // Start with cash contribution
     });
   });
 
@@ -57,66 +58,58 @@ export function calculateNetFinancialPositions(
     if (expense.isSplit && expense.splitWithMemberIds.length > 0) {
       membersSharingThisExpense = expense.splitWithMemberIds.filter(id => allMemberIdsInGroup.includes(id));
     } else {
-      // If not explicitly split, assume shared by all members in the group for this expense
       membersSharingThisExpense = [...allMemberIdsInGroup];
     }
 
     const numSharing = membersSharingThisExpense.length > 0 ? membersSharingThisExpense.length : 1;
     const individualShareOfThisExpense = parseFloat((expense.amount / numSharing).toFixed(2));
 
-    // If an individual member paid, credit their netShare for the full amount they paid
+    // If an individual member paid, credit their netShare and track amountPersonallyPaidForGroup
     if (expense.paidByMemberId && expense.paidByMemberId !== POT_PAYER_ID) {
-      const payerPosition = netPositions.get(expense.paidByMemberId);
-      if (payerPosition) {
-        payerPosition.netShare += expense.amount;
+      const payerResult = results.get(expense.paidByMemberId);
+      if (payerResult) {
+        payerResult.finalNetShareForSettlement += expense.amount;
+        payerResult.amountPersonallyPaidForGroup += expense.amount;
       }
     }
 
-    // Debit each sharing member for their share of this expense
+    // Debit each sharing member for their share of this expense and update totalShareOfAllGroupExpenses
     membersSharingThisExpense.forEach(memberIdInSplit => {
-      const memberPosition = netPositions.get(memberIdInSplit);
-      if (memberPosition) {
-        memberPosition.netShare -= individualShareOfThisExpense;
-        // If this expense was paid from the pot, also track it for the "Share of Pot-Paid Expenses" display
-        if (expense.paidByMemberId === POT_PAYER_ID && memberPosition.shareOfPotPaidExpenses !== undefined) {
-            memberPosition.shareOfPotPaidExpenses += individualShareOfThisExpense;
-        }
+      const memberResult = results.get(memberIdInSplit);
+      if (memberResult) {
+        memberResult.finalNetShareForSettlement -= individualShareOfThisExpense;
+        memberResult.totalShareOfAllGroupExpenses += individualShareOfThisExpense;
       }
     });
   });
 
-  // Round all final values
-  netPositions.forEach(position => {
-    position.netShare = parseFloat(position.netShare.toFixed(2));
-    if (position.directContribution !== undefined) {
-      position.directContribution = parseFloat(position.directContribution.toFixed(2));
-    }
-    if (position.shareOfPotPaidExpenses !== undefined) {
-      position.shareOfPotPaidExpenses = parseFloat(position.shareOfPotPaidExpenses.toFixed(2));
-    }
+  // Final rounding for all calculated fields
+  results.forEach(res => {
+    res.amountPersonallyPaidForGroup = parseFloat(res.amountPersonallyPaidForGroup.toFixed(2));
+    res.totalShareOfAllGroupExpenses = parseFloat(res.totalShareOfAllGroupExpenses.toFixed(2));
+    res.finalNetShareForSettlement = parseFloat(res.finalNetShareForSettlement.toFixed(2));
   });
 
-  return netPositions;
+  return results;
 }
 
 
 /**
- * Generates a list of settlements (who owes whom) based on net financial positions.
- * Uses a greedy algorithm to minimize the number of transactions.
+ * Generates a list of settlements (who owes whom) based on final net financial positions.
  */
-export function generateSettlements(memberNetPositionsArray: NetPosition[]): RawSettlement[] {
+export function generateSettlements(calculatedFinancialsArray: CalculatedMemberFinancials[]): RawSettlement[] {
   const settlements: RawSettlement[] = [];
-  if (memberNetPositionsArray.length < 2) {
+  if (calculatedFinancialsArray.length < 2) {
     return settlements;
   }
 
-  let debtors = memberNetPositionsArray
-    .filter(m => m.netShare < -EPSILON)
-    .map(m => ({ id: m.memberId, amount: parseFloat(Math.abs(m.netShare).toFixed(2)) }));
+  let debtors = calculatedFinancialsArray
+    .filter(m => m.finalNetShareForSettlement < -EPSILON)
+    .map(m => ({ id: m.memberId, amount: parseFloat(Math.abs(m.finalNetShareForSettlement).toFixed(2)) }));
 
-  let creditors = memberNetPositionsArray
-    .filter(m => m.netShare > EPSILON)
-    .map(m => ({ id: m.memberId, amount: parseFloat(m.netShare.toFixed(2)) }));
+  let creditors = calculatedFinancialsArray
+    .filter(m => m.finalNetShareForSettlement > EPSILON)
+    .map(m => ({ id: m.memberId, amount: parseFloat(m.finalNetShareForSettlement.toFixed(2)) }));
 
   debtors.sort((a, b) => b.amount - a.amount);
   creditors.sort((a, b) => b.amount - a.amount);

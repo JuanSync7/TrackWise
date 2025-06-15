@@ -6,13 +6,13 @@ import React, { createContext, useContext, useCallback, useMemo, useEffect } fro
 import type {
   Expense, Category, BudgetGoal, AppState, AppContextType,
   Member, Contribution, ShoppingListItem, SharedBudget, Debt, HouseholdMemberNetData, HouseholdSettlement,
-  Trip, TripMember, TripContribution, TripExpense, TripMemberNetData, TripSettlement
+  Trip, TripMember, TripContribution, TripExpense, TripMemberNetData as TripMemberNetDataType, TripSettlement
 } from '@/lib/types';
 import { INITIAL_CATEGORIES, HOUSEHOLD_EXPENSE_CATEGORY_ID, POT_PAYER_ID } from '@/lib/constants';
 import useLocalStorage from '@/hooks/use-local-storage';
 import { v4 as uuidv4 } from 'uuid';
 import { formatISO, parseISO, subDays, isWithinInterval } from 'date-fns';
-import { calculateNetFinancialPositions, generateSettlements, type MemberInput, type ExpenseInput, type NetPosition } from '@/lib/financial-utils';
+import { calculateNetFinancialPositions, generateSettlements, type MemberInput, type ExpenseInput, type CalculatedMemberFinancials } from '@/lib/financial-utils';
 
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -22,14 +22,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [categories, setCategories] = useLocalStorage<Category[]>('trackwise_categories', INITIAL_CATEGORIES);
   const [budgetGoals, setBudgetGoals] = useLocalStorage<BudgetGoal[]>('trackwise_budget_goals', []);
   const [members, setMembers] = useLocalStorage<Member[]>('trackwise_members', []);
-  const [contributions, setContributions] = useLocalStorage<Contribution[]>('trackwise_contributions', []);
+  const [contributions, setContributions] = useLocalStorage<Contribution[]>('trackwise_contributions', []); // Household cash contributions
   const [sharedBudgets, setSharedBudgets] = useLocalStorage<SharedBudget[]>('trackwise_shared_budgets', []);
   const [debts, setDebts] = useLocalStorage<Debt[]>('trackwise_debts', []);
   const [householdOverallSettlements, setHouseholdOverallSettlements] = useLocalStorage<HouseholdSettlement[]>('trackwise_household_settlements', []);
   const [shoppingListItems, setShoppingListItems] = useLocalStorage<ShoppingListItem[]>('trackwise_shopping_list_items', []);
   const [trips, setTrips] = useLocalStorage<Trip[]>('trackwise_trips', []);
   const [tripMembers, setTripMembers] = useLocalStorage<TripMember[]>('trackwise_trip_members', []);
-  const [tripContributions, setTripContributions] = useLocalStorage<TripContribution[]>('trackwise_trip_contributions', []);
+  const [tripContributions, setTripContributions] = useLocalStorage<TripContribution[]>('trackwise_trip_contributions', []); // Trip cash contributions
   const [tripExpenses, setTripExpensesState] = useLocalStorage<TripExpense[]>('trackwise_trip_expenses', []);
   const [tripSettlementsMap, setTripSettlementsMap] = useLocalStorage<Record<string, TripSettlement[]>>('trackwise_trip_settlements_map', {});
 
@@ -43,7 +43,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const getTripExpenses = useCallback((tripIdToFilter: string) => tripExpenses.filter(expense => expense.tripId === tripIdToFilter), [tripExpenses]);
   const getHouseholdOverallSettlements = useCallback(() => householdOverallSettlements, [householdOverallSettlements]);
   const getTripSettlements = useCallback((tripId: string) => tripSettlementsMap[tripId] || [], [tripSettlementsMap]);
-
 
   const _manageDebtsForExpense = useCallback((expense: Expense, currentDebts: Debt[]): Debt[] => {
     let updatedDebts = currentDebts.filter(d => d.expenseId !== expense.id);
@@ -69,58 +68,61 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
 
   const getHouseholdMemberNetPotData = useCallback((householdMemberId: string): HouseholdMemberNetData => {
-    const memberDirectContribution = contributions
-        .filter(c => c.memberId === householdMemberId)
-        .reduce((sum, c) => sum + c.amount, 0);
-
-    const potPaidExpenses = expenses.filter(exp => exp.paidByMemberId === POT_PAYER_ID);
-    let memberShareOfPotExpenses = 0;
-
-    potPaidExpenses.forEach(expense => {
-        let membersSharingThisExpense = expense.isSplit && expense.splitWithMemberIds && expense.splitWithMemberIds.length > 0
-            ? expense.splitWithMemberIds.filter(id => members.some(m => m.id === id))
-            : members.map(m => m.id);
-
-        if (membersSharingThisExpense.includes(householdMemberId)) {
-            const numSharing = membersSharingThisExpense.length > 0 ? membersSharingThisExpense.length : 1;
-            memberShareOfPotExpenses += expense.amount / numSharing;
-        }
-    });
-    const netPotShare = memberDirectContribution - memberShareOfPotExpenses;
-    return {
-        directContributionToPot: parseFloat(memberDirectContribution.toFixed(2)),
-        shareOfPotExpenses: parseFloat(memberShareOfPotExpenses.toFixed(2)),
-        netPotShare: parseFloat(netPotShare.toFixed(2)),
-    };
+    const memberInputs: MemberInput[] = members.map(m => ({
+      id: m.id,
+      directCashContribution: contributions.filter(c => c.memberId === m.id).reduce((s, c) => s + c.amount, 0),
+    }));
+    const expenseInputs: ExpenseInput[] = expenses.map(exp => ({
+      amount: exp.amount, isSplit: !!exp.isSplit,
+      splitWithMemberIds: exp.splitWithMemberIds || [], paidByMemberId: exp.paidByMemberId,
+    }));
+    const allHouseholdMemberIds = members.map(m => m.id);
+    const netPositions = calculateNetFinancialPositions(memberInputs, expenseInputs, allHouseholdMemberIds);
+    
+    const memberData = netPositions.get(householdMemberId);
+    if (memberData) {
+      return {
+        directCashContribution: memberData.directCashContribution,
+        amountPersonallyPaidForGroup: memberData.amountPersonallyPaidForGroup,
+        totalShareOfAllGroupExpenses: memberData.totalShareOfAllGroupExpenses,
+        netOverallPosition: memberData.finalNetShareForSettlement,
+      };
+    }
+    return { directCashContribution: 0, amountPersonallyPaidForGroup: 0, totalShareOfAllGroupExpenses: 0, netOverallPosition: 0 };
   }, [members, contributions, expenses]);
 
-  const getTripMemberNetData = useCallback((tripId: string, tripMemberId: string): TripMemberNetData => {
+
+  const getTripMemberNetData = useCallback((tripId: string, tripMemberId: string): TripMemberNetDataType => {
     const currentTripMembers = getTripMembers(tripId);
-    if (currentTripMembers.length === 0) return { directContribution: 0, shareOfExpenses: 0, netShare: 0 };
+    if (currentTripMembers.length === 0) return { directCashContribution: 0, amountPersonallyPaidForGroup: 0, totalShareOfAllGroupExpenses: 0, netOverallPosition: 0 };
 
     const memberInputs: MemberInput[] = currentTripMembers.map(tm => ({
       id: tm.id,
-      directContribution: getTripMemberTotalDirectContribution(tm.id, tripId),
+      directCashContribution: tripContributions.filter(tc => tc.tripMemberId === tm.id && tc.tripId === tripId).reduce((sum, tc) => sum + tc.amount, 0),
     }));
 
     const expensesForThisTrip = getTripExpenses(tripId);
     const expenseInputs: ExpenseInput[] = expensesForThisTrip.map(exp => ({
       amount: exp.amount,
-      isSplit: exp.isSplit || false,
+      isSplit: !!exp.isSplit,
       splitWithMemberIds: exp.splitWithTripMemberIds || [],
       paidByMemberId: exp.paidByTripMemberId,
     }));
-
+    
     const allTripMemberIds = currentTripMembers.map(tm => tm.id);
     const netPositions = calculateNetFinancialPositions(memberInputs, expenseInputs, allTripMemberIds);
     const memberData = netPositions.get(tripMemberId);
 
-    return {
-      directContribution: memberData?.directContribution || 0,
-      shareOfExpenses: memberData?.shareOfPotPaidExpenses || 0, // shareOfPotPaidExpenses for consistency with household
-      netShare: memberData?.netShare || 0,
-    };
-  }, [getTripMembers, getTripMemberTotalDirectContribution, getTripExpenses]);
+    if (memberData) {
+      return {
+        directCashContribution: memberData.directCashContribution,
+        amountPersonallyPaidForGroup: memberData.amountPersonallyPaidForGroup,
+        totalShareOfAllGroupExpenses: memberData.totalShareOfAllGroupExpenses,
+        netOverallPosition: memberData.finalNetShareForSettlement,
+      };
+    }
+    return { directCashContribution: 0, amountPersonallyPaidForGroup: 0, totalShareOfAllGroupExpenses: 0, netOverallPosition: 0 };
+  }, [getTripMembers, tripContributions, getTripExpenses]);
 
 
   const _calculateAndStoreHouseholdSettlements = useCallback(() => {
@@ -130,18 +132,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
     const memberInputs: MemberInput[] = members.map(m => ({
       id: m.id,
-      directContribution: contributions.filter(c => c.memberId === m.id).reduce((s, c) => s + c.amount, 0),
+      directCashContribution: contributions.filter(c => c.memberId === m.id).reduce((s, c) => s + c.amount, 0),
     }));
     const expenseInputs: ExpenseInput[] = expenses.map(exp => ({
-      amount: exp.amount, isSplit: exp.isSplit || false,
+      amount: exp.amount, isSplit: !!exp.isSplit,
       splitWithMemberIds: exp.splitWithMemberIds || [], paidByMemberId: exp.paidByMemberId,
     }));
     const householdMemberIds = members.map(m => m.id);
     const netPositionsMap = calculateNetFinancialPositions(memberInputs, expenseInputs, householdMemberIds);
-    const netPositionsArray = Array.from(netPositionsMap.values());
+    const netPositionsArray: CalculatedMemberFinancials[] = Array.from(netPositionsMap.values());
+
     const rawSettlements = generateSettlements(netPositionsArray);
     const finalSettlements: HouseholdSettlement[] = rawSettlements.map(s => ({
-        ...s, id: uuidv4(), tripId: 'household_pot_settlement',
+        ...s, id: uuidv4(), tripId: 'household_pot_settlement', // tripId is a generic group ID here
     }));
     setHouseholdOverallSettlements(finalSettlements);
   }, [members, contributions, expenses, setHouseholdOverallSettlements]);
@@ -159,22 +162,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
     const memberInputs: MemberInput[] = currentTripMembers.map(tm => ({
       id: tm.id,
-      directContribution: getTripMemberTotalDirectContribution(tm.id, tripId),
+      directCashContribution: tripContributions.filter(tc => tc.tripMemberId === tm.id && tc.tripId === tripId).reduce((s, tc) => s + tc.amount, 0),
     }));
     const expensesForThisTrip = getTripExpenses(tripId);
     const expenseInputs: ExpenseInput[] = expensesForThisTrip.map(exp => ({
-      amount: exp.amount, isSplit: exp.isSplit || false,
+      amount: exp.amount, isSplit: !!exp.isSplit,
       splitWithMemberIds: exp.splitWithTripMemberIds || [], paidByMemberId: exp.paidByTripMemberId,
     }));
     const allTripMemberIds = currentTripMembers.map(tm => tm.id);
     const netPositionsMap = calculateNetFinancialPositions(memberInputs, expenseInputs, allTripMemberIds);
-    const netPositionsArray = Array.from(netPositionsMap.values());
+    const netPositionsArray: CalculatedMemberFinancials[] = Array.from(netPositionsMap.values());
+    
     const rawSettlements = generateSettlements(netPositionsArray);
     const finalSettlements: TripSettlement[] = rawSettlements.map(s => ({
         ...s, id: uuidv4(), tripId: tripId,
     }));
     setTripSettlementsMap(prevMap => ({ ...prevMap, [tripId]: finalSettlements }));
-  }, [getTripMembers, getTripMemberTotalDirectContribution, getTripExpenses, setTripSettlementsMap]);
+  }, [getTripMembers, tripContributions, getTripExpenses, setTripSettlementsMap]);
 
   const triggerTripSettlementCalculation = useCallback((tripId: string) => {
     _calculateAndStoreTripSettlements(tripId);
@@ -185,19 +189,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const newExpense = { ...newExpenseData, id: uuidv4() };
     setExpenses(prev => [...prev, newExpense]);
     setDebts(prevDebts => _manageDebtsForExpense(newExpense, prevDebts));
-    // triggerHouseholdSettlementCalculation(); // Rely on useEffect in page
   }, [setExpenses, setDebts, _manageDebtsForExpense]);
 
   const updateExpense = useCallback((updatedExpense: Expense) => {
     setExpenses(prev => prev.map(exp => exp.id === updatedExpense.id ? updatedExpense : exp));
     setDebts(prevDebts => _manageDebtsForExpense(updatedExpense, prevDebts));
-    // triggerHouseholdSettlementCalculation(); // Rely on useEffect in page
   }, [setExpenses, setDebts, _manageDebtsForExpense]);
 
   const deleteExpense = useCallback((expenseId: string) => {
     setExpenses(prev => prev.filter(exp => exp.id !== expenseId));
     setDebts(prevDebts => prevDebts.filter(debt => debt.expenseId !== expenseId));
-    // triggerHouseholdSettlementCalculation(); // Rely on useEffect in page
   }, [setExpenses, setDebts]);
 
 
@@ -215,24 +216,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const addMember = useCallback((member: Omit<Member, 'id'>) => {
     setMembers(prev => [...prev, { ...member, id: uuidv4() }]);
-    // triggerHouseholdSettlementCalculation(); // Rely on useEffect in page
   }, [setMembers]);
 
   const deleteMember = useCallback((memberId: string) => {
     _deleteMemberContributionsAndDebts(memberId);
     setMembers(prev => prev.filter(mem => mem.id !== memberId));
-    // triggerHouseholdSettlementCalculation(); // Rely on useEffect in page
   }, [setMembers, _deleteMemberContributionsAndDebts]);
 
   const addContribution = useCallback((contribution: Omit<Contribution, 'id'>) => {
     setContributions(prev => [...prev, { ...contribution, id: uuidv4() }]);
-    // triggerHouseholdSettlementCalculation(); // Rely on useEffect in page
   }, [setContributions]);
 
   const getMemberContributions = useCallback((memberId: string) => contributions.filter(contrib => contrib.memberId === memberId), [contributions]);
   const getMemberTotalContribution = useCallback((memberId: string) => contributions.filter(c => c.memberId === memberId).reduce((s, c) => s + c.amount, 0), [contributions]);
 
-  const getTotalHouseholdSpending = useCallback(() => {
+  const getTotalHouseholdSpending = useCallback(() => { // Total actual cash spent from the pot
     return expenses.filter(exp => exp.paidByMemberId === POT_PAYER_ID).reduce((sum, exp) => sum + exp.amount, 0);
   }, [expenses]);
 
@@ -249,7 +247,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const deleteSharedBudget = useCallback((budgetId: string) => {
     setSharedBudgets(prev => prev.filter(b => b.id !== budgetId));
     setExpenses(prevExp => prevExp.map(e => e.sharedBudgetId === budgetId ? { ...e, sharedBudgetId: undefined } : e));
-    // triggerHouseholdSettlementCalculation(); // Rely on useEffect in page
   }, [setSharedBudgets, setExpenses]);
 
   const settleDebt = useCallback((debtId: string) => {
@@ -297,12 +294,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const addTripMember = useCallback((tripId: string, memberData: Omit<TripMember, 'id' | 'tripId'>) => {
     setTripMembers(prev => [...prev, { ...memberData, id: uuidv4(), tripId }]);
-    // triggerTripSettlementCalculation(tripId); // Rely on useEffect in page
   }, [setTripMembers]);
 
   const deleteTripMember = useCallback((tripMemberId: string, tripId: string) => {
     setTripMembers(prev => prev.filter(member => member.id !== tripMemberId));
-    setTripContributions(prev => prev.filter(contrib => contrib.tripMemberId !== tripMemberId));
+    setTripContributions(prevContributions => prevContributions.filter(contrib => contrib.tripMemberId !== tripMemberId || contrib.tripId !== tripId));
     setTripExpensesState(prevExpenses => prevExpenses.map(exp => {
       if (exp.tripId === tripId) {
         const newSplitWith = exp.splitWithTripMemberIds?.filter(id => id !== tripMemberId);
@@ -311,23 +307,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
       return exp;
     }));
-    // triggerTripSettlementCalculation(tripId); // Rely on useEffect in page
   }, [setTripMembers, setTripContributions, setTripExpensesState]);
 
   const addTripContribution = useCallback((tripId: string, tripMemberId: string, contributionData: Omit<TripContribution, 'id' | 'tripId' | 'tripMemberId'>) => {
     const newContrib: TripContribution = { ...contributionData, id: uuidv4(), tripId, tripMemberId, date: formatISO(contributionData.date) };
     setTripContributions(prev => [...prev, newContrib]);
-    // triggerTripSettlementCalculation(tripId); // Rely on useEffect in page
   }, [setTripContributions]);
 
   const getTripContributionsForMember = useCallback((tripMemberId: string) => tripContributions.filter(c => c.tripMemberId === tripMemberId), [tripContributions]);
+  
   const getTripMemberTotalDirectContribution = useCallback((tripMemberId: string, tripIdToFilter?: string) =>
     tripContributions.filter(tc => tc.tripMemberId === tripMemberId && (!tripIdToFilter || tc.tripId === tripIdToFilter)).reduce((s, tc) => s + tc.amount, 0),
   [tripContributions]);
 
   const addTripExpense = useCallback((expenseData: Omit<TripExpense, 'id'>) => {
     setTripExpensesState(prev => [...prev, { ...expenseData, id: uuidv4() }]);
-    // triggerTripSettlementCalculation(expenseData.tripId); // Rely on useEffect in page
   }, [setTripExpensesState]);
 
 
@@ -346,7 +340,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const value: AppContextType = {
     expenses, categories, budgetGoals, members, contributions, sharedBudgets, debts,
-    shoppingListItems, trips, tripMembers, tripContributions, tripExpenses: tripExpenses,
+    shoppingListItems, trips, tripMembers, tripContributions, tripExpenses,
     addExpense, updateExpense, deleteExpense,
     addBudgetGoal, updateBudgetGoal, deleteBudgetGoal, getCategoryById,
     addMember, deleteMember, getMemberById,
@@ -372,4 +366,3 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
-
