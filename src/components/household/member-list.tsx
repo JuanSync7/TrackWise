@@ -10,16 +10,14 @@ interface MemberListProps {
   members: Member[];
   onDeleteMember: (memberId: string) => void;
   onAddContribution: (memberId: string) => void;
-  totalHouseholdContributions: number;
-  remainingHouseholdPot: number;
+  // totalHouseholdContributions, remainingHouseholdPot, numberOfHouseholdMembers are no longer needed
+  // as MemberItem will use getHouseholdMemberNetPotData from context
 }
 
 export function MemberList({
   members,
   onDeleteMember,
   onAddContribution,
-  totalHouseholdContributions,
-  remainingHouseholdPot
 }: MemberListProps) {
   if (members.length === 0) {
     return (
@@ -47,9 +45,6 @@ export function MemberList({
               member={member}
               onDelete={onDeleteMember}
               onAddContribution={onAddContribution}
-              totalHouseholdContributions={totalHouseholdContributions}
-              remainingHouseholdPot={remainingHouseholdPot}
-              numberOfHouseholdMembers={members.length} // Pass the total number of members
             />
           </motion.div>
         ))}

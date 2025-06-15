@@ -1,10 +1,10 @@
 
 "use client";
 
-import { useState, useMemo } from 'react'; // Added useMemo
+import { useState, useMemo, useEffect, useCallback } from 'react'; // Added useEffect, useCallback
 import { PageHeader } from '@/components/shared/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Users, DollarSign, ClipboardList, WalletCards, DivideSquare, TrendingDown, TrendingUp, Banknote, ListChecks, Download } from 'lucide-react';
+import { PlusCircle, Users, DollarSign, ClipboardList, WalletCards, DivideSquare, TrendingDown, TrendingUp, Banknote, ListChecks, Download, Shuffle } from 'lucide-react'; // Added Shuffle
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -17,9 +17,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useAppContext } from '@/contexts/app-context';
-import { useAuth } from '@/contexts/auth-context'; // Import useAuth
+import { useAuth } from '@/contexts/auth-context'; 
 import { useToast } from "@/hooks/use-toast";
-import type { Member, Contribution, Expense } from '@/lib/types';
+import type { Member, Contribution, Expense, HouseholdSettlement } from '@/lib/types';
 import { MemberForm } from '@/components/household/member-form';
 import { MemberList } from '@/components/household/member-list';
 import { ContributionForm, type ContributionFormValues } from '@/components/household/contribution-form';
@@ -30,15 +30,18 @@ import { format } from 'date-fns';
 import { DEFAULT_CURRENCY, HOUSEHOLD_EXPENSE_CATEGORY_ID } from '@/lib/constants';
 import Link from 'next/link';
 import { cn, exportToCsv } from '@/lib/utils';
+import { TripSettlementList } from '@/components/trips/trip-settlement-list'; // Reusing for household settlements
+
 
 export default function HouseholdPage() {
   const { 
     members, addMember, deleteMember: contextDeleteMember, 
     contributions, addContribution, getMemberTotalContribution, 
     expenses, addExpense, sharedBudgets, getCategoryById, 
-    getTotalHouseholdSpending
+    getTotalHouseholdSpending,
+    getHouseholdOverallSettlements, triggerHouseholdSettlementCalculation, getHouseholdMemberNetPotData
   } = useAppContext();
-  const { user: authUser } = useAuth(); // Get authenticated user
+  const { user: authUser } = useAuth(); 
   const { toast } = useToast();
 
   const [isMemberFormOpen, setIsMemberFormOpen] = useState(false);
@@ -49,6 +52,13 @@ export default function HouseholdPage() {
   const [isSubmittingContribution, setIsSubmittingContribution] = useState(false);
   const [isSubmittingExpense, setIsSubmittingExpense] = useState(false);
   const [memberToDelete, setMemberToDelete] = useState<string | null>(null);
+
+  const householdSettlements = getHouseholdOverallSettlements();
+
+  useEffect(() => {
+    triggerHouseholdSettlementCalculation();
+  }, [members, contributions, expenses, sharedBudgets, triggerHouseholdSettlementCalculation]);
+
 
   const currentUserAsHouseholdMember = useMemo(() => {
     if (!authUser || !members || members.length === 0) return undefined;
@@ -61,7 +71,7 @@ export default function HouseholdPage() {
   const handleSaveMember = async (data: Omit<Member, 'id'>) => {
     setIsSubmittingMember(true);
     try {
-      addMember(data);
+      addMember(data); // This will trigger settlement calc in context
       toast({ title: "Member Added", description: `${data.name} has been added to the household.` });
       setIsMemberFormOpen(false);
     } catch (error) { 
@@ -78,7 +88,7 @@ export default function HouseholdPage() {
   const confirmDeleteMember = () => {
     if (memberToDelete) {
       const member = members.find(m => m.id === memberToDelete);
-      contextDeleteMember(memberToDelete);
+      contextDeleteMember(memberToDelete); // This will trigger settlement calc in context
       toast({ title: "Member Deleted", description: `${member?.name || 'The member'} has been removed from the household.` });
       setMemberToDelete(null);
     }
@@ -105,7 +115,7 @@ export default function HouseholdPage() {
         memberId: selectedMemberForContribution.id,
         date: format(data.date, "yyyy-MM-dd"),
       };
-      addContribution(contributionData);
+      addContribution(contributionData); // This will trigger settlement calc in context
       toast({ title: "Contribution Added", description: `Contribution from ${selectedMemberForContribution.name} recorded.` });
       setIsContributionFormOpen(false);
       setSelectedMemberForContribution(null);
@@ -129,7 +139,7 @@ export default function HouseholdPage() {
     }
 
     try {
-      addExpense(expenseData);
+      addExpense(expenseData); // This will trigger settlement calc in context if it's a pot expense
       toast({ title: "Shared Expense Added", description: "Your new shared expense has been successfully recorded." });
       setIsExpenseFormOpen(false);
     } catch (error) {
@@ -139,8 +149,14 @@ export default function HouseholdPage() {
     }
   };
   
-  const totalHouseholdContributions = members.reduce((sum, member) => sum + getMemberTotalContribution(member.id), 0);
-  const totalPotSpending = getTotalHouseholdSpending();
+  const totalHouseholdContributions = useMemo(() => {
+    return members.reduce((sum, member) => sum + getMemberTotalContribution(member.id), 0);
+  }, [members, getMemberTotalContribution, contributions]); // Added contributions
+
+  const totalPotSpending = useMemo(() => {
+    return getTotalHouseholdSpending();
+  }, [getTotalHouseholdSpending, expenses, sharedBudgets]); // Added expenses, sharedBudgets
+
   const remainingInPot = totalHouseholdContributions - totalPotSpending;
   const potUsagePercentage = totalHouseholdContributions > 0 ? Math.min((totalPotSpending / totalHouseholdContributions) * 100, 100) : 0;
 
@@ -150,9 +166,8 @@ export default function HouseholdPage() {
     const filename = `trackwise_household_data_${currentDate}.csv`;
 
     csvRows.push([`Trackwise Household Data - ${currentDate}`]);
-    csvRows.push([]); // Blank line
+    csvRows.push([]); 
 
-    // Section 1: Household Pot Summary
     csvRows.push(["Household Pot Summary"]);
     csvRows.push(["Metric", "Amount"]);
     csvRows.push([`Total Household Contributions (${DEFAULT_CURRENCY})`, totalHouseholdContributions.toFixed(2)]);
@@ -160,19 +175,29 @@ export default function HouseholdPage() {
     csvRows.push([`Remaining in Pot (${DEFAULT_CURRENCY})`, remainingInPot.toFixed(2)]);
     csvRows.push([]);
 
-    // Section 2: Member Overview
     csvRows.push(["Member Overview"]);
-    csvRows.push(["Member Name", `Total Direct Contributions (${DEFAULT_CURRENCY})`, `Net Share in Pot (${DEFAULT_CURRENCY})`]);
+    csvRows.push(["Member Name", `Total Direct Contributions (${DEFAULT_CURRENCY})`, `Share of Pot Expenses (${DEFAULT_CURRENCY})`, `Net Share in Pot (${DEFAULT_CURRENCY})`]);
     members.forEach(member => {
-      const directContribution = getMemberTotalContribution(member.id);
-      const memberShareOfPot = totalHouseholdContributions > 0 
-        ? (directContribution / totalHouseholdContributions) * remainingInPot 
-        : 0;
-      csvRows.push([member.name, directContribution.toFixed(2), memberShareOfPot.toFixed(2)]);
+      const netData = getHouseholdMemberNetPotData(member.id);
+      csvRows.push([member.name, netData.directContributionToPot.toFixed(2), netData.shareOfPotExpenses.toFixed(2), netData.netPotShare.toFixed(2)]);
     });
     csvRows.push([]);
 
-    // Section 3: Detailed Contributions List
+    if (householdSettlements.length > 0) {
+        csvRows.push(["Household Pot Settlements (Who Owes Whom)"]);
+        csvRows.push(["Owed By", "Owes To", `Amount (${DEFAULT_CURRENCY})`]);
+        householdSettlements.forEach(settlement => {
+            const owedByName = members.find(m => m.id === settlement.owedByTripMemberId)?.name || 'Unknown';
+            const owedToName = members.find(m => m.id === settlement.owedToTripMemberId)?.name || 'Unknown';
+            csvRows.push([owedByName, owedToName, settlement.amount.toFixed(2)]);
+        });
+    } else {
+        csvRows.push(["Household Pot Settlements (Who Owes Whom)"]);
+        csvRows.push(["All Square! No settlements needed for the pot."]);
+    }
+    csvRows.push([]);
+
+
     csvRows.push(["Individual Contributions"]);
     csvRows.push(["Member Name", `Amount (${DEFAULT_CURRENCY})`, "Date", "Notes"]);
     contributions.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).forEach(contrib => {
@@ -181,7 +206,6 @@ export default function HouseholdPage() {
     });
     csvRows.push([]);
 
-    // Section 4: Shared Expenses Affecting Pot
     csvRows.push(["Shared Expenses Affecting Pot"]);
     csvRows.push(["Description", `Amount (${DEFAULT_CURRENCY})`, "Date", "Source"]);
     const potAffectingExpenses = expenses.filter(exp => {
@@ -278,9 +302,9 @@ export default function HouseholdPage() {
             onSave={handleSaveExpense}
             onCancel={() => setIsExpenseFormOpen(false)}
             isSubmitting={isSubmittingExpense}
-            availableMembersForSplitting={members} // Pass household members
-            currentUserIdForDefaultPayer={currentUserAsHouseholdMember?.id} // Pass current user's household member ID
-            hideSplittingFeature={false} // Ensure splitting is enabled
+            availableMembersForSplitting={members} 
+            currentUserIdForDefaultPayer={currentUserAsHouseholdMember?.id} 
+            hideSplittingFeature={false} 
           />
         </DialogContent>
       </Dialog>
@@ -302,23 +326,34 @@ export default function HouseholdPage() {
       </AlertDialog>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-        <div className="md:col-span-2">
+        <div className="md:col-span-2 space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-6 w-6 text-primary" />
                 Household Members ({members.length})
               </CardTitle>
-              <CardDescription>View and manage your household members and their contributions. Log shared expenses using the "Add Shared Expense" button above. These will automatically be categorized as 'Household Expenses' if no other category/shared budget is selected, and will affect the pot.</CardDescription>
+              <CardDescription>View members, their contributions, and their net share of the household pot. Shared expenses affect the pot and settlements.</CardDescription>
             </CardHeader>
             <CardContent>
               <MemberList 
                 members={members}
                 onDeleteMember={handleDeleteMember}
                 onAddContribution={handleAddContributionClick}
-                totalHouseholdContributions={totalHouseholdContributions}
-                remainingHouseholdPot={remainingInPot}
               />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shuffle className="h-6 w-6 text-primary" />
+                Household Pot Settlement
+              </CardTitle>
+              <CardDescription>Who owes whom to balance the household pot. This updates as contributions and pot expenses are logged.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <TripSettlementList settlements={householdSettlements} tripId="household_pot_settlement" />
             </CardContent>
           </Card>
         </div>
@@ -400,12 +435,12 @@ export default function HouseholdPage() {
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <DivideSquare className="h-6 w-6 text-primary" />
-                    Expense Splitting
+                    Expense Splitting & Debts
                 </CardTitle>
-                <CardDescription>Easily split shared expenses among members and track reimbursements.</CardDescription>
+                <CardDescription>Easily split shared expenses among members and track individual reimbursements.</CardDescription>
             </CardHeader>
             <CardContent>
-                <p className="text-sm text-muted-foreground">Mark expenses as shared and track who owes whom to simplify household finances.</p>
+                <p className="text-sm text-muted-foreground">For expenses not paid from the household pot but shared among members, use this section to track who owes whom.</p>
             </CardContent>
              <CardFooter>
                <Link href="/household/expense-splitting" className="w-full">

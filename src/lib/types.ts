@@ -43,6 +43,16 @@ export interface Contribution {
   date: string; // ISO string date
   notes?: string;
 }
+
+export interface HouseholdMemberNetData {
+  directContributionToPot: number;
+  shareOfPotExpenses: number;
+  netPotShare: number;
+}
+
+// Using TripSettlement type for household settlements as structure is identical
+export type HouseholdSettlement = TripSettlement;
+
 // --- End Household Specific Types ---
 
 
@@ -84,9 +94,9 @@ export interface TripExpense {
 
 export interface TripSettlement {
   id: string;
-  tripId: string;
-  owedByTripMemberId: string;
-  owedToTripMemberId: string;
+  tripId: string; // Can be tripId for trips, or a generic 'household' constant for household settlements
+  owedByTripMemberId: string; // For trips, this is TripMember['id']. For household, Member['id']
+  owedToTripMemberId: string; // For trips, this is TripMember['id']. For household, Member['id']
   amount: number;
 }
 
@@ -139,6 +149,7 @@ export interface AppState {
   contributions: Contribution[];
   sharedBudgets: SharedBudget[];
   debts: Debt[];
+  householdOverallSettlements: HouseholdSettlement[]; // New state for household settlements
   
   shoppingListItems: ShoppingListItem[];
 
@@ -147,7 +158,7 @@ export interface AppState {
   tripMembers: TripMember[];
   tripContributions: TripContribution[];
   tripExpenses: TripExpense[]; 
-  tripSettlementsMap: Record<string, TripSettlement[]>; // Changed from tripSettlements: TripSettlement[]
+  tripSettlementsMap: Record<string, TripSettlement[]>;
 }
 
 export interface TripMemberNetData {
@@ -156,7 +167,7 @@ export interface TripMemberNetData {
   netShare: number;
 }
 
-export type AppContextType = Omit<AppState, 'tripSettlementsMap'> & { // Exclude map from direct context exposure if calculated on demand
+export type AppContextType = Omit<AppState, 'tripSettlementsMap' | 'householdOverallSettlements'> & {
   // Expense functions
   addExpense: (expense: Omit<Expense, 'id'>) => void;
   updateExpense: (expense: Expense) => void;
@@ -179,14 +190,20 @@ export type AppContextType = Omit<AppState, 'tripSettlementsMap'> & { // Exclude
   addContribution: (contribution: Omit<Contribution, 'id'>) => void;
   getMemberContributions: (memberId: string) => Contribution[];
   getMemberTotalContribution: (memberId: string) => number;
+  
+  // Household Pot & Net Data functions
   getTotalHouseholdSpending: () => number;
+  getHouseholdMemberNetPotData: (memberId: string) => HouseholdMemberNetData;
+  getHouseholdOverallSettlements: () => HouseholdSettlement[];
+  triggerHouseholdSettlementCalculation: () => void;
+
 
   // Shared Budget functions (Household)
   addSharedBudget: (budget: Omit<SharedBudget, 'id' | 'createdAt' | 'currentSpending'>) => void;
   updateSharedBudget: (budget: SharedBudget) => void;
   deleteSharedBudget: (budgetId: string) => void;
 
-  // Debt functions (Household)
+  // Debt functions (Household - from individual expense splits)
   settleDebt: (debtId: string) => void;
   unsettleDebt: (debtId: string) => void;
   getDebtsOwedByMember: (memberId: string, includeSettled?: boolean) => Debt[];
@@ -208,20 +225,20 @@ export type AppContextType = Omit<AppState, 'tripSettlementsMap'> & { // Exclude
   // Trip Member functions
   addTripMember: (tripId: string, memberData: Omit<TripMember, 'id' | 'tripId'>) => void;
   getTripMembers: (tripId: string) => TripMember[];
-  deleteTripMember: (tripMemberId: string, tripId: string) => void; // Added tripId
-  getTripMemberById: (tripMemberId: string) => TripMember | undefined; // This can find any trip member by ID
+  deleteTripMember: (tripMemberId: string, tripId: string) => void;
+  getTripMemberById: (tripMemberId: string) => TripMember | undefined;
 
   // Trip Contribution functions
   addTripContribution: (tripId: string, tripMemberId: string, contributionData: Omit<TripContribution, 'id' | 'tripId' | 'tripMemberId'>) => void;
   getTripContributionsForMember: (tripMemberId: string) => TripContribution[];
   getTripMemberTotalDirectContribution: (tripMemberId: string, tripIdToFilter?: string) => number;
-  getTripMemberNetData: (tripId: string, tripMemberId: string) => TripMemberNetData;
   
   // Trip Expense functions
   addTripExpense: (expenseData: Omit<TripExpense, 'id'>) => void; 
   getTripExpenses: (tripId: string) => TripExpense[];
 
-  // Trip Settlement functions
+  // Trip Net Data & Settlement functions
+  getTripMemberNetData: (tripId: string, tripMemberId: string) => TripMemberNetData;
   getTripSettlements: (tripId: string) => TripSettlement[];
   triggerTripSettlementCalculation: (tripId: string) => void;
 };
@@ -233,3 +250,4 @@ export interface NavItem {
   label?: string;
   variant?: 'default' | 'ghost';
 }
+
