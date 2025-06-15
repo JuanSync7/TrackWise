@@ -12,6 +12,7 @@ import {
   SidebarMenuButton,
   SidebarFooter,
   SidebarTrigger,
+  useSidebar, // Import useSidebar
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import type { NavItem } from "@/lib/types";
@@ -33,9 +34,16 @@ export function AppSidebar() {
   const pathname = usePathname();
   const { user, logout, loading: authLoading } = useAuth();
   const router = useRouter();
+  const { isMobile, setOpenMobile } = useSidebar(); // Get isMobile and setOpenMobile
 
   const handleLogout = async () => {
     await logout();
+  };
+
+  const handleNavItemClick = () => {
+    if (isMobile) {
+      setOpenMobile(false); // Close mobile sidebar on item click
+    }
   };
 
   return (
@@ -56,7 +64,7 @@ export function AppSidebar() {
         <SidebarMenu className="p-2 space-y-1">
           {navItems.map((item) => (
             <SidebarMenuItem key={item.title}>
-              <Link href={item.href}>
+              <Link href={item.href} onClick={handleNavItemClick}> {/* Add onClick handler */}
                 <SidebarMenuButton
                   
                   isActive={pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href))}
