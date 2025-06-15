@@ -62,10 +62,11 @@ export function AppHeader() {
         .slice(0, 10); // Limit results
 
       setSearchResults(results);
-      setIsSearchPopoverOpen(results.length > 0 || (debouncedSearchQuery.trim().length > 1 && results.length === 0));
+      // Open popover if query is valid (debounced and long enough), regardless of having results (to show "no results" message)
+      setIsSearchPopoverOpen(true); 
     } else {
       setSearchResults([]);
-      setIsSearchPopoverOpen(false);
+      setIsSearchPopoverOpen(false); // Close popover if query is too short
     }
   }, [debouncedSearchQuery, transactions, getCategoryById]);
 
@@ -83,18 +84,12 @@ export function AppHeader() {
   };
 
   const handleSearchResultClick = (transactionId: string) => {
-    // For now, just clears search and closes popover.
-    // Future: router.push(`/transactions?highlight=${transactionId}`);
     console.log("Clicked transaction:", transactionId);
-    setSearchQuery("");
-    setSearchResults([]);
-    setIsSearchPopoverOpen(false);
+    setSearchQuery(""); // This will clear debouncedSearchQuery via useEffect, closing popover
   };
 
   const clearSearch = () => {
-    setSearchQuery("");
-    setSearchResults([]);
-    setIsSearchPopoverOpen(false);
+    setSearchQuery(""); // This will clear debouncedSearchQuery via useEffect, closing popover
   };
 
   return (
@@ -121,11 +116,6 @@ export function AppHeader() {
                   className="pl-8 sm:w-[300px] md:w-[200px] lg:w-[300px] rounded-full"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  onFocus={() => {
-                    if (searchQuery.trim().length > 1 && searchResults.length > 0) {
-                       setIsSearchPopoverOpen(true);
-                    }
-                  }}
                 />
                 {searchQuery && (
                   <Button
@@ -142,7 +132,7 @@ export function AppHeader() {
               </div>
             </form>
           </PopoverAnchor>
-          {isSearchPopoverOpen && (
+          {isSearchPopoverOpen && ( // Only render content if popover should be open
             <PopoverContent className="w-[--radix-popover-trigger-width] p-0 mt-1 shadow-lg" sideOffset={5}>
               <ScrollArea className="max-h-[400px]">
                 {searchResults.length > 0 ? (
@@ -174,7 +164,7 @@ export function AppHeader() {
                     })}
                   </div>
                 ) : (
-                  debouncedSearchQuery.trim().length > 1 && (
+                  debouncedSearchQuery.trim().length > 1 && ( // Show "no results" only if a valid debounced query exists
                     <div className="p-4 text-center text-sm text-muted-foreground">
                       No results found for "{debouncedSearchQuery}".
                     </div>
@@ -222,4 +212,3 @@ export function AppHeader() {
     </header>
   );
 }
-
