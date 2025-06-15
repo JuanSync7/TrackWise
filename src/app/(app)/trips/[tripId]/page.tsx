@@ -33,64 +33,70 @@ export default function TripDetailPage() {
     getTripById,
     addTripMember, deleteTripMember: contextDeleteTripMember, getTripMemberById,
     addTripContribution, getTripMemberTotalDirectContribution,
-    tripMembers: globalTripMembers,
-    tripContributions: globalTripContributions,
-    addTripExpense, getTripExpenses,
-    tripExpenses: globalTripExpenses,
-    getTripMembers,
-    getTripSettlements, triggerTripSettlementCalculation,
+    tripMembers: globalTripMembers, // Raw global state for dependency
+    tripContributions: globalTripContributions, // Raw global state for dependency
+    addTripExpense,
+    tripExpenses: globalTripExpenses, // Raw global state for dependency
+    getTripMembers, // Context getter function
+    getTripExpenses, // Context getter function
+    getTripSettlements, // Context getter function
+    triggerTripSettlementCalculation,
   } = useAppContext();
   const { user: authUser } = useAuth();
   const { toast } = useToast();
 
   const [trip, setTrip] = useState<Trip | undefined>(undefined);
-  const [currentTripMembers, setCurrentTripMembers] = useState<TripMember[]>([]);
-  const [currentTripExpensesList, setCurrentTripExpensesList] = useState<TripExpense[]>([]);
-  const [settlements, setSettlements] = useState<TripSettlement[]>([]);
-
   const [isMemberFormOpen, setIsMemberFormOpen] = useState(false);
   const [isContributionFormOpen, setIsContributionFormOpen] = useState(false);
   const [isExpenseFormOpen, setIsExpenseFormOpen] = useState(false);
   const [selectedTripMemberForContribution, setSelectedTripMemberForContribution] = useState<TripMember | null>(null);
-
   const [isSubmittingMember, setIsSubmittingMember] = useState(false);
   const [isSubmittingContribution, setIsSubmittingContribution] = useState(false);
   const [isSubmittingExpense, setIsSubmittingExpense] = useState(false);
   const [tripMemberToDelete, setTripMemberToDelete] = useState<string | null>(null);
 
+  // Derive lists directly from context using useMemo
+  const memoizedTripMembers = useMemo(() => {
+    return tripId ? getTripMembers(tripId) : [];
+  }, [tripId, getTripMembers]);
+
+  const memoizedTripExpensesList = useMemo(() => {
+    return tripId ? getTripExpenses(tripId) : [];
+  }, [tripId, getTripExpenses]);
+
+  const memoizedSettlements = useMemo(() => {
+    return tripId ? getTripSettlements(tripId) : [];
+  }, [tripId, getTripSettlements]);
+
+  // Effect for initial trip loading
   useEffect(() => {
     if (tripId) {
       const foundTrip = getTripById(tripId);
       if (foundTrip) {
         setTrip(foundTrip);
-        setCurrentTripMembers(getTripMembers(tripId));
-        setCurrentTripExpensesList(getTripExpenses(tripId));
-        triggerTripSettlementCalculation(tripId);
-        setSettlements(getTripSettlements(tripId));
+        // Initial settlement calculation happens after global data dependencies trigger the other useEffect
       } else {
         toast({ variant: "destructive", title: "Trip Not Found", description: "The requested trip could not be found." });
         router.push('/trips');
       }
     }
-  }, [tripId, getTripById, getTripMembers, getTripExpenses, router, toast, triggerTripSettlementCalculation, getTripSettlements]);
+  }, [tripId, getTripById, router, toast]);
 
+  // Effect to re-calculate settlements when relevant global data changes or tripId changes
   useEffect(() => {
     if (tripId) {
-        setCurrentTripMembers(getTripMembers(tripId));
-        setCurrentTripExpensesList(getTripExpenses(tripId));
-        triggerTripSettlementCalculation(tripId); 
-        setSettlements(getTripSettlements(tripId));
+      triggerTripSettlementCalculation(tripId);
     }
-  }, [tripId, globalTripMembers, globalTripContributions, globalTripExpenses, getTripMembers, getTripExpenses, getTripSettlements, triggerTripSettlementCalculation]);
+  }, [tripId, globalTripMembers, globalTripContributions, globalTripExpenses, triggerTripSettlementCalculation]);
 
 
   const currentAuthUserAsTripMember = useMemo(() => {
-    if (!authUser || !currentTripMembers || currentTripMembers.length === 0) return undefined;
-    return currentTripMembers.find(tm =>
+    if (!authUser || !memoizedTripMembers || memoizedTripMembers.length === 0) return undefined;
+    return memoizedTripMembers.find(tm =>
         (authUser.displayName && tm.name.toLowerCase() === authUser.displayName.toLowerCase()) ||
         (authUser.email && tm.name.toLowerCase() === authUser.email.split('@')[0].toLowerCase())
     );
-  }, [authUser, currentTripMembers]);
+  }, [authUser, memoizedTripMembers]);
 
 
   const handleSaveTripMember = useCallback(async (data: TripMemberFormValues) => {
@@ -121,7 +127,7 @@ export default function TripDetailPage() {
   }, [tripMemberToDelete, tripId, contextDeleteTripMember, getTripMemberById, toast]);
 
   const handleAddTripContributionClick = useCallback((memberId: string) => {
-    const member = getTripMemberById(memberId);
+    const member = getTripMemberById(memberId); // getTripMemberById should be stable
     if (member) {
       setSelectedTripMemberForContribution(member);
       setIsContributionFormOpen(true);
@@ -169,14 +175,14 @@ export default function TripDetailPage() {
   }, [tripId, addTripExpense, toast]);
 
   const totalTripContributions = useMemo(() => {
-    return currentTripMembers.reduce((sum, member) => sum + getTripMemberTotalDirectContribution(member.id, tripId), 0);
-  }, [currentTripMembers, getTripMemberTotalDirectContribution, tripId, globalTripContributions]);
+    return memoizedTripMembers.reduce((sum, member) => sum + getTripMemberTotalDirectContribution(member.id, tripId), 0);
+  }, [memoizedTripMembers, getTripMemberTotalDirectContribution, tripId]);
 
   const totalTripPotSpending = useMemo(() => {
-    return currentTripExpensesList
+    return memoizedTripExpensesList
       .filter(exp => exp.paidByTripMemberId === POT_PAYER_ID)
       .reduce((sum, exp) => sum + exp.amount, 0);
-  }, [currentTripExpensesList]);
+  }, [memoizedTripExpensesList]);
 
   const remainingTripPot = totalTripContributions - totalTripPotSpending;
   const tripPotUsagePercentage = totalTripContributions > 0 ? Math.min((totalTripPotSpending / totalTripContributions) * 100, 100) : 0;
@@ -261,7 +267,7 @@ export default function TripDetailPage() {
             isSubmitting={isSubmittingExpense}
             hideSharedBudgetLink={true}
             hideSplittingFeature={false}
-            availableMembersForSplitting={currentTripMembers}
+            availableMembersForSplitting={memoizedTripMembers}
             currentUserIdForDefaultPayer={currentAuthUserAsTripMember?.id}
             allowPotPayer={true} 
           />
@@ -290,16 +296,16 @@ export default function TripDetailPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-6 w-6 text-primary" />
-                Trip Members ({currentTripMembers.length})
+                Trip Members ({memoizedTripMembers.length})
               </CardTitle>
               <CardDescription>Manage trip members, their contributions to the trip pot, and their net financial position within the trip pot.</CardDescription>
             </CardHeader>
             <CardContent>
               <TripMemberList
-                tripMembers={currentTripMembers}
+                tripMembers={memoizedTripMembers}
                 onDeleteTripMember={handleDeleteTripMemberRequest}
                 onAddTripContribution={handleAddTripContributionClick}
-                numberOfTripMembers={currentTripMembers.length} 
+                numberOfTripMembers={memoizedTripMembers.length} 
               />
             </CardContent>
           </Card>
@@ -313,7 +319,7 @@ export default function TripDetailPage() {
               <CardDescription>Who owes whom to balance all trip finances (contributions, pot expenses, and member-paid shared expenses).</CardDescription>
             </CardHeader>
             <CardContent>
-                <TripSettlementList settlements={settlements} tripId={tripId} />
+                <TripSettlementList settlements={memoizedSettlements} tripId={tripId} />
             </CardContent>
           </Card>
         </div>
