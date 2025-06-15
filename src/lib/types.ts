@@ -3,6 +3,7 @@ import type { LucideIcon } from 'lucide-react';
 
 export type TransactionType = 'expense' | 'income';
 export type RecurrencePeriod = 'daily' | 'weekly' | 'monthly' | 'yearly';
+export type SplitType = 'even' | 'custom';
 
 export interface Category {
   id: string;
@@ -10,6 +11,11 @@ export interface Category {
   iconName: string;
   color: string;
   appliesTo: 'expense' | 'income' | 'both';
+}
+
+export interface CustomSplitAmount {
+  memberId: string;
+  amount: number;
 }
 
 // Base Transaction type
@@ -25,27 +31,34 @@ interface BaseTransaction {
   recurrencePeriod?: RecurrencePeriod;
   recurrenceEndDate?: string; // ISO string date
   nextRecurrenceDate?: string; // ISO string date, calculated for display/reminders
+
+  // Fields for splitting, applicable if transactionType is 'expense'
+  isSplit?: boolean;
+  splitType?: SplitType; // 'even' or 'custom'
+  customSplitAmounts?: CustomSplitAmount[]; // Used if splitType is 'custom'
 }
 
 // Personal Transaction
 export interface Transaction extends BaseTransaction {
-  // Personal transactions will use the full BaseTransaction spec
+  // Personal transactions can also be split, but typically among abstract payers or for personal tracking.
+  // If splitting is among defined 'members' (e.g. family for personal budgeting),
+  // then paidByMemberId and splitWithMemberIds would be relevant.
+  // For simplicity, personal transactions won't use paidByMemberId/splitWithMemberIds from Household/Trip context here.
+  // The generic isSplit, splitType, customSplitAmounts can still be used for personal tracking.
 }
 
 // Household Transaction (includes shared features)
 export interface HouseholdTransaction extends BaseTransaction {
   sharedBudgetId?: string;
-  isSplit?: boolean;
-  paidByMemberId?: string;
-  splitWithMemberIds?: string[];
+  paidByMemberId?: string; // Household member ID or POT_PAYER_ID
+  splitWithMemberIds?: string[]; // Household member IDs
 }
 
 // Trip Transaction (similar to HouseholdTransaction but for trips)
 export interface TripTransaction extends BaseTransaction {
   tripId: string;
-  isSplit?: boolean;
-  paidByTripMemberId?: string;
-  splitWithTripMemberIds?: string[];
+  paidByTripMemberId?: string; // Trip member ID or POT_PAYER_ID
+  splitWithTripMemberIds?: string[]; // Trip member IDs
 }
 
 
@@ -303,4 +316,3 @@ export interface NavItem {
   external?: boolean;
   submenu?: NavItem[];
 }
-
