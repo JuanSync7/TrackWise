@@ -44,14 +44,16 @@ export interface Contribution {
   notes?: string;
 }
 
-// Updated: Data structure for displaying member's financial details on cards
-export interface MemberDisplayFinancials {
+export interface CalculatedMemberFinancials {
+  memberId: string;
   directCashContribution: number;
   amountPersonallyPaidForGroup: number;
   totalShareOfAllGroupExpenses: number;
-  netOverallPosition: number; // (Cash Contrib + Personally Paid) - Share of All Expenses
+  finalNetShareForSettlement: number;
 }
-export type HouseholdMemberNetData = MemberDisplayFinancials; // Alias for consistency
+export type HouseholdMemberNetData = CalculatedMemberFinancials;
+export type TripMemberNetData = CalculatedMemberFinancials;
+
 
 // Using TripSettlement type for household settlements as structure is identical
 export type HouseholdSettlement = TripSettlement;
@@ -152,7 +154,8 @@ export interface AppState {
   contributions: Contribution[];
   sharedBudgets: SharedBudget[];
   debts: Debt[];
-  householdOverallSettlements: HouseholdSettlement[]; 
+  householdOverallSettlements: HouseholdSettlement[];
+  householdMemberFinancialsMap: Record<string, CalculatedMemberFinancials>; // Keyed by memberId
   
   shoppingListItems: ShoppingListItem[];
 
@@ -161,12 +164,12 @@ export interface AppState {
   tripMembers: TripMember[];
   tripContributions: TripContribution[];
   tripExpenses: TripExpense[]; 
-  tripSettlementsMap: Record<string, TripSettlement[]>;
+  tripSettlementsMap: Record<string, TripSettlement[]>; // Keyed by tripId
+  tripMemberFinancialsMap: Record<string, Record<string, CalculatedMemberFinancials>>; // Outer key: tripId, Inner key: tripMemberId
 }
 
-export type TripMemberNetData = MemberDisplayFinancials; // Alias for consistency with household
 
-export type AppContextType = Omit<AppState, 'tripSettlementsMap' | 'householdOverallSettlements'> & {
+export type AppContextType = Omit<AppState, 'tripSettlementsMap' | 'householdOverallSettlements' | 'tripMemberFinancialsMap' | 'householdMemberFinancialsMap'> & {
   // Expense functions
   addExpense: (expense: Omit<Expense, 'id'>) => void;
   updateExpense: (expense: Expense) => void;
@@ -192,7 +195,7 @@ export type AppContextType = Omit<AppState, 'tripSettlementsMap' | 'householdOve
   
   // Household Pot & Net Data functions
   getTotalHouseholdSpending: () => number; // Total spent from the pot
-  getHouseholdMemberNetPotData: (memberId: string) => HouseholdMemberNetData; // Updated return type
+  getHouseholdMemberNetPotData: (memberId: string) => HouseholdMemberNetData | undefined; // Updated return type
   getHouseholdOverallSettlements: () => HouseholdSettlement[];
   triggerHouseholdSettlementCalculation: () => void;
 
@@ -237,15 +240,7 @@ export type AppContextType = Omit<AppState, 'tripSettlementsMap' | 'householdOve
   getTripExpenses: (tripId: string) => TripExpense[];
 
   // Trip Net Data & Settlement functions
-  getTripMemberNetData: (tripId: string, tripMemberId: string) => TripMemberNetData; // Updated return type
+  getTripMemberNetData: (tripId: string, tripMemberId: string) => TripMemberNetData | undefined; // Updated return type
   getTripSettlements: (tripId: string) => TripSettlement[];
   triggerTripSettlementCalculation: (tripId: string) => void;
 };
-
-export interface NavItem {
-  title: string;
-  href: string;
-  icon: LucideIcon;
-  label?: string;
-  variant?: 'default' | 'ghost';
-}

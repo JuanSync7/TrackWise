@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useMemo } from 'react';
-import type { Member, HouseholdMemberNetData } from '@/lib/types';
+import type { Member, HouseholdMemberNetData, CalculatedMemberFinancials } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { User, Trash2, MoreVertical, DollarSign, Scale, TrendingUp, TrendingDown, Landmark } from 'lucide-react';
@@ -17,6 +17,15 @@ interface MemberItemProps {
   onAddContribution: (memberId: string) => void;
 }
 
+const defaultFinancialData: CalculatedMemberFinancials = {
+  memberId: '',
+  directCashContribution: 0,
+  amountPersonallyPaidForGroup: 0,
+  totalShareOfAllGroupExpenses: 0,
+  finalNetShareForSettlement: 0,
+};
+
+
 const MemberItem = React.memo(function MemberItem({
   member,
   onDelete,
@@ -24,8 +33,8 @@ const MemberItem = React.memo(function MemberItem({
 }: MemberItemProps) {
   const { getHouseholdMemberNetPotData } = useAppContext();
 
-  const calculatedNetData: HouseholdMemberNetData = useMemo(() => {
-    return getHouseholdMemberNetPotData(member.id);
+  const calculatedNetData: CalculatedMemberFinancials = useMemo(() => {
+    return getHouseholdMemberNetPotData(member.id) || defaultFinancialData;
   }, [member.id, getHouseholdMemberNetPotData]);
 
 
@@ -67,11 +76,11 @@ const MemberItem = React.memo(function MemberItem({
       </CardHeader>
       <CardContent className="p-4 pt-1">
         <div className="flex items-center gap-2">
-          <Scale className={cn("h-5 w-5", calculatedNetData.netOverallPosition >=0 ? "text-accent" : "text-destructive")} />
+          <Scale className={cn("h-5 w-5", calculatedNetData.finalNetShareForSettlement >=0 ? "text-accent" : "text-destructive")} />
           <div>
             <p className="text-sm font-medium">Net Position:</p>
-            <p className={cn("text-xl font-bold", calculatedNetData.netOverallPosition >=0 ? "text-accent" : "text-destructive")}>
-                {DEFAULT_CURRENCY}{calculatedNetData.netOverallPosition.toFixed(2)}
+            <p className={cn("text-xl font-bold", calculatedNetData.finalNetShareForSettlement >=0 ? "text-accent" : "text-destructive")}>
+                {DEFAULT_CURRENCY}{calculatedNetData.finalNetShareForSettlement.toFixed(2)}
             </p>
           </div>
         </div>

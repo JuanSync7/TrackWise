@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useMemo } from 'react';
-import type { TripMember, TripMemberNetData } from '@/lib/types';
+import type { TripMember, TripMemberNetData, CalculatedMemberFinancials } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { User, Trash2, MoreVertical, DollarSign, Scale, TrendingUp, TrendingDown, Landmark } from 'lucide-react';
@@ -18,6 +18,14 @@ interface TripMemberItemProps {
   numberOfTripMembers: number;
 }
 
+const defaultFinancialData: CalculatedMemberFinancials = {
+  memberId: '',
+  directCashContribution: 0,
+  amountPersonallyPaidForGroup: 0,
+  totalShareOfAllGroupExpenses: 0,
+  finalNetShareForSettlement: 0,
+};
+
 const TripMemberItem = React.memo(function TripMemberItem({
   tripMember,
   onDelete,
@@ -25,8 +33,8 @@ const TripMemberItem = React.memo(function TripMemberItem({
 }: TripMemberItemProps) {
   const { getTripMemberNetData } = useAppContext();
 
-  const calculatedNetData: TripMemberNetData = useMemo(() => {
-    return getTripMemberNetData(tripMember.tripId, tripMember.id);
+  const calculatedNetData: CalculatedMemberFinancials = useMemo(() => {
+    return getTripMemberNetData(tripMember.tripId, tripMember.id) || defaultFinancialData;
   }, [tripMember.id, tripMember.tripId, getTripMemberNetData]);
 
 
@@ -68,11 +76,11 @@ const TripMemberItem = React.memo(function TripMemberItem({
       </CardHeader>
       <CardContent className="p-4 pt-1">
         <div className="flex items-center gap-2">
-          <Scale className={cn("h-5 w-5", calculatedNetData.netOverallPosition >=0 ? "text-accent" : "text-destructive")} />
+          <Scale className={cn("h-5 w-5", calculatedNetData.finalNetShareForSettlement >=0 ? "text-accent" : "text-destructive")} />
           <div>
             <p className="text-sm font-medium">Net Position:</p>
-            <p className={cn("text-xl font-bold", calculatedNetData.netOverallPosition >=0 ? "text-accent" : "text-destructive")}>
-                {DEFAULT_CURRENCY}{calculatedNetData.netOverallPosition.toFixed(2)}
+            <p className={cn("text-xl font-bold", calculatedNetData.finalNetShareForSettlement >=0 ? "text-accent" : "text-destructive")}>
+                {DEFAULT_CURRENCY}{calculatedNetData.finalNetShareForSettlement.toFixed(2)}
             </p>
           </div>
         </div>
