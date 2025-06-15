@@ -17,7 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Check, ChevronsUpDown, Sparkles as AiSparklesIcon, Users, Landmark, CheckSquare, Square, MessageSquarePlus, Edit, CircleDollarSign, TrendingUp, TrendingDown, Repeat } from "lucide-react"; // Added Repeat
+import { CalendarIcon, Check, ChevronsUpDown, Sparkles as AiSparklesIcon, Users, Landmark, CheckSquare, Square, MessageSquarePlus, Edit, CircleDollarSign, TrendingUp, TrendingDown, Repeat } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -27,7 +27,7 @@ import { cn } from "@/lib/utils";
 import type { Transaction, SharedBudget, Member, TripMember, HouseholdTransaction, TripTransaction, TransactionType, RecurrencePeriod } from '@/lib/types';
 import { usePersonalFinance } from '@/contexts/personal-finance-context';
 import { useHousehold } from '@/contexts/household-context';
-import { format, addDays, addWeeks, addMonths, addYears } from "date-fns";
+import { format } from "date-fns";
 import { useEffect, useState, useCallback, useMemo }  from "react";
 import { suggestExpenseCategory, type SuggestExpenseCategoryInput, type SuggestExpenseCategoryOutput } from "@/ai/flows/suggest-expense-category";
 import { suggestExpenseNotes, type SuggestExpenseNotesInput, type SuggestExpenseNotesOutput } from "@/ai/flows/suggest-expense-notes";
@@ -46,11 +46,9 @@ const transactionFormSchemaBase = z.object({
   date: z.date({ required_error: "A date is required." }),
   categoryId: z.string({ required_error: "Please select a category." }),
   notes: z.string().max(200).optional(),
-  // Recurrence fields
   isRecurring: z.boolean().optional().default(false),
   recurrencePeriod: recurrencePeriodEnum.optional(),
   recurrenceEndDate: z.date().optional(),
-  // Shared/Split fields
   sharedBudgetId: z.string().optional(),
   isSplit: z.boolean().optional().default(false),
   paidByMemberId: z.string().optional(),
@@ -95,7 +93,7 @@ type MemberLike = { id: string; name: string };
 
 interface TransactionFormProps {
   transaction?: Transaction | HouseholdTransaction | TripTransaction;
-  onSave: (data: TransactionFormValues & { nextRecurrenceDate?: string }) => void; // Add nextRecurrenceDate here
+  onSave: (data: TransactionFormValues & { nextRecurrenceDate?: string }) => void;
   onCancel?: () => void;
   isSubmitting?: boolean;
   showSharedBudgetLink?: boolean;
@@ -261,28 +259,13 @@ export function TransactionForm({
 
 
   function onSubmit(data: TransactionFormValues) {
-    let nextRecurrenceDate: string | undefined = undefined;
-    if (data.isRecurring && data.recurrencePeriod && data.date) {
-        const startDate = data.date;
-        switch (data.recurrencePeriod) {
-            case 'daily': nextRecurrenceDate = format(addDays(startDate, 1), "yyyy-MM-dd"); break;
-            case 'weekly': nextRecurrenceDate = format(addWeeks(startDate, 1), "yyyy-MM-dd"); break;
-            case 'monthly': nextRecurrenceDate = format(addMonths(startDate, 1), "yyyy-MM-dd"); break;
-            case 'yearly': nextRecurrenceDate = format(addYears(startDate, 1), "yyyy-MM-dd"); break;
-        }
-        if (data.recurrenceEndDate && nextRecurrenceDate && new Date(nextRecurrenceDate) > data.recurrenceEndDate) {
-            nextRecurrenceDate = undefined; // Stop if next date is past end date
-        }
-    }
-
     const dataToSave = {
       ...data,
       recurrenceEndDate: data.recurrenceEndDate ? format(data.recurrenceEndDate, "yyyy-MM-dd") : undefined,
-      nextRecurrenceDate,
       sharedBudgetId: (data.sharedBudgetId === NONE_SHARED_BUDGET_VALUE) ? undefined : data.sharedBudgetId,
       isSplit: data.transactionType === 'expense' ? data.isSplit : false,
-      paidByMemberId: data.transactionType === 'expense' ? data.paidByMemberId : undefined,
-      splitWithMemberIds: data.transactionType === 'expense' ? data.splitWithMemberIds : [],
+      paidByMemberId: data.transactionType === 'expense' && data.isSplit ? data.paidByMemberId : undefined,
+      splitWithMemberIds: data.transactionType === 'expense' && data.isSplit ? data.splitWithMemberIds : [],
     };
 
     onSave(dataToSave);
@@ -526,7 +509,7 @@ export function TransactionForm({
           control={form.control}
           name="isRecurring"
           render={({ field }) => (
-            <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-3 shadow-sm">
+            <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-3 shadow-sm bg-muted/30">
               <FormControl>
                 <Checkbox
                   checked={field.value}
@@ -534,9 +517,10 @@ export function TransactionForm({
                 />
               </FormControl>
               <div className="space-y-1 leading-none">
-                <FormLabel className="flex items-center gap-1">
-                  <Repeat className="h-4 w-4" /> Is this a recurring transaction?
+                <FormLabel className="flex items-center gap-1.5 cursor-pointer">
+                  <Repeat className="h-4 w-4 text-primary" /> Is this a recurring transaction?
                 </FormLabel>
+                <FormDescription className="text-xs">Check if this transaction repeats (e.g., salary, rent).</FormDescription>
               </div>
             </FormItem>
           )}
@@ -550,7 +534,7 @@ export function TransactionForm({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Repeats</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select recurrence period" />
@@ -578,7 +562,7 @@ export function TransactionForm({
                       <FormControl>
                         <Button
                           variant={"outline"}
-                          className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
+                          className={cn("w-full pl-3 text-left font-normal bg-background", !field.value && "text-muted-foreground")}
                         >
                           {field.value ? format(field.value, "PPP") : <span>Pick an end date</span>}
                           <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
@@ -670,7 +654,7 @@ export function TransactionForm({
                       }}
                     />
                   </FormControl>
-                  <FormLabel className="font-normal text-sm">Split this expense?</FormLabel>
+                  <FormLabel className="font-normal text-sm cursor-pointer">Split this expense?</FormLabel>
                 </FormItem>
               )}
             />
@@ -757,7 +741,7 @@ export function TransactionForm({
                                       }}
                                     />
                                   </FormControl>
-                                  <FormLabel className="text-sm font-normal">
+                                  <FormLabel className="text-sm font-normal cursor-pointer">
                                     {member.name}
                                   </FormLabel>
                                 </FormItem>
@@ -834,5 +818,3 @@ export function TransactionForm({
     </Form>
   );
 }
-
-    

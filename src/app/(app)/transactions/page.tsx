@@ -7,10 +7,10 @@ import type { Transaction } from '@/lib/types';
 import { usePersonalFinance } from '@/contexts/personal-finance-context';
 import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Download, Loader2, TrendingDown, TrendingUp, ArrowRightLeft, Repeat } from 'lucide-react'; // Added Repeat
+import { PlusCircle, Download, Loader2, TrendingDown, TrendingUp, ArrowRightLeft, Repeat } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useToast } from "@/hooks/use-toast";
-import { format as formatDate, parseISO, addDays, addWeeks, addMonths, addYears } from 'date-fns'; // Added date-fns functions
+import { format as formatDate, parseISO, addDays, addWeeks, addMonths, addYears, isBefore, isEqual } from 'date-fns';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,9 +40,9 @@ export default function TransactionsPage() {
   const [transactionToDelete, setTransactionToDelete] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'all' | 'expenses' | 'income'>('all');
 
-  const handleSaveTransaction = async (data: any) => {
+  const handleSaveTransaction = async (data: any) => { // data is TransactionFormValues & { nextRecurrenceDate?: string }
     setIsSubmitting(true);
-    const transactionData: Omit<Transaction, 'id'> & { nextRecurrenceDate?: string } = {
+    const transactionData: Omit<Transaction, 'id'> = {
       description: data.description,
       amount: data.amount,
       date: formatDate(data.date, "yyyy-MM-dd"),
@@ -52,7 +52,7 @@ export default function TransactionsPage() {
       isRecurring: data.isRecurring,
       recurrencePeriod: data.isRecurring ? data.recurrencePeriod : undefined,
       recurrenceEndDate: data.isRecurring && data.recurrenceEndDate ? formatDate(data.recurrenceEndDate, "yyyy-MM-dd") : undefined,
-      nextRecurrenceDate: data.nextRecurrenceDate, // This is now passed from the form
+      nextRecurrenceDate: data.nextRecurrenceDate,
     };
     try {
       if (editingTransaction) {
@@ -94,23 +94,26 @@ export default function TransactionsPage() {
   }
 
   const handleLogUpcomingRecurring = () => {
-    const today = format(new Date(), "yyyy-MM-dd");
+    const today = new Date();
     let count = 0;
     transactions.forEach(t => {
-      if (t.isRecurring && t.nextRecurrenceDate && t.nextRecurrenceDate <= today) {
+      if (t.isRecurring && t.nextRecurrenceDate && (isBefore(parseISO(t.nextRecurrenceDate), today) || isEqual(parseISO(t.nextRecurrenceDate), today)) ) {
+        if(t.recurrenceEndDate && isBefore(parseISO(t.recurrenceEndDate), parseISO(t.nextRecurrenceDate))) {
+            // If end date is past, effectively stop recurrence by clearing nextRecurrenceDate on template
+            updateTransaction({ ...t, nextRecurrenceDate: undefined });
+            return; // Skip creating this instance
+        }
         const newInstanceDate = parseISO(t.nextRecurrenceDate);
-        // Create new instance
         addTransaction({
-          ...t, // Spread the template transaction
-          date: format(newInstanceDate, "yyyy-MM-dd"), // Set the new date
-          isRecurring: false, // The instance itself is not a template
+          ...t,
+          date: formatDate(newInstanceDate, "yyyy-MM-dd"),
+          isRecurring: false, 
           recurrencePeriod: undefined,
           recurrenceEndDate: undefined,
           nextRecurrenceDate: undefined,
           notes: `${t.notes || ''} (Recurring instance of: ${t.description})`.trim(),
         });
 
-        // Update next recurrence date for the template
         let nextDate: Date | undefined = undefined;
         if (t.recurrencePeriod) {
             switch (t.recurrencePeriod) {
@@ -121,9 +124,9 @@ export default function TransactionsPage() {
             }
         }
         
-        let newNextRecurrenceDate: string | undefined = nextDate ? format(nextDate, "yyyy-MM-dd") : undefined;
-        if (t.recurrenceEndDate && newNextRecurrenceDate && new Date(newNextRecurrenceDate) > parseISO(t.recurrenceEndDate)) {
-            newNextRecurrenceDate = undefined; // Stop if next date is past end date
+        let newNextRecurrenceDate: string | undefined = nextDate ? formatDate(nextDate, "yyyy-MM-dd") : undefined;
+        if (t.recurrenceEndDate && newNextRecurrenceDate && isBefore(parseISO(t.recurrenceEndDate), new Date(newNextRecurrenceDate)) ) {
+            newNextRecurrenceDate = undefined;
         }
 
         updateTransaction({ ...t, nextRecurrenceDate: newNextRecurrenceDate });
@@ -167,15 +170,19 @@ export default function TransactionsPage() {
   };
   
   const filteredTransactions = useMemo(() => {
-    let baseTransactions = transactions.filter(t => !t.isRecurring); // Exclude templates from main list for now
+    let baseTransactions = transactions.filter(t => !t.isRecurring); 
     if (activeTab !== 'all') {
         baseTransactions = baseTransactions.filter(t => t.transactionType === activeTab);
     }
-    // Could add a separate list/view for recurring templates if needed
     return baseTransactions;
   }, [transactions, activeTab]);
 
   const recurringTemplates = useMemo(() => transactions.filter(t => t.isRecurring), [transactions]);
+  const dueRecurringTemplatesCount = useMemo(() => {
+    const today = new Date();
+    return recurringTemplates.filter(t => t.nextRecurrenceDate && (isBefore(parseISO(t.nextRecurrenceDate), today) || isEqual(parseISO(t.nextRecurrenceDate), today))).length;
+  }, [recurringTemplates]);
+
 
   return (
     <div className="container mx-auto">
@@ -184,8 +191,8 @@ export default function TransactionsPage() {
         description="Keep track of your income and expenses. Log recurring transactions as they occur."
         actions={
           <div className="flex gap-2 flex-wrap">
-             <Button onClick={handleLogUpcomingRecurring} variant="outline" disabled={recurringTemplates.filter(t => t.nextRecurrenceDate && t.nextRecurrenceDate <= format(new Date(), "yyyy-MM-dd")).length === 0}>
-              <Repeat className="mr-2 h-4 w-4" /> Log Upcoming
+             <Button onClick={handleLogUpcomingRecurring} variant="outline" disabled={dueRecurringTemplatesCount === 0}>
+              <Repeat className="mr-2 h-4 w-4" /> Log Upcoming ({dueRecurringTemplatesCount})
             </Button>
             <Button onClick={handleExportTransactions} variant="outline" disabled={filteredTransactions.length === 0}>
               <Download className="mr-2 h-4 w-4" /> Export View
@@ -216,8 +223,8 @@ export default function TransactionsPage() {
               onSave={handleSaveTransaction}
               onCancel={() => { setIsFormOpen(false); setEditingTransaction(undefined);}}
               isSubmitting={isSubmitting}
-              hideSharedBudgetLink={true}
-              hideSplittingFeature={true}
+              hideSharedBudgetLink={true} // Not applicable for personal transactions page
+              hideSplittingFeature={true} // Not applicable for personal transactions page
             />
           </Suspense>
         </DialogContent>
@@ -233,7 +240,7 @@ export default function TransactionsPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setTransactionToDelete(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeleteTransaction}>Delete</AlertDialogAction>
+            <AlertDialogAction onClick={confirmDeleteTransaction} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -275,5 +282,3 @@ export default function TransactionsPage() {
     </div>
   );
 }
-
-    

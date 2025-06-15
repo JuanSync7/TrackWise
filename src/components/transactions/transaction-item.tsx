@@ -10,10 +10,11 @@ import { format, parseISO } from 'date-fns';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Edit2, Trash2, Users, UserCheck, TrendingDown, TrendingUp, Repeat } from 'lucide-react'; // Added Repeat
+import { MoreHorizontal, Edit2, Trash2, Users, UserCheck, TrendingDown, TrendingUp, Repeat } from 'lucide-react';
 import { CategoryIcon } from '@/components/shared/category-icon';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { useMemo } from 'react';
 
 interface TransactionItemProps {
   transaction: Transaction | HouseholdTransaction | TripTransaction;
@@ -62,10 +63,18 @@ export function TransactionItem({ transaction, onEdit, onDelete, transactionCont
     if (!transaction.isRecurring || !transaction.recurrencePeriod) return null;
     let text = `Repeats ${transaction.recurrencePeriod}`;
     if (transaction.nextRecurrenceDate) {
-      text += ` (Next: ${format(parseISO(transaction.nextRecurrenceDate), 'MMM d, yyyy')})`;
+      try {
+        text += ` (Next: ${format(parseISO(transaction.nextRecurrenceDate), 'MMM d, yyyy')})`;
+      } catch (e) {
+         console.error("Error parsing nextRecurrenceDate for display:", transaction.nextRecurrenceDate, e);
+      }
     }
     if (transaction.recurrenceEndDate) {
-      text += ` until ${format(parseISO(transaction.recurrenceEndDate), 'MMM d, yyyy')}`;
+      try {
+        text += ` until ${format(parseISO(transaction.recurrenceEndDate), 'MMM d, yyyy')}`;
+      } catch (e) {
+        console.error("Error parsing recurrenceEndDate for display:", transaction.recurrenceEndDate, e);
+      }
     }
     return text;
   }, [transaction.isRecurring, transaction.recurrencePeriod, transaction.nextRecurrenceDate, transaction.recurrenceEndDate]);
@@ -140,5 +149,3 @@ export function TransactionItem({ transaction, onEdit, onDelete, transactionCont
     </Card>
   );
 }
-
-    

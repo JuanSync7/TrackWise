@@ -57,6 +57,32 @@ export interface BudgetGoal {
   period: 'monthly' | 'yearly' | 'weekly';
 }
 
+// --- Financial Goals ---
+export interface FinancialGoal {
+  id: string;
+  name: string;
+  targetAmount: number;
+  currentAmount: number;
+  deadlineDate?: string; // ISO string date
+  createdAt: string; // ISO string date
+  notes?: string;
+}
+
+// --- Personal Debts ---
+export interface PersonalDebt {
+  id: string;
+  name: string; // e.g., "Car Loan", "Student Loan"
+  lender?: string; // e.g., "Bank of America"
+  initialAmount: number;
+  currentBalance: number;
+  interestRate?: number; // Annual percentage rate
+  minimumPayment?: number;
+  dueDate?: string; // e.g., "15th of month" or specific date for one-time
+  notes?: string;
+  createdAt: string; // ISO string date
+}
+
+
 // --- Household Specific Types ---
 export interface Member {
   id: string;
@@ -165,13 +191,27 @@ export interface PersonalFinanceContextType {
   transactions: Transaction[];
   categories: Category[];
   budgetGoals: BudgetGoal[];
+  financialGoals: FinancialGoal[];
+  personalDebts: PersonalDebt[];
+
   addTransaction: (transaction: Omit<Transaction, 'id'>) => void;
   updateTransaction: (transaction: Transaction) => void;
   deleteTransaction: (transactionId: string) => void;
+
   addBudgetGoal: (goal: Omit<BudgetGoal, 'id' | 'currentSpending'>) => void;
   updateBudgetGoal: (goal: BudgetGoal) => void;
   deleteBudgetGoal: (goalId: string) => void;
   getCategoryById: (categoryId: string) => Category | undefined;
+
+  addFinancialGoal: (goal: Omit<FinancialGoal, 'id' | 'createdAt' | 'currentAmount'>) => void;
+  updateFinancialGoal: (goal: FinancialGoal) => void;
+  deleteFinancialGoal: (goalId: string) => void;
+  contributeToFinancialGoal: (goalId: string, amount: number) => void;
+
+  addPersonalDebt: (debt: Omit<PersonalDebt, 'id' | 'createdAt' | 'currentBalance'>) => void;
+  updatePersonalDebt: (debt: PersonalDebt) => void;
+  deletePersonalDebt: (debtId: string) => void;
+  logPaymentToPersonalDebt: (debtId: string, paymentAmount: number, transactionDetails?: Omit<Transaction, 'id' | 'amount' | 'categoryId' | 'transactionType'>) => void;
 }
 
 export interface HouseholdContextType {
@@ -259,5 +299,3 @@ export interface NavItem {
   external?: boolean;
   submenu?: NavItem[];
 }
-
-    

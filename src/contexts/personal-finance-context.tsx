@@ -3,8 +3,8 @@
 
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useCallback, useEffect } from 'react';
-import type { Transaction, Category, BudgetGoal, PersonalFinanceContextType } from '@/lib/types';
-import { INITIAL_CATEGORIES } from '@/lib/constants';
+import type { Transaction, Category, BudgetGoal, PersonalFinanceContextType, FinancialGoal, PersonalDebt } from '@/lib/types';
+import { INITIAL_CATEGORIES, DEFAULT_CURRENCY } from '@/lib/constants';
 import useLocalStorage from '@/hooks/use-local-storage';
 import { v4 as uuidv4 } from 'uuid';
 import { format, parseISO, addDays, addWeeks, addMonths, addYears } from 'date-fns';
@@ -15,13 +15,16 @@ export const PersonalFinanceProvider: React.FC<{ children: ReactNode }> = ({ chi
   const [transactions, setTransactions] = useLocalStorage<Transaction[]>('trackwise_personal_transactions', []);
   const [categories, setCategories] = useLocalStorage<Category[]>('trackwise_categories', INITIAL_CATEGORIES);
   const [budgetGoals, setBudgetGoals] = useLocalStorage<BudgetGoal[]>('trackwise_personal_budget_goals', []);
+  const [financialGoals, setFinancialGoals] = useLocalStorage<FinancialGoal[]>('trackwise_financial_goals', []);
+  const [personalDebts, setPersonalDebts] = useLocalStorage<PersonalDebt[]>('trackwise_personal_debts', []);
+
 
   const getCategoryById = useCallback((categoryId: string) => categories.find(cat => cat.id === categoryId), [categories]);
 
   const addTransaction = useCallback((newTransactionData: Omit<Transaction, 'id'>) => {
     let nextRecurrenceDate: string | undefined = undefined;
     if (newTransactionData.isRecurring && newTransactionData.recurrencePeriod && newTransactionData.date) {
-        const startDate = parseISO(newTransactionData.date); // Ensure date is parsed correctly
+        const startDate = parseISO(newTransactionData.date);
         switch (newTransactionData.recurrencePeriod) {
             case 'daily': nextRecurrenceDate = format(addDays(startDate, 1), "yyyy-MM-dd"); break;
             case 'weekly': nextRecurrenceDate = format(addWeeks(startDate, 1), "yyyy-MM-dd"); break;
@@ -37,7 +40,7 @@ export const PersonalFinanceProvider: React.FC<{ children: ReactNode }> = ({ chi
   }, [setTransactions]);
 
   const updateTransaction = useCallback((updatedTransaction: Transaction) => {
-    let nextRecurrenceDate: string | undefined = updatedTransaction.nextRecurrenceDate; // Preserve if already calculated
+    let nextRecurrenceDate: string | undefined = updatedTransaction.nextRecurrenceDate;
     if (updatedTransaction.isRecurring && updatedTransaction.recurrencePeriod && updatedTransaction.date) {
         const startDate = parseISO(updatedTransaction.date);
         let potentialNextDate: string | undefined;
@@ -49,11 +52,11 @@ export const PersonalFinanceProvider: React.FC<{ children: ReactNode }> = ({ chi
         }
         if (updatedTransaction.recurrenceEndDate && potentialNextDate && new Date(potentialNextDate) > parseISO(updatedTransaction.recurrenceEndDate)) {
             nextRecurrenceDate = undefined;
-        } else {
+        } else if (potentialNextDate) { // Only update if a new date is calculated
             nextRecurrenceDate = potentialNextDate;
         }
     } else if (!updatedTransaction.isRecurring) {
-        nextRecurrenceDate = undefined; // Clear if not recurring
+        nextRecurrenceDate = undefined;
     }
 
     const transactionToSave = { ...updatedTransaction, nextRecurrenceDate };
@@ -82,11 +85,90 @@ export const PersonalFinanceProvider: React.FC<{ children: ReactNode }> = ({ chi
     })));
   }, [transactions, setBudgetGoals]);
 
+  // Financial Goals
+  const addFinancialGoal = useCallback((goalData: Omit<FinancialGoal, 'id' | 'createdAt' | 'currentAmount'>) => {
+    const newGoal: FinancialGoal = {
+      ...goalData,
+      id: uuidv4(),
+      createdAt: formatISO(new Date()),
+      currentAmount: 0,
+    };
+    setFinancialGoals(prev => [...prev, newGoal]);
+  }, [setFinancialGoals]);
+
+  const updateFinancialGoal = useCallback((updatedGoal: FinancialGoal) => {
+    setFinancialGoals(prev => prev.map(g => g.id === updatedGoal.id ? updatedGoal : g));
+  }, [setFinancialGoals]);
+
+  const deleteFinancialGoal = useCallback((goalId: string) => {
+    setFinancialGoals(prev => prev.filter(g => g.id !== goalId));
+  }, [setFinancialGoals]);
+
+  const contributeToFinancialGoal = useCallback((goalId: string, amount: number) => {
+    setFinancialGoals(prev => prev.map(g => g.id === goalId ? { ...g, currentAmount: Math.min(g.targetAmount, g.currentAmount + amount) } : g));
+    // Optionally, create a corresponding transaction
+    const goal = financialGoals.find(g => g.id === goalId);
+    if (goal) {
+        const savingsCategory = categories.find(c => c.name.toLowerCase() === "savings contribution");
+        addTransaction({
+            description: `Contribution to goal: ${goal.name}`,
+            amount: amount,
+            date: formatISO(new Date()),
+            categoryId: savingsCategory?.id || 'other',
+            transactionType: 'expense', // Saving is technically an expense from available cash
+            notes: `Automated contribution for financial goal.`
+        });
+    }
+  }, [setFinancialGoals, financialGoals, addTransaction, categories]);
+
+
+  // Personal Debts
+  const addPersonalDebt = useCallback((debtData: Omit<PersonalDebt, 'id' | 'createdAt' | 'currentBalance'>) => {
+    const newDebt: PersonalDebt = {
+      ...debtData,
+      id: uuidv4(),
+      createdAt: formatISO(new Date()),
+      currentBalance: debtData.initialAmount, // Current balance starts as initial amount
+    };
+    setPersonalDebts(prev => [...prev, newDebt]);
+  }, [setPersonalDebts]);
+
+  const updatePersonalDebt = useCallback((updatedDebt: PersonalDebt) => {
+    setPersonalDebts(prev => prev.map(d => d.id === updatedDebt.id ? updatedDebt : d));
+  }, [setPersonalDebts]);
+
+  const deletePersonalDebt = useCallback((debtId: string) => {
+    setPersonalDebts(prev => prev.filter(d => d.id !== debtId));
+  }, [setPersonalDebts]);
+
+  const logPaymentToPersonalDebt = useCallback((debtId: string, paymentAmount: number, transactionDetails?: Omit<Transaction, 'id' | 'amount' | 'categoryId' | 'transactionType'>) => {
+    setPersonalDebts(prev => prev.map(d => {
+      if (d.id === debtId) {
+        return { ...d, currentBalance: Math.max(0, d.currentBalance - paymentAmount) };
+      }
+      return d;
+    }));
+     const debt = personalDebts.find(d => d.id === debtId);
+     if (debt) {
+        const debtCategory = categories.find(c => c.name.toLowerCase() === "debt payment");
+        addTransaction({
+            description: transactionDetails?.description || `Payment for: ${debt.name}`,
+            amount: paymentAmount,
+            date: transactionDetails?.date || formatISO(new Date()),
+            categoryId: debtCategory?.id || 'other',
+            transactionType: 'expense',
+            notes: transactionDetails?.notes || `Automated payment log for debt ${debt.name}.`
+        });
+    }
+  }, [setPersonalDebts, personalDebts, addTransaction, categories]);
+
 
   const value: PersonalFinanceContextType = {
-    transactions, categories, budgetGoals,
+    transactions, categories, budgetGoals, financialGoals, personalDebts,
     addTransaction, updateTransaction, deleteTransaction,
     addBudgetGoal, updateBudgetGoal, deleteBudgetGoal, getCategoryById,
+    addFinancialGoal, updateFinancialGoal, deleteFinancialGoal, contributeToFinancialGoal,
+    addPersonalDebt, updatePersonalDebt, deletePersonalDebt, logPaymentToPersonalDebt,
   };
 
   return <PersonalFinanceContext.Provider value={value}>{children}</PersonalFinanceContext.Provider>;
@@ -99,5 +181,3 @@ export const usePersonalFinance = (): PersonalFinanceContextType => {
   }
   return context;
 };
-
-    

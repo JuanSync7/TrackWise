@@ -19,14 +19,14 @@ export const INITIAL_CATEGORIES: Category[] = [
   { id: 'education', name: 'Education', iconName: 'BookOpen', color: '#007bff', appliesTo: 'expense'},
   { id: 'personal_care', name: 'Personal Care', iconName: 'Sparkles', color: '#F76707', appliesTo: 'expense'},
   { id: 'gifts', name: 'Gifts & Donations', iconName: 'Gift', color: '#845EF7', appliesTo: 'expense'},
-  { id: HOUSEHOLD_EXPENSE_CATEGORY_ID, name: 'Household Shared', iconName: 'ReceiptText', color: '#607D8B', appliesTo: 'expense' }, // For shared household expenses
-  { id: 'salary', name: 'Salary', iconName: 'Briefcase', color: '#28A745', appliesTo: 'income' }, // Example income category
-  { id: 'freelance', name: 'Freelance Income', iconName: 'Laptop', color: '#17A2B8', appliesTo: 'income' }, // Example income category
-  { id: 'investment', name: 'Investment Income', iconName: 'TrendingUp', color: '#FFC107', appliesTo: 'income' }, // Example income category
+  { id: HOUSEHOLD_EXPENSE_CATEGORY_ID, name: 'Household Shared', iconName: 'ReceiptText', color: '#607D8B', appliesTo: 'expense' },
+  { id: 'salary', name: 'Salary', iconName: 'Briefcase', color: '#28A745', appliesTo: 'income' },
+  { id: 'freelance', name: 'Freelance Income', iconName: 'Laptop', color: '#17A2B8', appliesTo: 'income' },
+  { id: 'investment', name: 'Investment Income', iconName: 'TrendingUp', color: '#FFC107', appliesTo: 'income' },
+  { id: 'savings_contribution', name: 'Savings Contribution', iconName: 'PiggyBank', color: '#66BB6A', appliesTo: 'expense' }, // For goal contributions
+  { id: 'debt_payment', name: 'Debt Payment', iconName: 'CreditCard', color: '#EF5350', appliesTo: 'expense' }, // For debt payments
   { id: 'other_income', name: 'Other Income', iconName: 'DollarSign', color: '#6F42C1', appliesTo: 'income' },
-  { id: 'other', name: 'Other', iconName: 'Archive', color: '#6C757D', appliesTo: 'both' }, // Can be for both
+  { id: 'other', name: 'Other', iconName: 'Archive', color: '#6C757D', appliesTo: 'both' },
 ];
 
 export const DEFAULT_CURRENCY = '$';
-
-    
