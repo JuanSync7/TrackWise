@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useMemo } from 'react'; // Added React
+import React, { useMemo } from 'react';
 import type { TripMember, TripMemberNetData } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,16 +22,16 @@ const TripMemberItem = React.memo(function TripMemberItem({
   tripMember,
   onDelete,
   onAddContribution,
-  numberOfTripMembers,
+  numberOfTripMembers, // Retained for potential future use, though current net calc doesn't directly use it here
 }: TripMemberItemProps) {
-  const { getTripMemberNetData, tripContributions, tripExpenses } = useAppContext();
+  const { getTripMemberNetData } = useAppContext();
 
   const calculatedNetData: TripMemberNetData = useMemo(() => {
     if (tripMember && tripMember.tripId && tripMember.id) {
       return getTripMemberNetData(tripMember.tripId, tripMember.id);
     }
     return { directContribution: 0, shareOfExpenses: 0, netShare: 0 };
-  }, [tripMember.id, tripMember.tripId, getTripMemberNetData, tripContributions, tripExpenses]);
+  }, [tripMember.id, tripMember.tripId, getTripMemberNetData]);
 
 
   return (

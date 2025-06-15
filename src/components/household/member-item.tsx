@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useMemo } from 'react'; // Added React
+import React, { useMemo } from 'react';
 import type { Member, HouseholdMemberNetData } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,11 +22,14 @@ const MemberItem = React.memo(function MemberItem({
   onDelete,
   onAddContribution,
 }: MemberItemProps) {
-  const { getHouseholdMemberNetPotData, contributions, expenses, sharedBudgets, members: allMembers } = useAppContext();
+  const { getHouseholdMemberNetPotData } = useAppContext();
 
   const calculatedNetData: HouseholdMemberNetData = useMemo(() => {
-    return getHouseholdMemberNetPotData(member.id);
-  }, [member.id, getHouseholdMemberNetPotData, contributions, expenses, sharedBudgets, allMembers]);
+    if (member && member.id) {
+      return getHouseholdMemberNetPotData(member.id);
+    }
+    return { directContributionToPot: 0, shareOfPotExpenses: 0, netPotShare: 0 };
+  }, [member.id, getHouseholdMemberNetPotData]);
 
 
   return (
@@ -81,4 +84,3 @@ const MemberItem = React.memo(function MemberItem({
 });
 
 export { MemberItem };
-
