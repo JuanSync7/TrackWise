@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react'; // Added useMemo
 import { PageHeader } from '@/components/shared/page-header';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, Users, DollarSign, ClipboardList, WalletCards, DivideSquare, TrendingDown, TrendingUp, Banknote, ListChecks, Download } from 'lucide-react';
@@ -17,6 +17,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useAppContext } from '@/contexts/app-context';
+import { useAuth } from '@/contexts/auth-context'; // Import useAuth
 import { useToast } from "@/hooks/use-toast";
 import type { Member, Contribution, Expense } from '@/lib/types';
 import { MemberForm } from '@/components/household/member-form';
@@ -34,9 +35,10 @@ export default function HouseholdPage() {
   const { 
     members, addMember, deleteMember: contextDeleteMember, 
     contributions, addContribution, getMemberTotalContribution, 
-    expenses, addExpense, sharedBudgets, getCategoryById, // Added expenses, sharedBudgets, getCategoryById
+    expenses, addExpense, sharedBudgets, getCategoryById, 
     getTotalHouseholdSpending
   } = useAppContext();
+  const { user: authUser } = useAuth(); // Get authenticated user
   const { toast } = useToast();
 
   const [isMemberFormOpen, setIsMemberFormOpen] = useState(false);
@@ -47,6 +49,14 @@ export default function HouseholdPage() {
   const [isSubmittingContribution, setIsSubmittingContribution] = useState(false);
   const [isSubmittingExpense, setIsSubmittingExpense] = useState(false);
   const [memberToDelete, setMemberToDelete] = useState<string | null>(null);
+
+  const currentUserAsHouseholdMember = useMemo(() => {
+    if (!authUser || !members || members.length === 0) return undefined;
+    return members.find(m => 
+        (authUser.displayName && m.name.toLowerCase() === authUser.displayName.toLowerCase()) ||
+        (authUser.email && m.name.toLowerCase() === authUser.email.split('@')[0].toLowerCase())
+    );
+  }, [authUser, members]);
 
   const handleSaveMember = async (data: Omit<Member, 'id'>) => {
     setIsSubmittingMember(true);
@@ -171,7 +181,7 @@ export default function HouseholdPage() {
     });
     csvRows.push([]);
 
-    // Section 4: Shared Expenses (Pot-Affecting)
+    // Section 4: Shared Expenses Affecting Pot
     csvRows.push(["Shared Expenses Affecting Pot"]);
     csvRows.push(["Description", `Amount (${DEFAULT_CURRENCY})`, "Date", "Source"]);
     const potAffectingExpenses = expenses.filter(exp => {
@@ -268,6 +278,9 @@ export default function HouseholdPage() {
             onSave={handleSaveExpense}
             onCancel={() => setIsExpenseFormOpen(false)}
             isSubmitting={isSubmittingExpense}
+            availableMembersForSplitting={members} // Pass household members
+            currentUserIdForDefaultPayer={currentUserAsHouseholdMember?.id} // Pass current user's household member ID
+            hideSplittingFeature={false} // Ensure splitting is enabled
           />
         </DialogContent>
       </Dialog>
