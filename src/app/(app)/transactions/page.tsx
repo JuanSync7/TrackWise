@@ -95,7 +95,8 @@ export default function TransactionsPage() {
     }
   };
 
-  const openFormForNew = () => {
+  // Renamed to avoid conflict with global add button if it were implemented on this page
+  const openLocalTransactionForm = () => { 
     setEditingTransaction(undefined);
     setIsFormOpen(true);
   }
@@ -255,8 +256,9 @@ export default function TransactionsPage() {
               <Button onClick={handleExportTransactions} variant="outline" disabled={filteredTransactions.length === 0}>
                 <Download className="mr-2 h-4 w-4" /> Export View
               </Button>
-              <Button onClick={openFormForNew}>
-                <PlusCircle className="mr-2 h-4 w-4" /> Add New
+              {/* This button can remain for page-specific adding, or be removed if the header button is preferred */}
+              <Button onClick={openLocalTransactionForm}> 
+                <PlusCircle className="mr-2 h-4 w-4" /> Add New (Local)
               </Button>
             </div>
           </div>
