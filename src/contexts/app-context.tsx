@@ -60,14 +60,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       });
     }
     return updatedDebts;
-  }, []); // No external dependencies that change
+  }, []);
 
   const _deleteMemberContributionsAndDebts = useCallback((memberId: string) => {
     setContributions(prev => prev.filter(contrib => contrib.memberId !== memberId));
     setDebts(prevDebts => prevDebts.filter(debt => debt.owedByMemberId !== memberId && debt.owedToMemberId !== memberId));
   }, [setContributions, setDebts]);
 
-  // For "Net Share in Pot/Trip" display (claim on pot cash)
+
   const getHouseholdMemberNetPotData = useCallback((householdMemberId: string): HouseholdMemberNetData => {
     const memberDirectContribution = contributions
         .filter(c => c.memberId === householdMemberId)
@@ -78,7 +78,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     potPaidExpenses.forEach(expense => {
         let membersSharingThisExpense = expense.isSplit && expense.splitWithMemberIds && expense.splitWithMemberIds.length > 0
-            ? expense.splitWithMemberIds.filter(id => members.some(m => m.id === id)) // Ensure member is still in household
+            ? expense.splitWithMemberIds.filter(id => members.some(m => m.id === id))
             : members.map(m => m.id);
 
         if (membersSharingThisExpense.includes(householdMemberId)) {
@@ -98,31 +98,29 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const currentTripMembers = getTripMembers(tripId);
     if (currentTripMembers.length === 0) return { directContribution: 0, shareOfExpenses: 0, netShare: 0 };
 
-    const memberDirectContribution = tripContributions
-        .filter(tc => tc.tripId === tripId && tc.tripMemberId === tripMemberId)
-        .reduce((sum, tc) => sum + tc.amount, 0);
+    const memberInputs: MemberInput[] = currentTripMembers.map(tm => ({
+      id: tm.id,
+      directContribution: getTripMemberTotalDirectContribution(tm.id, tripId),
+    }));
 
-    const potPaidTripExpenses = getTripExpenses(tripId).filter(exp => exp.paidByTripMemberId === POT_PAYER_ID);
-    let memberShareOfPotPaidExpenses = 0;
+    const expensesForThisTrip = getTripExpenses(tripId);
+    const expenseInputs: ExpenseInput[] = expensesForThisTrip.map(exp => ({
+      amount: exp.amount,
+      isSplit: exp.isSplit || false,
+      splitWithMemberIds: exp.splitWithTripMemberIds || [],
+      paidByMemberId: exp.paidByTripMemberId,
+    }));
 
-    potPaidTripExpenses.forEach(expense => {
-        let membersSharingThisExpense = expense.isSplit && expense.splitWithMemberIds && expense.splitWithMemberIds.length > 0
-            ? expense.splitWithMemberIds.filter(id => currentTripMembers.some(tm => tm.id === id)) // Ensure member is in this trip
-            : currentTripMembers.map(tm => tm.id);
+    const allTripMemberIds = currentTripMembers.map(tm => tm.id);
+    const netPositions = calculateNetFinancialPositions(memberInputs, expenseInputs, allTripMemberIds);
+    const memberData = netPositions.get(tripMemberId);
 
-        if (membersSharingThisExpense.includes(tripMemberId)) {
-            const numSharing = membersSharingThisExpense.length > 0 ? membersSharingThisExpense.length : 1;
-            memberShareOfPotPaidExpenses += expense.amount / numSharing;
-        }
-    });
-
-    const netShareInPot = memberDirectContribution - memberShareOfPotPaidExpenses;
     return {
-        directContribution: parseFloat(memberDirectContribution.toFixed(2)),
-        shareOfExpenses: parseFloat(memberShareOfPotPaidExpenses.toFixed(2)), // This is share of POT-PAID expenses for display
-        netShare: parseFloat(netShareInPot.toFixed(2)),
+      directContribution: memberData?.directContribution || 0,
+      shareOfExpenses: memberData?.shareOfPotPaidExpenses || 0, // shareOfPotPaidExpenses for consistency with household
+      netShare: memberData?.netShare || 0,
     };
-  }, [getTripMembers, tripContributions, getTripExpenses]);
+  }, [getTripMembers, getTripMemberTotalDirectContribution, getTripExpenses]);
 
 
   const _calculateAndStoreHouseholdSettlements = useCallback(() => {
@@ -143,7 +141,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const netPositionsArray = Array.from(netPositionsMap.values());
     const rawSettlements = generateSettlements(netPositionsArray);
     const finalSettlements: HouseholdSettlement[] = rawSettlements.map(s => ({
-        ...s, id: uuidv4(), tripId: 'household_pot_settlement', // Using tripId field for consistency
+        ...s, id: uuidv4(), tripId: 'household_pot_settlement',
     }));
     setHouseholdOverallSettlements(finalSettlements);
   }, [members, contributions, expenses, setHouseholdOverallSettlements]);
@@ -151,6 +149,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const triggerHouseholdSettlementCalculation = useCallback(() => {
     _calculateAndStoreHouseholdSettlements();
   }, [_calculateAndStoreHouseholdSettlements]);
+
 
   const _calculateAndStoreTripSettlements = useCallback((tripId: string) => {
     const currentTripMembers = getTripMembers(tripId);
@@ -160,21 +159,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
     const memberInputs: MemberInput[] = currentTripMembers.map(tm => ({
       id: tm.id,
-      directContribution: tripContributions.filter(tc => tc.tripId === tripId && tc.tripMemberId === tm.id).reduce((s, tc) => s + tc.amount, 0),
+      directContribution: getTripMemberTotalDirectContribution(tm.id, tripId),
     }));
-    const expenseInputs: ExpenseInput[] = getTripExpenses(tripId).map(exp => ({
+    const expensesForThisTrip = getTripExpenses(tripId);
+    const expenseInputs: ExpenseInput[] = expensesForThisTrip.map(exp => ({
       amount: exp.amount, isSplit: exp.isSplit || false,
       splitWithMemberIds: exp.splitWithTripMemberIds || [], paidByMemberId: exp.paidByTripMemberId,
     }));
-    const tripMemberIds = currentTripMembers.map(tm => tm.id);
-    const netPositionsMap = calculateNetFinancialPositions(memberInputs, expenseInputs, tripMemberIds);
+    const allTripMemberIds = currentTripMembers.map(tm => tm.id);
+    const netPositionsMap = calculateNetFinancialPositions(memberInputs, expenseInputs, allTripMemberIds);
     const netPositionsArray = Array.from(netPositionsMap.values());
     const rawSettlements = generateSettlements(netPositionsArray);
     const finalSettlements: TripSettlement[] = rawSettlements.map(s => ({
         ...s, id: uuidv4(), tripId: tripId,
     }));
     setTripSettlementsMap(prevMap => ({ ...prevMap, [tripId]: finalSettlements }));
-  }, [getTripMembers, tripContributions, getTripExpenses, setTripSettlementsMap]);
+  }, [getTripMembers, getTripMemberTotalDirectContribution, getTripExpenses, setTripSettlementsMap]);
 
   const triggerTripSettlementCalculation = useCallback((tripId: string) => {
     _calculateAndStoreTripSettlements(tripId);
@@ -185,20 +185,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const newExpense = { ...newExpenseData, id: uuidv4() };
     setExpenses(prev => [...prev, newExpense]);
     setDebts(prevDebts => _manageDebtsForExpense(newExpense, prevDebts));
-    triggerHouseholdSettlementCalculation();
-  }, [setExpenses, setDebts, _manageDebtsForExpense, triggerHouseholdSettlementCalculation]);
+    // triggerHouseholdSettlementCalculation(); // Rely on useEffect in page
+  }, [setExpenses, setDebts, _manageDebtsForExpense]);
 
   const updateExpense = useCallback((updatedExpense: Expense) => {
     setExpenses(prev => prev.map(exp => exp.id === updatedExpense.id ? updatedExpense : exp));
     setDebts(prevDebts => _manageDebtsForExpense(updatedExpense, prevDebts));
-    triggerHouseholdSettlementCalculation();
-  }, [setExpenses, setDebts, _manageDebtsForExpense, triggerHouseholdSettlementCalculation]);
+    // triggerHouseholdSettlementCalculation(); // Rely on useEffect in page
+  }, [setExpenses, setDebts, _manageDebtsForExpense]);
 
   const deleteExpense = useCallback((expenseId: string) => {
     setExpenses(prev => prev.filter(exp => exp.id !== expenseId));
     setDebts(prevDebts => prevDebts.filter(debt => debt.expenseId !== expenseId));
-    triggerHouseholdSettlementCalculation();
-  }, [setExpenses, setDebts, triggerHouseholdSettlementCalculation]);
+    // triggerHouseholdSettlementCalculation(); // Rely on useEffect in page
+  }, [setExpenses, setDebts]);
+
 
   const addBudgetGoal = useCallback((goal: Omit<BudgetGoal, 'id' | 'currentSpending'>) => {
     setBudgetGoals(prev => [...prev, { ...goal, id: uuidv4(), currentSpending: 0 }]);
@@ -214,19 +215,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const addMember = useCallback((member: Omit<Member, 'id'>) => {
     setMembers(prev => [...prev, { ...member, id: uuidv4() }]);
-    triggerHouseholdSettlementCalculation();
-  }, [setMembers, triggerHouseholdSettlementCalculation]);
+    // triggerHouseholdSettlementCalculation(); // Rely on useEffect in page
+  }, [setMembers]);
 
   const deleteMember = useCallback((memberId: string) => {
     _deleteMemberContributionsAndDebts(memberId);
     setMembers(prev => prev.filter(mem => mem.id !== memberId));
-    triggerHouseholdSettlementCalculation();
-  }, [setMembers, _deleteMemberContributionsAndDebts, triggerHouseholdSettlementCalculation]);
+    // triggerHouseholdSettlementCalculation(); // Rely on useEffect in page
+  }, [setMembers, _deleteMemberContributionsAndDebts]);
 
   const addContribution = useCallback((contribution: Omit<Contribution, 'id'>) => {
     setContributions(prev => [...prev, { ...contribution, id: uuidv4() }]);
-    triggerHouseholdSettlementCalculation();
-  }, [setContributions, triggerHouseholdSettlementCalculation]);
+    // triggerHouseholdSettlementCalculation(); // Rely on useEffect in page
+  }, [setContributions]);
 
   const getMemberContributions = useCallback((memberId: string) => contributions.filter(contrib => contrib.memberId === memberId), [contributions]);
   const getMemberTotalContribution = useCallback((memberId: string) => contributions.filter(c => c.memberId === memberId).reduce((s, c) => s + c.amount, 0), [contributions]);
@@ -248,8 +249,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const deleteSharedBudget = useCallback((budgetId: string) => {
     setSharedBudgets(prev => prev.filter(b => b.id !== budgetId));
     setExpenses(prevExp => prevExp.map(e => e.sharedBudgetId === budgetId ? { ...e, sharedBudgetId: undefined } : e));
-    triggerHouseholdSettlementCalculation();
-  }, [setSharedBudgets, setExpenses, triggerHouseholdSettlementCalculation]);
+    // triggerHouseholdSettlementCalculation(); // Rely on useEffect in page
+  }, [setSharedBudgets, setExpenses]);
 
   const settleDebt = useCallback((debtId: string) => {
     setDebts(prev => prev.map(d => d.id === debtId ? { ...d, isSettled: true, settledAt: formatISO(new Date()) } : d));
@@ -296,8 +297,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const addTripMember = useCallback((tripId: string, memberData: Omit<TripMember, 'id' | 'tripId'>) => {
     setTripMembers(prev => [...prev, { ...memberData, id: uuidv4(), tripId }]);
-    triggerTripSettlementCalculation(tripId);
-  }, [setTripMembers, triggerTripSettlementCalculation]);
+    // triggerTripSettlementCalculation(tripId); // Rely on useEffect in page
+  }, [setTripMembers]);
 
   const deleteTripMember = useCallback((tripMemberId: string, tripId: string) => {
     setTripMembers(prev => prev.filter(member => member.id !== tripMemberId));
@@ -310,14 +311,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
       return exp;
     }));
-    triggerTripSettlementCalculation(tripId);
-  }, [setTripMembers, setTripContributions, setTripExpensesState, triggerTripSettlementCalculation]);
+    // triggerTripSettlementCalculation(tripId); // Rely on useEffect in page
+  }, [setTripMembers, setTripContributions, setTripExpensesState]);
 
   const addTripContribution = useCallback((tripId: string, tripMemberId: string, contributionData: Omit<TripContribution, 'id' | 'tripId' | 'tripMemberId'>) => {
     const newContrib: TripContribution = { ...contributionData, id: uuidv4(), tripId, tripMemberId, date: formatISO(contributionData.date) };
     setTripContributions(prev => [...prev, newContrib]);
-    triggerTripSettlementCalculation(tripId);
-  }, [setTripContributions, triggerTripSettlementCalculation]);
+    // triggerTripSettlementCalculation(tripId); // Rely on useEffect in page
+  }, [setTripContributions]);
 
   const getTripContributionsForMember = useCallback((tripMemberId: string) => tripContributions.filter(c => c.tripMemberId === tripMemberId), [tripContributions]);
   const getTripMemberTotalDirectContribution = useCallback((tripMemberId: string, tripIdToFilter?: string) =>
@@ -326,8 +327,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const addTripExpense = useCallback((expenseData: Omit<TripExpense, 'id'>) => {
     setTripExpensesState(prev => [...prev, { ...expenseData, id: uuidv4() }]);
-    triggerTripSettlementCalculation(expenseData.tripId);
-  }, [setTripExpensesState, triggerTripSettlementCalculation]);
+    // triggerTripSettlementCalculation(expenseData.tripId); // Rely on useEffect in page
+  }, [setTripExpensesState]);
 
 
   useEffect(() => {
@@ -345,7 +346,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const value: AppContextType = {
     expenses, categories, budgetGoals, members, contributions, sharedBudgets, debts,
-    shoppingListItems, trips, tripMembers, tripContributions, tripExpenses: tripExpenses, // ensure tripExpenses is passed directly
+    shoppingListItems, trips, tripMembers, tripContributions, tripExpenses: tripExpenses,
     addExpense, updateExpense, deleteExpense,
     addBudgetGoal, updateBudgetGoal, deleteBudgetGoal, getCategoryById,
     addMember, deleteMember, getMemberById,
@@ -371,3 +372,4 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
+
