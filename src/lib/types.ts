@@ -82,15 +82,18 @@ export interface TripExpense {
   splitWithTripMemberIds?: string[];
 }
 
-// Placeholder for future trip-specific budget, debt types
-export interface TripSharedBudget extends Omit<SharedBudget, 'currentSpending'> {
-  tripId: string;
-  currentSpending: number; 
-}
-export interface TripDebt extends Omit<Debt, 'owedByMemberId' | 'owedToMemberId'> {
+export interface TripSettlement {
+  id: string;
   tripId: string;
   owedByTripMemberId: string;
   owedToTripMemberId: string;
+  amount: number;
+}
+
+// Placeholder for future trip-specific budget
+export interface TripSharedBudget extends Omit<SharedBudget, 'currentSpending'> {
+  tripId: string;
+  currentSpending: number; 
 }
 // --- End Trip Specific Types ---
 
@@ -144,6 +147,7 @@ export interface AppState {
   tripMembers: TripMember[];
   tripContributions: TripContribution[];
   tripExpenses: TripExpense[]; 
+  tripSettlementsMap: Record<string, TripSettlement[]>; // Changed from tripSettlements: TripSettlement[]
 }
 
 export interface TripMemberNetData {
@@ -152,7 +156,7 @@ export interface TripMemberNetData {
   netShare: number;
 }
 
-export type AppContextType = AppState & {
+export type AppContextType = Omit<AppState, 'tripSettlementsMap'> & { // Exclude map from direct context exposure if calculated on demand
   // Expense functions
   addExpense: (expense: Omit<Expense, 'id'>) => void;
   updateExpense: (expense: Expense) => void;
@@ -204,18 +208,22 @@ export type AppContextType = AppState & {
   // Trip Member functions
   addTripMember: (tripId: string, memberData: Omit<TripMember, 'id' | 'tripId'>) => void;
   getTripMembers: (tripId: string) => TripMember[];
-  deleteTripMember: (tripMemberId: string) => void;
-  getTripMemberById: (tripMemberId: string) => TripMember | undefined;
+  deleteTripMember: (tripMemberId: string, tripId: string) => void; // Added tripId
+  getTripMemberById: (tripMemberId: string) => TripMember | undefined; // This can find any trip member by ID
 
   // Trip Contribution functions
   addTripContribution: (tripId: string, tripMemberId: string, contributionData: Omit<TripContribution, 'id' | 'tripId' | 'tripMemberId'>) => void;
   getTripContributionsForMember: (tripMemberId: string) => TripContribution[];
-  getTripMemberTotalDirectContribution: (tripMemberId: string) => number;
+  getTripMemberTotalDirectContribution: (tripMemberId: string, tripIdToFilter?: string) => number;
   getTripMemberNetData: (tripId: string, tripMemberId: string) => TripMemberNetData;
   
   // Trip Expense functions
   addTripExpense: (expenseData: Omit<TripExpense, 'id'>) => void; 
   getTripExpenses: (tripId: string) => TripExpense[];
+
+  // Trip Settlement functions
+  getTripSettlements: (tripId: string) => TripSettlement[];
+  triggerTripSettlementCalculation: (tripId: string) => void;
 };
 
 export interface NavItem {
@@ -225,4 +233,3 @@ export interface NavItem {
   label?: string;
   variant?: 'default' | 'ghost';
 }
-

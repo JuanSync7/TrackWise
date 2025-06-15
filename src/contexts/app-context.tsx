@@ -2,11 +2,11 @@
 "use client";
 
 import type { ReactNode } from 'react';
-import React, { createContext, useContext, useCallback } from 'react';
+import React, { createContext, useContext, useCallback, useMemo } from 'react';
 import type { 
   Expense, Category, BudgetGoal, AppState, AppContextType, 
   Member, Contribution, ShoppingListItem, SharedBudget, Debt,
-  Trip, TripMember, TripContribution, TripExpense, TripMemberNetData
+  Trip, TripMember, TripContribution, TripExpense, TripMemberNetData, TripSettlement
 } from '@/lib/types';
 import { INITIAL_CATEGORIES, HOUSEHOLD_EXPENSE_CATEGORY_ID } from '@/lib/constants';
 import useLocalStorage from '@/hooks/use-local-storage';
@@ -33,6 +33,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [tripMembers, setTripMembers] = useLocalStorage<TripMember[]>('trackwise_trip_members', []);
   const [tripContributions, setTripContributions] = useLocalStorage<TripContribution[]>('trackwise_trip_contributions', []);
   const [tripExpenses, setTripExpenses] = useLocalStorage<TripExpense[]>('trackwise_trip_expenses', []);
+  const [tripSettlementsMap, setTripSettlementsMap] = useLocalStorage<Record<string, TripSettlement[]>>('trackwise_trip_settlements_map', {});
 
 
   const getMemberById = useCallback((memberId: string) => {
@@ -289,6 +290,110 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return trips;
   }, [trips]);
 
+  const getTripMembers = useCallback((tripId: string): TripMember[] => {
+    return tripMembers.filter(member => member.tripId === tripId);
+  }, [tripMembers]);
+  
+  const getTripMemberById = useCallback((tripMemberId: string): TripMember | undefined => {
+    return tripMembers.find(member => member.id === tripMemberId);
+  }, [tripMembers]);
+
+  const getTripMemberTotalDirectContribution = useCallback((tripMemberId: string, tripIdToFilter?: string): number => {
+    return tripContributions
+      .filter(contrib => contrib.tripMemberId === tripMemberId && (!tripIdToFilter || contrib.tripId === tripIdToFilter))
+      .reduce((sum, contrib) => sum + contrib.amount, 0);
+  }, [tripContributions]);
+
+  const getTripExpenses = useCallback((tripIdToFilter: string): TripExpense[] => {
+    return tripExpenses.filter(expense => expense.tripId === tripIdToFilter);
+  }, [tripExpenses]);
+
+  const getTripMemberNetData = useCallback((tripId: string, tripMemberId: string): TripMemberNetData => {
+    const membersOfThisTrip = getTripMembers(tripId);
+    const memberExistsInTrip = membersOfThisTrip.some(tm => tm.id === tripMemberId);
+
+    if (!memberExistsInTrip) {
+      // If the member isn't part of this trip (e.g., was deleted), their net share is 0.
+      return { directContribution: 0, shareOfExpenses: 0, netShare: 0 };
+    }
+    
+    const directContribution = getTripMemberTotalDirectContribution(tripMemberId, tripId);
+    let shareOfExpenses = 0;
+    const expensesForThisTrip = getTripExpenses(tripId);
+    const numMembersInTrip = membersOfThisTrip.length;
+
+    expensesForThisTrip.forEach(expense => {
+      if (expense.isSplit && expense.splitWithTripMemberIds && expense.splitWithTripMemberIds.length > 0) {
+        if (expense.splitWithTripMemberIds.includes(tripMemberId)) {
+          shareOfExpenses += expense.amount / expense.splitWithTripMemberIds.length;
+        }
+      } else if (numMembersInTrip > 0) { 
+        shareOfExpenses += expense.amount / numMembersInTrip;
+      }
+    });
+
+    const netShare = directContribution - shareOfExpenses;
+    return { directContribution, shareOfExpenses, netShare };
+  }, [getTripMembers, getTripMemberTotalDirectContribution, getTripExpenses]);
+
+  const _calculateAndStoreTripSettlements = useCallback((tripId: string) => {
+    const currentTripMembers = getTripMembers(tripId);
+    if (currentTripMembers.length === 0) {
+      setTripSettlementsMap(prevMap => ({ ...prevMap, [tripId]: [] }));
+      return;
+    }
+
+    const memberNetShares: { id: string; netShare: number }[] = currentTripMembers.map(member => ({
+      id: member.id,
+      netShare: getTripMemberNetData(tripId, member.id).netShare,
+    }));
+
+    let debtors = memberNetShares.filter(m => m.netShare < 0).map(m => ({ id: m.id, amount: Math.abs(m.netShare) }));
+    let creditors = memberNetShares.filter(m => m.netShare > 0).map(m => ({ id: m.id, amount: m.netShare }));
+
+    debtors.sort((a, b) => b.amount - a.amount); // Largest debt first
+    creditors.sort((a, b) => b.amount - a.amount); // Largest credit first
+
+    const settlementsForTrip: TripSettlement[] = [];
+    let debtorIdx = 0;
+    let creditorIdx = 0;
+
+    while (debtorIdx < debtors.length && creditorIdx < creditors.length) {
+      const debtor = debtors[debtorIdx];
+      const creditor = creditors[creditorIdx];
+      const transferAmount = Math.min(debtor.amount, creditor.amount);
+
+      if (transferAmount > 0.005) { // Threshold to avoid tiny float discrepancies
+        settlementsForTrip.push({
+          id: uuidv4(),
+          tripId,
+          owedByTripMemberId: debtor.id,
+          owedToTripMemberId: creditor.id,
+          amount: transferAmount,
+        });
+
+        debtor.amount -= transferAmount;
+        creditor.amount -= transferAmount;
+      }
+
+      if (debtor.amount <= 0.005) {
+        debtorIdx++;
+      }
+      if (creditor.amount <= 0.005) {
+        creditorIdx++;
+      }
+    }
+    setTripSettlementsMap(prevMap => ({ ...prevMap, [tripId]: settlementsForTrip }));
+  }, [getTripMembers, getTripMemberNetData, setTripSettlementsMap]);
+
+  const triggerTripSettlementCalculation = useCallback((tripId: string) => {
+    _calculateAndStoreTripSettlements(tripId);
+  }, [_calculateAndStoreTripSettlements]);
+
+  const getTripSettlements = useCallback((tripId: string): TripSettlement[] => {
+    return tripSettlementsMap[tripId] || [];
+  }, [tripSettlementsMap]);
+
   // Trip Member Functions
   const addTripMember = (tripId: string, memberData: Omit<TripMember, 'id' | 'tripId'>) => {
     const newTripMember: TripMember = {
@@ -297,21 +402,29 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       tripId,
     };
     setTripMembers(prev => [...prev, newTripMember]);
+    _calculateAndStoreTripSettlements(tripId);
   };
 
-  const getTripMembers = useCallback((tripId: string): TripMember[] => {
-    return tripMembers.filter(member => member.tripId === tripId);
-  }, [tripMembers]);
-
-  const deleteTripMember = (tripMemberId: string) => {
-    setTripContributions(prev => prev.filter(contrib => contrib.tripMemberId !== tripMemberId));
+  const deleteTripMember = (tripMemberId: string, tripId: string) => {
     setTripMembers(prev => prev.filter(member => member.id !== tripMemberId));
-    // Also delete trip expenses paid by or split with this member if needed (future enhancement)
+    setTripContributions(prev => prev.filter(contrib => contrib.tripMemberId !== tripMemberId));
+    // Also update trip expenses if the deleted member was the payer or involved in splits
+    setTripExpenses(prevExpenses => {
+      return prevExpenses.map(exp => {
+        if (exp.tripId === tripId) {
+          const newSplitWith = exp.splitWithTripMemberIds?.filter(id => id !== tripMemberId);
+          return {
+            ...exp,
+            paidByTripMemberId: exp.paidByTripMemberId === tripMemberId ? undefined : exp.paidByTripMemberId,
+            splitWithTripMemberIds: newSplitWith,
+            isSplit: newSplitWith && newSplitWith.length > 0 ? exp.isSplit : false // if no one left to split with, it's not split
+          };
+        }
+        return exp;
+      });
+    });
+    _calculateAndStoreTripSettlements(tripId);
   };
-
-  const getTripMemberById = useCallback((tripMemberId: string): TripMember | undefined => {
-    return tripMembers.find(member => member.id === tripMemberId);
-  }, [tripMembers]);
 
   // Trip Contribution Functions
   const addTripContribution = (tripId: string, tripMemberId: string, contributionData: Omit<TripContribution, 'id' | 'tripId' | 'tripMemberId'>) => {
@@ -322,18 +435,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       tripMemberId,
     };
     setTripContributions(prev => [...prev, newTripContribution]);
+    _calculateAndStoreTripSettlements(tripId);
   };
 
   const getTripContributionsForMember = useCallback((tripMemberId: string): TripContribution[] => {
     return tripContributions.filter(contrib => contrib.tripMemberId === tripMemberId);
   }, [tripContributions]);
-
-  const getTripMemberTotalDirectContribution = useCallback((tripMemberId: string): number => {
-    return tripContributions
-      .filter(contrib => contrib.tripMemberId === tripMemberId)
-      .reduce((sum, contrib) => sum + contrib.amount, 0);
-  }, [tripContributions]);
-
+  
   // Trip Expense Functions
   const addTripExpense = (expenseData: Omit<TripExpense, 'id'>) => {
     const newTripExpense: TripExpense = {
@@ -341,38 +449,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       id: uuidv4(),
     };
     setTripExpenses(prev => [...prev, newTripExpense]);
+    _calculateAndStoreTripSettlements(expenseData.tripId);
   };
-
-  const getTripExpenses = useCallback((tripIdToFilter: string): TripExpense[] => {
-    return tripExpenses.filter(expense => expense.tripId === tripIdToFilter);
-  }, [tripExpenses]);
-
-  const getTripMemberNetData = useCallback((tripId: string, tripMemberId: string): TripMemberNetData => {
-    const member = tripMembers.find(tm => tm.id === tripMemberId && tm.tripId === tripId);
-    // Ensure we only proceed if the member actually belongs to the trip
-    if (!member) return { directContribution: 0, shareOfExpenses: 0, netShare: 0 };
-
-    const directContribution = getTripMemberTotalDirectContribution(tripMemberId);
-
-    let shareOfExpenses = 0;
-    const expensesForThisTrip = tripExpenses.filter(te => te.tripId === tripId);
-    const currentMembersOfThisTrip = tripMembers.filter(tm => tm.tripId === tripId); // Re-filter for accuracy within this scope
-    const numMembersInTrip = currentMembersOfThisTrip.length;
-
-    expensesForThisTrip.forEach(expense => {
-      if (expense.isSplit && expense.splitWithTripMemberIds && expense.splitWithTripMemberIds.length > 0) {
-        if (expense.splitWithTripMemberIds.includes(tripMemberId)) {
-          shareOfExpenses += expense.amount / expense.splitWithTripMemberIds.length;
-        }
-      } else if (numMembersInTrip > 0) { // Not explicitly split, assume shared equally by all in *this* trip
-        shareOfExpenses += expense.amount / numMembersInTrip;
-      }
-    });
-
-    const netShare = directContribution - shareOfExpenses;
-    return { directContribution, shareOfExpenses, netShare };
-  }, [tripMembers, tripExpenses, getTripMemberTotalDirectContribution]);
-
 
   // --- Effects for dynamic calculations ---
   React.useEffect(() => {
@@ -380,7 +458,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       prevGoals.map(goal => {
         const relevantExpenses = expenses.filter(exp => {
           if (exp.categoryId !== goal.categoryId) return false;
-          // Further filtering by period could be added here if needed, e.g., for monthly goals
           return true; 
         });
         const currentSpending = relevantExpenses.reduce((sum, exp) => sum + exp.amount, 0);
@@ -410,7 +487,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const value: AppContextType = {
     expenses, categories, budgetGoals, members, contributions, sharedBudgets, debts,
     shoppingListItems,
-    trips, tripMembers, tripContributions, tripExpenses,
+    trips, tripMembers, tripContributions, tripExpenses, 
     addExpense, updateExpense, deleteExpense,
     addBudgetGoal, updateBudgetGoal, deleteBudgetGoal, getCategoryById,
     addMember, deleteMember, getMemberById,
@@ -423,6 +500,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addTripMember, getTripMembers, deleteTripMember, getTripMemberById,
     addTripContribution, getTripContributionsForMember, getTripMemberTotalDirectContribution, getTripMemberNetData,
     addTripExpense, getTripExpenses,
+    getTripSettlements, triggerTripSettlementCalculation,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
@@ -435,4 +513,3 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
-

@@ -1,23 +1,24 @@
 
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/shared/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Users, Banknote, ListChecks, ArrowLeft } from 'lucide-react';
+import { PlusCircle, Users, Banknote, ListChecks, ArrowLeft, HandCoins, CircleDollarSign, Shuffle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { useAppContext } from '@/contexts/app-context';
-import { useAuth } from '@/contexts/auth-context'; // Import useAuth
+import { useAuth } from '@/contexts/auth-context'; 
 import { useToast } from "@/hooks/use-toast";
-import type { Trip, TripMember, TripContribution, TripExpense } from '@/lib/types';
+import type { Trip, TripMember, TripContribution, TripExpense, TripSettlement } from '@/lib/types';
 import { TripMemberForm, type TripMemberFormValues } from '@/components/trips/trip-member-form';
 import { TripMemberList } from '@/components/trips/trip-member-list';
 import { TripContributionForm, type TripContributionFormValues } from '@/components/trips/trip-contribution-form';
 import { ExpenseForm, type ExpenseFormValues as GenericExpenseFormValues } from '@/components/expenses/expense-form';
+import { TripSettlementList } from '@/components/trips/trip-settlement-list'; 
 import { DEFAULT_CURRENCY } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -36,13 +37,16 @@ export default function TripDetailPage() {
     tripContributions: globalTripContributions, 
     addTripExpense, getTripExpenses,
     tripExpenses: globalTripExpenses, 
-    getTripMembers
+    getTripMembers,
+    getTripSettlements, triggerTripSettlementCalculation
   } = useAppContext();
-  const { user: authUser } = useAuth(); // Get authenticated user
+  const { user: authUser } = useAuth(); 
   const { toast } = useToast();
 
   const [trip, setTrip] = useState<Trip | undefined>(undefined);
   const [currentTripMembers, setCurrentTripMembers] = useState<TripMember[]>([]);
+  const [currentTripExpenses, setCurrentTripExpensesList] = useState<TripExpense[]>([]);
+  const [settlements, setSettlements] = useState<TripSettlement[]>([]);
 
   const [isMemberFormOpen, setIsMemberFormOpen] = useState(false);
   const [isContributionFormOpen, setIsContributionFormOpen] = useState(false);
@@ -60,22 +64,27 @@ export default function TripDetailPage() {
       if (foundTrip) {
         setTrip(foundTrip);
         setCurrentTripMembers(getTripMembers(tripId));
+        setCurrentTripExpensesList(getTripExpenses(tripId));
+        triggerTripSettlementCalculation(tripId); 
+        setSettlements(getTripSettlements(tripId));
       } else {
         toast({ variant: "destructive", title: "Trip Not Found", description: "The requested trip could not be found." });
         router.push('/trips');
       }
     }
-  }, [tripId, getTripById, getTripMembers, router, toast]);
-
+  }, [tripId, getTripById, getTripMembers, getTripExpenses, router, toast, triggerTripSettlementCalculation, getTripSettlements]);
+  
   useEffect(() => {
     if (tripId) {
         setCurrentTripMembers(getTripMembers(tripId));
+        setCurrentTripExpensesList(getTripExpenses(tripId));
+        setSettlements(getTripSettlements(tripId)); // Also update settlements if global state changes
     }
-  }, [getTripMembers, tripId, globalTripMembers]); 
+  }, [tripId, globalTripMembers, globalTripContributions, globalTripExpenses, getTripMembers, getTripExpenses, getTripSettlements]);
+
 
   const currentAuthUserAsTripMember = useMemo(() => {
     if (!authUser || !currentTripMembers || currentTripMembers.length === 0) return undefined;
-    // Match by name (case-insensitive) or potentially by email prefix if names are not unique
     return currentTripMembers.find(tm => 
         (authUser.displayName && tm.name.toLowerCase() === authUser.displayName.toLowerCase()) ||
         (authUser.email && tm.name.toLowerCase() === authUser.email.split('@')[0].toLowerCase())
@@ -87,7 +96,7 @@ export default function TripDetailPage() {
     if (!tripId) return;
     setIsSubmittingMember(true);
     try {
-      addTripMember(tripId, data);
+      addTripMember(tripId, data); // This will also trigger settlement calc in context
       toast({ title: "Trip Member Added", description: `${data.name} has been added to the trip.` });
       setIsMemberFormOpen(false);
     } catch (error) {
@@ -102,9 +111,9 @@ export default function TripDetailPage() {
   };
 
   const confirmDeleteTripMember = () => {
-    if (tripMemberToDelete) {
+    if (tripMemberToDelete && tripId) {
       const member = getTripMemberById(tripMemberToDelete);
-      contextDeleteTripMember(tripMemberToDelete);
+      contextDeleteTripMember(tripMemberToDelete, tripId); // This will also trigger settlement calc
       toast({ title: "Trip Member Deleted", description: `${member?.name || 'The member'} has been removed from the trip.` });
       setTripMemberToDelete(null);
     }
@@ -122,7 +131,7 @@ export default function TripDetailPage() {
     if (!selectedTripMemberForContribution || !tripId) return;
     setIsSubmittingContribution(true);
     try {
-      addTripContribution(tripId, selectedTripMemberForContribution.id, data);
+      addTripContribution(tripId, selectedTripMemberForContribution.id, data); // This will also trigger settlement calc
       toast({ title: "Trip Contribution Added", description: `Contribution from ${selectedTripMemberForContribution.name} recorded.` });
       setIsContributionFormOpen(false);
       setSelectedTripMemberForContribution(null);
@@ -145,10 +154,10 @@ export default function TripDetailPage() {
         categoryId: formData.categoryId,
         notes: formData.notes,
         isSplit: formData.isSplit,
-        paidByTripMemberId: formData.paidByMemberId, // Form uses paidByMemberId, map to paidByTripMemberId
-        splitWithTripMemberIds: formData.splitWithMemberIds, // Form uses splitWithMemberIds
+        paidByTripMemberId: formData.paidByMemberId,
+        splitWithTripMemberIds: formData.splitWithMemberIds,
       };
-      addTripExpense(tripExpenseData);
+      addTripExpense(tripExpenseData); // This will also trigger settlement calc
       toast({ title: "Trip Expense Added", description: `Expense "${formData.description}" recorded for the trip.` });
       setIsExpenseFormOpen(false);
     } catch (error) {
@@ -158,15 +167,9 @@ export default function TripDetailPage() {
     }
   };
 
-
   const totalTripContributions = useMemo(() => {
-    return currentTripMembers.reduce((sum, member) => sum + getTripMemberTotalDirectContribution(member.id), 0);
-  }, [currentTripMembers, getTripMemberTotalDirectContribution, globalTripContributions]); 
-
-  const currentTripExpenses = useMemo(() => {
-    if (!tripId) return [];
-    return getTripExpenses(tripId);
-  }, [tripId, getTripExpenses, globalTripExpenses]); 
+    return currentTripMembers.reduce((sum, member) => sum + getTripMemberTotalDirectContribution(member.id, tripId), 0);
+  }, [currentTripMembers, getTripMemberTotalDirectContribution, tripId, globalTripContributions]); 
 
   const totalTripSpending = useMemo(() => {
     return currentTripExpenses.reduce((sum, exp) => sum + exp.amount, 0);
@@ -246,7 +249,7 @@ export default function TripDetailPage() {
           <DialogHeader>
             <DialogTitle>Add New Trip Expense</DialogTitle>
             <DialogDescription>
-              Fill in the details for a new expense for this trip. This will affect the trip pot.
+              Fill in the details for a new expense for this trip. This will affect the trip pot and settlements.
             </DialogDescription>
           </DialogHeader>
           <ExpenseForm
@@ -254,7 +257,7 @@ export default function TripDetailPage() {
             onCancel={() => setIsExpenseFormOpen(false)}
             isSubmitting={isSubmittingExpense}
             hideSharedBudgetLink={true} 
-            hideSplittingFeature={false} // Enable splitting for trips
+            hideSplittingFeature={false}
             availableMembersForSplitting={currentTripMembers}
             currentUserIdForDefaultPayer={currentAuthUserAsTripMember?.id}
           />
@@ -267,7 +270,7 @@ export default function TripDetailPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will remove the member and their contributions from this trip. This action cannot be undone.
+              This will remove the member, their contributions, and adjust expense splits from this trip. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -278,23 +281,34 @@ export default function TripDetailPage() {
       </AlertDialog>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-        <div className="md:col-span-2">
+        <div className="md:col-span-2 space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-6 w-6 text-primary" />
                 Trip Members ({currentTripMembers.length})
               </CardTitle>
-              <CardDescription>Manage trip members and their contributions to the trip pot.</CardDescription>
+              <CardDescription>Manage trip members, their contributions, and their net financial position within the trip.</CardDescription>
             </CardHeader>
             <CardContent>
               <TripMemberList
                 tripMembers={currentTripMembers}
                 onDeleteTripMember={handleDeleteTripMember}
                 onAddTripContribution={handleAddTripContributionClick}
-                totalTripContributions={totalTripContributions}
-                remainingTripPot={remainingTripPot}
               />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shuffle className="h-6 w-6 text-primary" />
+                Trip Settlement
+              </CardTitle>
+              <CardDescription>Who owes whom to balance the trip's finances. This updates as contributions and expenses are logged.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <TripSettlementList settlements={settlements} tripId={tripId} />
             </CardContent>
           </Card>
         </div>
@@ -303,10 +317,10 @@ export default function TripDetailPage() {
            <Card>
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                    <Banknote className="h-6 w-6 text-primary" />
+                    <CircleDollarSign className="h-6 w-6 text-primary" />
                     Trip Pot Summary
                 </CardTitle>
-                <CardDescription>Overview of the collective funds for this trip.</CardDescription>
+                <CardDescription>Overall financial status of the trip pot.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -328,7 +342,7 @@ export default function TripDetailPage() {
                         <p className="text-xs text-muted-foreground mt-1 text-right">{tripPotUsagePercentage.toFixed(0)}% of pot used.</p>
                     </div>
                 )}
-                 <p className="text-xs text-muted-foreground pt-1">Trip spending is tracked via expenses logged on this page.</p>
+                 <p className="text-xs text-muted-foreground pt-1">This is the collective balance of the trip's funds.</p>
             </CardContent>
            </Card>
         </div>
@@ -336,5 +350,3 @@ export default function TripDetailPage() {
     </div>
   );
 }
-
-    

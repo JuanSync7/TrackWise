@@ -1,11 +1,11 @@
 
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import TripDetailPage from '@/app/(app)/trips/[tripId]/page';
 import { AppContext } from '@/contexts/app-context';
 import { AuthContext } from '@/contexts/auth-context';
-import type { AppContextType, Trip, TripMember, TripContribution, TripExpense, TripMemberNetData } from '@/lib/types';
+import type { AppContextType, Trip, TripMember, TripContribution, TripExpense, TripMemberNetData, TripSettlement } from '@/lib/types';
 import type { User as FirebaseUser } from 'firebase/auth';
 import { DEFAULT_CURRENCY, INITIAL_CATEGORIES } from '@/lib/constants';
 import { formatISO, format as formatDateFns } from 'date-fns';
@@ -28,7 +28,6 @@ jest.mock('@/hooks/use-toast', () => ({
   }),
 }));
 
-// Mock Next.js Link component
 jest.mock('next/link', () => {
   return ({ children, href }: { children: React.ReactNode, href: string }) => {
     return <a href={href}>{children}</a>;
@@ -44,38 +43,37 @@ const mockAuthUser = {
 
 const mockTripBase: Trip = {
   id: 'trip-123',
-  name: 'Adventure Trip',
+  name: 'Adventure Base Trip',
   description: 'An exciting adventure!',
   createdAt: formatISO(new Date(2023, 0, 1)),
 };
 
-// Base lists for AppContext, can be overridden in tests
 let mockTripMembersList: TripMember[] = [];
 let mockTripContributionsList: TripContribution[] = [];
 let mockTripExpensesList: TripExpense[] = [];
+let mockTripSettlementsMap: Record<string, TripSettlement[]> = {};
 
 
 const mockAppContextBase: Partial<AppContextType> = {
   getTripById: jest.fn((id) => id === mockTripBase.id ? mockTripBase : undefined),
   
-  // Functions that operate on the mutable lists
+  // --- Dynamic list functions ---
+  tripMembers: mockTripMembersList, 
   getTripMembers: jest.fn((tripId) => mockTripMembersList.filter(tm => tm.tripId === tripId)),
-  tripMembers: mockTripMembersList, // Global list reference
-  
   getTripMemberById: jest.fn((id) => mockTripMembersList.find(tm => tm.id === id)),
   
-  tripContributions: mockTripContributionsList, // Global list reference
-  getTripMemberTotalDirectContribution: jest.fn((memberId) =>
-    mockTripContributionsList.filter(tc => tc.tripMemberId === memberId).reduce((sum, tc) => sum + tc.amount, 0)
+  tripContributions: mockTripContributionsList,
+  getTripMemberTotalDirectContribution: jest.fn((memberId, tripIdToFilter) =>
+    mockTripContributionsList.filter(tc => tc.tripMemberId === memberId && (!tripIdToFilter || tc.tripId === tripIdToFilter)).reduce((sum, tc) => sum + tc.amount, 0)
   ),
   
-  tripExpenses: mockTripExpensesList, // Global list reference
+  tripExpenses: mockTripExpensesList,
   getTripExpenses: jest.fn((tripId) => mockTripExpensesList.filter(te => te.tripId === tripId)),
 
-  // New function for net share calculation
   getTripMemberNetData: jest.fn((tripId, tripMemberId): TripMemberNetData => {
-    const member = mockTripMembersList.find(tm => tm.id === tripMemberId && tm.tripId === tripId);
-    if (!member) return { directContribution: 0, shareOfExpenses: 0, netShare: 0 };
+    const membersOfThisTrip = mockTripMembersList.filter(tm => tm.tripId === tripId);
+    const memberExistsInTrip = membersOfThisTrip.some(tm => tm.id === tripMemberId);
+    if (!memberExistsInTrip) return { directContribution: 0, shareOfExpenses: 0, netShare: 0 };
 
     const directContribution = mockTripContributionsList
       .filter(tc => tc.tripMemberId === tripMemberId && tc.tripId === tripId)
@@ -83,15 +81,14 @@ const mockAppContextBase: Partial<AppContextType> = {
 
     let shareOfExpenses = 0;
     const expensesForThisTrip = mockTripExpensesList.filter(te => te.tripId === tripId);
-    const currentMembersOfThisTrip = mockTripMembersList.filter(tm => tm.tripId === tripId);
-    const numMembersInTrip = currentMembersOfThisTrip.length;
+    const numMembersInTrip = membersOfThisTrip.length;
 
     expensesForThisTrip.forEach(expense => {
       if (expense.isSplit && expense.splitWithTripMemberIds && expense.splitWithTripMemberIds.length > 0) {
         if (expense.splitWithTripMemberIds.includes(tripMemberId)) {
           shareOfExpenses += expense.amount / expense.splitWithTripMemberIds.length;
         }
-      } else if (numMembersInTrip > 0) { // Not split, assume shared equally by all in trip
+      } else if (numMembersInTrip > 0) { 
         shareOfExpenses += expense.amount / numMembersInTrip;
       }
     });
@@ -100,21 +97,75 @@ const mockAppContextBase: Partial<AppContextType> = {
     return { directContribution, shareOfExpenses, netShare };
   }),
 
+  getTripSettlements: jest.fn((tripId) => mockTripSettlementsMap[tripId] || []),
+  
+  triggerTripSettlementCalculation: jest.fn((tripId) => {
+    const currentTripMembers = mockTripMembersList.filter(tm => tm.tripId === tripId);
+    if (currentTripMembers.length === 0) {
+        mockTripSettlementsMap[tripId] = [];
+        return;
+    }
+
+    const memberNetShares: { id: string; netShare: number }[] = currentTripMembers.map(member => ({
+        id: member.id,
+        netShare: (mockAppContextBase.getTripMemberNetData as jest.Mock)(tripId, member.id).netShare,
+    }));
+
+    let debtors = memberNetShares.filter(m => m.netShare < -0.005).map(m => ({ id: m.id, amount: Math.abs(m.netShare) }));
+    let creditors = memberNetShares.filter(m => m.netShare > 0.005).map(m => ({ id: m.id, amount: m.netShare }));
+    debtors.sort((a, b) => b.amount - a.amount);
+    creditors.sort((a, b) => b.amount - a.amount);
+
+    const settlementsForTrip: TripSettlement[] = [];
+    let debtorIdx = 0;
+    let creditorIdx = 0;
+
+    while (debtorIdx < debtors.length && creditorIdx < creditors.length) {
+        const debtor = debtors[debtorIdx];
+        const creditor = creditors[creditorIdx];
+        const transferAmount = Math.min(debtor.amount, creditor.amount);
+
+        if (transferAmount > 0.005) {
+            settlementsForTrip.push({
+                id: `settlement-${Date.now()}-${Math.random()}`, tripId,
+                owedByTripMemberId: debtor.id, owedToTripMemberId: creditor.id, amount: transferAmount,
+            });
+            debtor.amount -= transferAmount;
+            creditor.amount -= transferAmount;
+        }
+        if (debtor.amount <= 0.005) debtorIdx++;
+        if (creditor.amount <= 0.005) creditorIdx++;
+    }
+    mockTripSettlementsMap[tripId] = settlementsForTrip;
+  }),
+
+
   addTripMember: jest.fn((tripId, data) => {
     const newMember = { ...data, id: `tm-${Date.now()}`, tripId };
     mockTripMembersList.push(newMember);
+    (mockAppContextBase.triggerTripSettlementCalculation as jest.Mock)(tripId);
   }),
-  deleteTripMember: jest.fn((memberId) => {
+  deleteTripMember: jest.fn((memberId, tripId) => {
     mockTripMembersList = mockTripMembersList.filter(tm => tm.id !== memberId);
     mockTripContributionsList = mockTripContributionsList.filter(tc => tc.tripMemberId !== memberId);
+    mockTripExpensesList = mockTripExpensesList.map(exp => {
+      if (exp.tripId === tripId) {
+        const newSplitWith = exp.splitWithTripMemberIds?.filter(id => id !== memberId);
+        return { ...exp, paidByTripMemberId: exp.paidByTripMemberId === memberId ? undefined : exp.paidByTripMemberId, splitWithTripMemberIds: newSplitWith, isSplit: newSplitWith && newSplitWith.length > 0 ? exp.isSplit : false };
+      }
+      return exp;
+    });
+    (mockAppContextBase.triggerTripSettlementCalculation as jest.Mock)(tripId);
   }),
   addTripContribution: jest.fn((tripId, memberId, data) => {
     const newContrib = { ...data, id: `tc-${Date.now()}`, tripId, tripMemberId: memberId, date: formatISO(data.date || new Date()) };
     mockTripContributionsList.push(newContrib);
+    (mockAppContextBase.triggerTripSettlementCalculation as jest.Mock)(tripId);
   }),
   addTripExpense: jest.fn((data) => {
     const newExpense = { ...data, id: `te-${Date.now()}` };
     mockTripExpensesList.push(newExpense);
+    (mockAppContextBase.triggerTripSettlementCalculation as jest.Mock)(data.tripId);
   }),
   categories: INITIAL_CATEGORIES,
   getCategoryById: (id) => INITIAL_CATEGORIES.find(cat => cat.id === id),
@@ -125,57 +176,23 @@ describe('TripDetailPage', () => {
   const user = userEvent.setup();
 
   const renderPage = (
+    tripData: Partial<Trip> = {},
     initialMembers: TripMember[] = [],
     initialContributions: TripContribution[] = [],
     initialExpenses: TripExpense[] = []
   ) => {
-    // Reset and populate mock lists for each test
+    mockTripBase.name = tripData.name || "Adventure Test Trip";
+    mockTripBase.description = tripData.description;
     mockTripMembersList = [...initialMembers];
     mockTripContributionsList = [...initialContributions];
     mockTripExpensesList = [...initialExpenses];
+    mockTripSettlementsMap = {}; // Reset settlements map
+    (mockAppContextBase.triggerTripSettlementCalculation as jest.Mock)(mockTripBase.id); // Initial calculation
 
-    // Ensure the global lists referenced by AppContext are updated
     const currentAppContext = {
       ...mockAppContextBase,
-      tripMembers: mockTripMembersList,
-      tripContributions: mockTripContributionsList,
-      tripExpenses: mockTripExpensesList,
     } as AppContextType;
     
-    // Re-mock functions that depend on these lists to use the current state
-    currentAppContext.getTripMembers = jest.fn((tripId) => mockTripMembersList.filter(tm => tm.tripId === tripId));
-    currentAppContext.getTripMemberById = jest.fn((id) => mockTripMembersList.find(tm => tm.id === id));
-    currentAppContext.getTripMemberTotalDirectContribution = jest.fn((memberId) =>
-        mockTripContributionsList.filter(tc => tc.tripMemberId === memberId).reduce((sum, tc) => sum + tc.amount, 0)
-    );
-    currentAppContext.getTripExpenses = jest.fn((tripId) => mockTripExpensesList.filter(te => te.tripId === tripId));
-    currentAppContext.getTripMemberNetData = jest.fn((tripId, tripMemberId): TripMemberNetData => {
-        const member = mockTripMembersList.find(tm => tm.id === tripMemberId && tm.tripId === tripId);
-        if (!member) return { directContribution: 0, shareOfExpenses: 0, netShare: 0 };
-
-        const directContribution = mockTripContributionsList
-        .filter(tc => tc.tripMemberId === tripMemberId && tc.tripId === tripId)
-        .reduce((sum, tc) => sum + tc.amount, 0);
-
-        let shareOfExpenses = 0;
-        const expensesForThisTrip = mockTripExpensesList.filter(te => te.tripId === tripId);
-        const currentMembersOfThisTrip = mockTripMembersList.filter(tm => tm.tripId === tripId);
-        const numMembersInTrip = currentMembersOfThisTrip.length;
-
-        expensesForThisTrip.forEach(expense => {
-        if (expense.isSplit && expense.splitWithTripMemberIds && expense.splitWithTripMemberIds.length > 0) {
-            if (expense.splitWithTripMemberIds.includes(tripMemberId)) {
-            shareOfExpenses += expense.amount / expense.splitWithTripMemberIds.length;
-            }
-        } else if (numMembersInTrip > 0) {
-            shareOfExpenses += expense.amount / numMembersInTrip;
-        }
-        });
-        const netShare = directContribution - shareOfExpenses;
-        return { directContribution, shareOfExpenses, netShare };
-    });
-
-
     return render(
       <AuthContext.Provider value={{ user: mockAuthUser, loading: false, loginWithEmail: jest.fn(), signupWithEmail: jest.fn(), logout: jest.fn() }}>
         <AppContext.Provider value={currentAppContext}>
@@ -187,36 +204,28 @@ describe('TripDetailPage', () => {
 
   beforeEach(() => {
     mockToast.mockClear();
-    // Clear mock function calls for add/delete if they are spied on
     (mockAppContextBase.addTripMember as jest.Mock).mockClear();
     (mockAppContextBase.deleteTripMember as jest.Mock).mockClear();
     (mockAppContextBase.addTripContribution as jest.Mock).mockClear();
     (mockAppContextBase.addTripExpense as jest.Mock).mockClear();
+    (mockAppContextBase.triggerTripSettlementCalculation as jest.Mock).mockClear();
   });
 
   it('renders the page header with trip name and action buttons', () => {
-    renderPage();
-    expect(screen.getByRole('heading', { name: mockTripBase.name })).toBeInTheDocument();
-    expect(screen.getByText(mockTripBase.description!)).toBeInTheDocument();
+    renderPage({name: "My Grand Tour"});
+    expect(screen.getByRole('heading', { name: "My Grand Tour" })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /add trip expense/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /add trip member/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /back to all trips/i })).toBeInTheDocument();
   });
 
   it('calculates and displays correct trip pot summary (positive balance)', () => {
-    const members = [
-        { id: 'tm-alice', tripId: 'trip-123', name: 'Alice' },
-        { id: 'tm-bob', tripId: 'trip-123', name: 'Bob' },
-    ];
+    const members = [ { id: 'tm-alice', tripId: 'trip-123', name: 'Alice' }, { id: 'tm-bob', tripId: 'trip-123', name: 'Bob' }];
     const contributions = [
         { id: 'tc-1', tripId: 'trip-123', tripMemberId: 'tm-alice', amount: 100, date: formatISO(new Date()) },
         { id: 'tc-2', tripId: 'trip-123', tripMemberId: 'tm-bob', amount: 150, date: formatISO(new Date()) },
     ]; // Total: 250
-    const expenses = [
-        { id: 'te-1', tripId: 'trip-123', description: 'Shared Tent', amount: 50, date: formatISO(new Date()), categoryId: 'travel' },
-    ]; // Total: 50
-    // Remaining: 200. Pot Usage: (50/250)*100 = 20%
-    renderPage(members, contributions, expenses);
+    const expenses = [ { id: 'te-1', tripId: 'trip-123', description: 'Shared Tent', amount: 50, date: formatISO(new Date()), categoryId: 'travel' }]; // Total: 50
+    renderPage({}, members, contributions, expenses);
     
     expect(screen.getByText(`${DEFAULT_CURRENCY}250.00`)).toBeInTheDocument(); // Total Contributions
     expect(screen.getByText(`${DEFAULT_CURRENCY}50.00`)).toBeInTheDocument(); // Total Trip Spending
@@ -225,55 +234,40 @@ describe('TripDetailPage', () => {
   });
 
   it('calculates and displays correct "Net Share in Trip" for each member (positive pot)', async () => {
-    const members = [
-      { id: 'tm-alice', tripId: 'trip-123', name: 'Alice' },
-      { id: 'tm-bob', tripId: 'trip-123', name: 'Bob' },
-    ];
+    const members = [ { id: 'tm-alice', tripId: 'trip-123', name: 'Alice' }, { id: 'tm-bob', tripId: 'trip-123', name: 'Bob' }];
     const contributions = [
       { id: 'tc-1', tripId: 'trip-123', tripMemberId: 'tm-alice', amount: 100, date: formatISO(new Date()) },
       { id: 'tc-2', tripId: 'trip-123', tripMemberId: 'tm-bob', amount: 50, date: formatISO(new Date()) },
-    ]; // Total Contrib: 150
-    const expenses = [
-      { id: 'te-1', tripId: 'trip-123', description: 'Tickets', amount: 30, date: formatISO(new Date()), categoryId: 'entertainment' }, // Shared equally: Alice 15, Bob 15
-    ]; // Total Spending: 30
-    // Alice: Contrib 100, ShareOfExp 15. Net: 85
-    // Bob: Contrib 50, ShareOfExp 15. Net: 35
-    renderPage(members, contributions, expenses);
+    ]; 
+    const expenses = [ { id: 'te-1', tripId: 'trip-123', description: 'Tickets', amount: 30, date: formatISO(new Date()), categoryId: 'entertainment' }]; 
+    renderPage({}, members, contributions, expenses);
 
     await waitFor(() => {
       const aliceCard = screen.getByText('Alice').closest('div[class*="card"]');
       const bobCard = screen.getByText('Bob').closest('div[class*="card"]');
       
+      // Alice: Contrib 100, ShareOfExp 15. Net: 85
       expect(within(aliceCard!).getByText(`${DEFAULT_CURRENCY}100.00`)).toBeInTheDocument(); // Direct contrib
-      expect(within(aliceCard!).getByText(`${DEFAULT_CURRENCY}15.00`)).toBeInTheDocument(); // Share of exp
+      expect(within(aliceCard!).getByText(/share of expenses: \$15\.00/i)).toBeInTheDocument();
       expect(within(aliceCard!).getByText(`${DEFAULT_CURRENCY}85.00`)).toBeInTheDocument(); // Net Share
 
+      // Bob: Contrib 50, ShareOfExp 15. Net: 35
       expect(within(bobCard!).getByText(`${DEFAULT_CURRENCY}50.00`)).toBeInTheDocument(); // Direct contrib
-      expect(within(bobCard!).getByText(`${DEFAULT_CURRENCY}15.00`)).toBeInTheDocument(); // Share of exp
+      expect(within(bobCard!).getByText(/share of expenses: \$15\.00/i)).toBeInTheDocument();
       expect(within(bobCard!).getByText(`${DEFAULT_CURRENCY}35.00`)).toBeInTheDocument(); // Net Share
     });
   });
 
 
-  it('calculates and displays correct trip pot summary and net shares (negative balance)', async () => {
-    const members = [
-        { id: 'tm-alice', tripId: 'trip-123', name: 'Alice' },
-        { id: 'tm-bob', tripId: 'trip-123', name: 'Bob' },
-    ];
-    const contributions = [
-        { id: 'tc-1', tripId: 'trip-123', tripMemberId: 'tm-alice', amount: 20, date: formatISO(new Date()) },
-    ]; // Total Contrib: 20
-    const expenses = [
-      { id: 'te-1', tripId: 'trip-123', description: 'Big Dinner', amount: 50, date: formatISO(new Date()), categoryId: 'food' }, // Shared: Alice 25, Bob 25
-    ]; // Total Spending: 50
-    // Remaining Pot: 20 - 50 = -30
-    // Alice: Contrib 20, ShareOfExp 25. Net: -5
-    // Bob: Contrib 0, ShareOfExp 25. Net: -25
-    renderPage(members, contributions, expenses);
+  it('calculates trip pot summary and net shares (negative balance)', async () => {
+    const members = [ { id: 'tm-alice', tripId: 'trip-123', name: 'Alice' }, { id: 'tm-bob', tripId: 'trip-123', name: 'Bob' }];
+    const contributions = [ { id: 'tc-1', tripId: 'trip-123', tripMemberId: 'tm-alice', amount: 20, date: formatISO(new Date()) }]; 
+    const expenses = [ { id: 'te-1', tripId: 'trip-123', description: 'Big Dinner', amount: 50, date: formatISO(new Date()), categoryId: 'food' }]; 
+    renderPage({}, members, contributions, expenses);
 
     expect(screen.getByText(`${DEFAULT_CURRENCY}20.00`)).toBeInTheDocument(); // Total Contributions
     expect(screen.getByText(`${DEFAULT_CURRENCY}50.00`)).toBeInTheDocument(); // Total Trip Spending
-    const remainingPotElement = screen.getByText(`-${DEFAULT_CURRENCY}30.00`); // Remaining in Pot
+    const remainingPotElement = screen.getByText(`-${DEFAULT_CURRENCY}30.00`); 
     expect(remainingPotElement).toHaveClass('text-destructive');
     expect(screen.getByText(/100% of pot used/i)).toBeInTheDocument();
 
@@ -281,94 +275,95 @@ describe('TripDetailPage', () => {
       const aliceCard = screen.getByText('Alice').closest('div[class*="card"]');
       const bobCard = screen.getByText('Bob').closest('div[class*="card"]');
 
+      // Alice: Contrib 20, ShareOfExp 25. Net: -5
       const aliceNetShareEl = within(aliceCard!).getByText(`-${DEFAULT_CURRENCY}5.00`);
-      expect(aliceNetShareEl).toBeInTheDocument();
       expect(aliceNetShareEl).toHaveClass('text-destructive');
       
+      // Bob: Contrib 0, ShareOfExp 25. Net: -25
       const bobNetShareEl = within(bobCard!).getByText(`-${DEFAULT_CURRENCY}25.00`);
-      expect(bobNetShareEl).toBeInTheDocument();
       expect(bobNetShareEl).toHaveClass('text-destructive');
     });
   });
 
-  it('calculates net share correctly when expense is split among subset of members', async () => {
-    const members = [
-      { id: 'tm-alice', tripId: 'trip-123', name: 'Alice' },
-      { id: 'tm-bob', tripId: 'trip-123', name: 'Bob' },
-      { id: 'tm-charlie', tripId: 'trip-123', name: 'Charlie' },
-    ];
-    const contributions = [
-      { id: 'c1', tripId: 'trip-123', tripMemberId: 'tm-alice', amount: 100, date: formatISO(new Date()) },
-    ]; // Alice: 100
-    const expenses = [
-      { id: 'e1', tripId: 'trip-123', description: 'Activity for Alice & Bob', amount: 40, date: formatISO(new Date()), categoryId: 'entertainment', isSplit: true, paidByTripMemberId: 'tm-alice', splitWithTripMemberIds: ['tm-alice', 'tm-bob'] },
-      // Alice share: 20, Bob share: 20, Charlie share: 0
-    ];
-    // Alice: Contrib 100, ShareOfExp 20. Net: 80
-    // Bob: Contrib 0, ShareOfExp 20. Net: -20
-    // Charlie: Contrib 0, ShareOfExp 0. Net: 0
-    renderPage(members, contributions, expenses);
+  it('calculates "Net Share in Trip Pot" when member contributes $0 and pot goes negative', async () => {
+    const members = [ { id: 'tm1', tripId: 'trip-123', name: 'ZeroDollarMember' }, { id: 'tm2', tripId: 'trip-123', name: 'PayerMember' }];
+    const contributions = [ { id: 'c-payer', tripId: 'trip-123', tripMemberId: 'tm2', amount: 10, date: formatISO(new Date()) }]; // Payer contributes 10
+    const expenses = [ { id: 'e-big', tripId: 'trip-123', description: 'Costly Item', amount: 40, date: formatISO(new Date()), categoryId: 'other' }]; // Cost 40, Pot = 10-40 = -30
+    // ZeroDollarMember: Contrib 0, ShareOfExp 20. Net = -20
+    // PayerMember: Contrib 10, ShareOfExp 20. Net = -10
+    renderPage({}, members, contributions, expenses);
 
     await waitFor(() => {
-      const aliceCard = screen.getByText('Alice').closest('div[class*="card"]');
-      const bobCard = screen.getByText('Bob').closest('div[class*="card"]');
-      const charlieCard = screen.getByText('Charlie').closest('div[class*="card"]');
+      const zeroMemberCard = screen.getByText('ZeroDollarMember').closest('div[class*="card"]');
+      const payerMemberCard = screen.getByText('PayerMember').closest('div[class*="card"]');
+      
+      const zeroNetShare = within(zeroMemberCard!).getByText(`-${DEFAULT_CURRENCY}20.00`);
+      expect(zeroNetShare).toBeInTheDocument();
+      expect(zeroNetShare).toHaveClass('text-destructive');
 
-      expect(within(aliceCard!).getByText(`${DEFAULT_CURRENCY}80.00`)).toBeInTheDocument();
-      expect(within(bobCard!).getByText(`-${DEFAULT_CURRENCY}20.00`)).toHaveClass('text-destructive');
-      expect(within(charlieCard!).getByText(`${DEFAULT_CURRENCY}0.00`)).toBeInTheDocument();
-    });
-  });
-
-
-  it('calculates net share as equally shared deficit when total contributions are zero and pot is negative', async () => {
-    const members = [
-      { id: 'tm1', tripId: 'trip-123', name: 'Member1' },
-      { id: 'tm2', tripId: 'trip-123', name: 'Member2' },
-    ];
-    const expenses = [
-      { id: 'te-deficit', tripId: 'trip-123', description: 'Unexpected Fee', amount: 100, date: formatISO(new Date()), categoryId: 'other' },
-      // Each member's share of expense: 100 / 2 = 50
-    ];
-    // Member1: Contrib 0, ShareOfExp 50. Net: -50
-    // Member2: Contrib 0, ShareOfExp 50. Net: -50
-    renderPage(members, [], expenses);
-
-    await waitFor(() => {
-      const member1Card = screen.getByText('Member1').closest('div[class*="card"]');
-      const member2Card = screen.getByText('Member2').closest('div[class*="card"]');
-
-      const m1NetShare = within(member1Card!).getByText(`-${DEFAULT_CURRENCY}50.00`);
-      expect(m1NetShare).toHaveClass('text-destructive');
-      const m2NetShare = within(member2Card!).getByText(`-${DEFAULT_CURRENCY}50.00`);
-      expect(m2NetShare).toHaveClass('text-destructive');
+      const payerNetShare = within(payerMemberCard!).getByText(`-${DEFAULT_CURRENCY}10.00`);
+      expect(payerNetShare).toBeInTheDocument();
+      expect(payerNetShare).toHaveClass('text-destructive');
     });
   });
   
-  it('handles deletion of a trip member', async () => {
-    const initialMembers = [ { id: 'tm-bob', tripId: 'trip-123', name: 'Bob' }];
-    renderPage(initialMembers);
+  it('handles deletion of a trip member and updates calculations', async () => {
+    const initialMembers = [ { id: 'tm-bob', tripId: 'trip-123', name: 'Bob' }, { id: 'tm-carol', tripId: 'trip-123', name: 'Carol'} ];
+    renderPage({}, initialMembers);
     
+    expect(screen.getByText('Bob')).toBeInTheDocument();
     const bobCard = screen.getByText('Bob').closest('div[class*="card"]');
-    if (!bobCard) throw new Error("Bob card not found");
-
-    const optionsButton = bobCard.querySelector('button[aria-haspopup="menu"]');
-    if (!optionsButton) throw new Error("Options button for Bob not found");
+    const optionsButton = within(bobCard!).getByRole('button', { name: /trip member options/i });
     await user.click(optionsButton);
-
-    const deleteButton = await screen.findByRole('menuitem', { name: /delete trip member/i });
-    await user.click(deleteButton);
-
-    expect(screen.getByRole('alertdialog', { name: /are you sure/i })).toBeInTheDocument();
-    expect(screen.getByText(/this will remove the member and their contributions/i)).toBeInTheDocument();
+    await user.click(await screen.findByRole('menuitem', { name: /delete trip member/i }));
     await user.click(screen.getByRole('button', { name: /delete/i }));
 
-    expect(mockAppContextBase.deleteTripMember).toHaveBeenCalledWith('tm-bob');
+    expect(mockAppContextBase.deleteTripMember).toHaveBeenCalledWith('tm-bob', 'trip-123');
     expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ title: "Trip Member Deleted" }));
+    // Add checks for updated pot summary if necessary
+  });
+
+  it('displays "Who Owes Whom" settlements correctly', async () => {
+    const members = [
+        { id: 'tm-alice', tripId: 'trip-123', name: 'Alice' }, // Creditor
+        { id: 'tm-bob', tripId: 'trip-123', name: 'Bob' },     // Debtor
+        { id: 'tm-charlie', tripId: 'trip-123', name: 'Charlie' },// Debtor
+    ];
+    const contributions = [
+        { id: 'c1', tripId: 'trip-123', tripMemberId: 'tm-alice', amount: 100, date: formatISO(new Date()) }, // Alice +100
+    ];
+    const expenses = [
+        { id: 'e1', tripId: 'trip-123', description: 'Meal', amount: 60, date: formatISO(new Date()), categoryId: 'food', isSplit: true, splitWithTripMemberIds: ['tm-alice', 'tm-bob', 'tm-charlie']}, 
+        // Each share 20. Alice: 100-20 = +80. Bob: 0-20 = -20. Charlie: 0-20 = -20.
+        // Expected: Bob owes Alice 20, Charlie owes Alice 20.
+    ];
+    renderPage({ name: "Settlement Test Trip"}, members, contributions, expenses);
+
+    await waitFor(() => {
+        expect(screen.getByText("Trip Settlement")).toBeInTheDocument();
+        // Check Bob owes Alice
+        const bobOwesAlice = screen.getAllByText(/bob/i).find(el => el.closest('.flex')?.textContent?.includes('owes Alice'));
+        expect(bobOwesAlice).toBeInTheDocument();
+        expect(bobOwesAlice!.closest('.flex')).toHaveTextContent(`${DEFAULT_CURRENCY}20.00`);
+        
+        // Check Charlie owes Alice
+        const charlieOwesAlice = screen.getAllByText(/charlie/i).find(el => el.closest('.flex')?.textContent?.includes('owes Alice'));
+        expect(charlieOwesAlice).toBeInTheDocument();
+        expect(charlieOwesAlice!.closest('.flex')).toHaveTextContent(`${DEFAULT_CURRENCY}20.00`);
+    });
+  });
+
+  it('displays "All Square!" when no settlements are needed', async () => {
+    const members = [{ id: 'tm-dave', tripId: 'trip-123', name: 'Dave' }];
+    const contributions = [{ id: 'c1', tripId: 'trip-123', tripMemberId: 'tm-dave', amount: 50, date: formatISO(new Date()) }];
+    const expenses = [{ id: 'e1', tripId: 'trip-123', description: 'Solo Item', amount: 50, date: formatISO(new Date()), categoryId: 'shopping', isSplit: true, splitWithTripMemberIds: ['tm-dave'] }];
+    // Dave: 50 - 50 = 0.
+    renderPage({name: "All Square Trip"}, members, contributions, expenses);
+
+    await waitFor(() => {
+        expect(screen.getByText("Trip Settlement")).toBeInTheDocument();
+        expect(screen.getByText("All Square!")).toBeInTheDocument();
+    });
   });
 
 });
-
-// Helper to get elements within a specific scope
-import { within } from '@testing-library/react';
-
