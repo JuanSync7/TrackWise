@@ -110,9 +110,9 @@ export type AppContextType = AppState & {
   deleteSharedBudget: (budgetId: string) => void;
   settleDebt: (debtId: string) => void;
   unsettleDebt: (debtId: string) => void;
-  getDebtsOwedByMember: (memberId: string) => Debt[];
-  getDebtsOwedToMember: (memberId: string) => Debt[];
-  getAllUnsettledDebts: () => Debt[];
+  getDebtsOwedByMember: (memberId: string, includeSettled?: boolean) => Debt[];
+  getDebtsOwedToMember: (memberId: string, includeSettled?: boolean) => Debt[];
+  getAllDebts: (includeSettled?: boolean) => Debt[];
   getMemberById: (memberId: string) => Member | undefined;
 };
 

@@ -6,6 +6,7 @@ import { DebtItem } from './debt-item';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { DivideSquare } from 'lucide-react';
+import { parseISO } from 'date-fns';
 
 interface DebtListProps {
   debts: Debt[];
@@ -27,16 +28,23 @@ export function DebtList({ debts, title, emptyStateMessage, emptyStateImageHint 
   }
 
   const sortedDebts = [...debts].sort((a, b) => {
-    if (a.isSettled === b.isSettled) {
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    if (a.isSettled !== b.isSettled) {
+      return a.isSettled ? 1 : -1; // Unsettled debts first
     }
-    return a.isSettled ? 1 : -1; // Unsettled debts first
+    // If both are settled or both are unsettled
+    if (a.isSettled) { // Both settled, sort by settledAt (newest first), then createdAt
+      const settledA = a.settledAt ? parseISO(a.settledAt).getTime() : 0;
+      const settledB = b.settledAt ? parseISO(b.settledAt).getTime() : 0;
+      if (settledB !== settledA) return settledB - settledA;
+    }
+    // Sort by createdAt (newest first) for unsettled, or as secondary for settled
+    return parseISO(b.createdAt).getTime() - parseISO(a.createdAt).getTime();
   });
 
   return (
     <div className="mt-6">
       <h2 className="text-xl font-semibold mb-4">{title} ({sortedDebts.length})</h2>
-      <ScrollArea className="h-[60vh] pr-3">
+      <ScrollArea className="h-[calc(100vh-300px)] md:h-[calc(100vh-350px)] pr-3"> {/* Adjusted height */}
         <div className="space-y-4">
           <AnimatePresence initial={false}>
             {sortedDebts.map((debt) => (

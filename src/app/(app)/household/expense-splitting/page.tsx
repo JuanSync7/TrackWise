@@ -13,14 +13,11 @@ import { DEFAULT_CURRENCY } from '@/lib/constants';
 import { ArrowDownCircle, ArrowUpCircle, Users, DivideSquare, Scale } from 'lucide-react'; // Added Scale for Net Balance
 
 export default function ExpenseSplittingPage() {
-  const { getAllUnsettledDebts, getMemberById, members, getDebtsOwedByMember, getDebtsOwedToMember } = useAppContext();
+  const { getAllDebts, getMemberById, members, getDebtsOwedByMember, getDebtsOwedToMember } = useAppContext();
   const { user } = useAuth(); 
 
   const currentUserMember = useMemo(() => {
     if (!user || !members || members.length === 0) return null;
-    // Prioritize matching by a stored member ID if available, otherwise by name/email part
-    // This part assumes you might store a direct link between Firebase user and household member
-    // For now, we'll stick to name/email matching as per previous logic.
     return members.find(m => 
       (user.displayName && m.name.toLowerCase().includes(user.displayName.toLowerCase())) ||
       (user.email && m.name.toLowerCase().includes(user.email.split('@')[0].toLowerCase()))
@@ -28,58 +25,71 @@ export default function ExpenseSplittingPage() {
   }, [user, members]);
 
 
-  const allUnsettledDebts = getAllUnsettledDebts();
+  const allDebtsForDisplay = getAllDebts(true); // Get all debts (settled and unsettled) for list display
   
-  const debtsOwedByCurrentUser = useMemo(() => {
+  // For summary cards, we only care about unsettled debts
+  const unsettledDebtsOwedByCurrentUser = useMemo(() => {
     if (!currentUserMember) return [];
-    return getDebtsOwedByMember(currentUserMember.id);
+    return getDebtsOwedByMember(currentUserMember.id, false); // false for includeSettled
   }, [currentUserMember, getDebtsOwedByMember]);
 
-  const debtsOwedToCurrentUser = useMemo(() => {
+  const unsettledDebtsOwedToCurrentUser = useMemo(() => {
     if (!currentUserMember) return [];
-    return getDebtsOwedToMember(currentUserMember.id);
+    return getDebtsOwedToMember(currentUserMember.id, false); // false for includeSettled
   }, [currentUserMember, getDebtsOwedToMember]);
 
-  const totalOwedByCurrentUser = debtsOwedByCurrentUser.reduce((sum, debt) => sum + debt.amount, 0);
-  const totalOwedToCurrentUser = debtsOwedToCurrentUser.reduce((sum, debt) => sum + debt.amount, 0);
+  const totalOwedByCurrentUser = unsettledDebtsOwedByCurrentUser.reduce((sum, debt) => sum + debt.amount, 0);
+  const totalOwedToCurrentUser = unsettledDebtsOwedToCurrentUser.reduce((sum, debt) => sum + debt.amount, 0);
   const netBalance = totalOwedToCurrentUser - totalOwedByCurrentUser;
+
+  // For tab content, get all debts (settled and unsettled)
+  const debtsOwedByCurrentUserForList = useMemo(() => {
+    if (!currentUserMember) return [];
+    return getDebtsOwedByMember(currentUserMember.id, true); // true for includeSettled
+  }, [currentUserMember, getDebtsOwedByMember]);
+
+  const debtsOwedToCurrentUserForList = useMemo(() => {
+    if (!currentUserMember) return [];
+    return getDebtsOwedToMember(currentUserMember.id, true); // true for includeSettled
+  }, [currentUserMember, getDebtsOwedToMember]);
+
 
   return (
     <div className="container mx-auto">
       <PageHeader
         title="Expense Splitting & Debts"
-        description="Manage and track shared expenses and who owes whom within the household."
+        description="Manage and track shared expenses and who owes whom within the household. Settled debts are shown for record-keeping."
       />
 
       {currentUserMember && (
         <div className="grid gap-4 md:grid-cols-3 mb-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">You Owe</CardTitle>
+              <CardTitle className="text-sm font-medium">You Owe (Unsettled)</CardTitle>
               <ArrowDownCircle className="h-5 w-5 text-destructive" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-destructive">{DEFAULT_CURRENCY}{totalOwedByCurrentUser.toFixed(2)}</div>
               <p className="text-xs text-muted-foreground">
-                Total amount you owe to others.
+                Total amount you currently owe to others.
               </p>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">You Are Owed</CardTitle>
+              <CardTitle className="text-sm font-medium">You Are Owed (Unsettled)</CardTitle>
               <ArrowUpCircle className="h-5 w-5 text-accent" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-accent">{DEFAULT_CURRENCY}{totalOwedToCurrentUser.toFixed(2)}</div>
               <p className="text-xs text-muted-foreground">
-                Total amount others owe you.
+                Total amount others currently owe you.
               </p>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Net Balance</CardTitle>
+              <CardTitle className="text-sm font-medium">Net Balance (Unsettled)</CardTitle>
               <Scale className="h-5 w-5 text-primary" />
             </CardHeader>
             <CardContent>
@@ -87,7 +97,7 @@ export default function ExpenseSplittingPage() {
                 {netBalance >= 0 ? '+' : '-'}{DEFAULT_CURRENCY}{Math.abs(netBalance).toFixed(2)}
               </div>
               <p className="text-xs text-muted-foreground">
-                {netBalance >= 0 ? "You are net owed this amount." : "You net owe this amount."}
+                {netBalance >= 0 ? "You are net owed this amount." : "You net owe this amount."} (Based on unsettled debts)
               </p>
             </CardContent>
           </Card>
@@ -106,17 +116,17 @@ export default function ExpenseSplittingPage() {
       )}
 
 
-      <Tabs defaultValue="all_unsettled" className="w-full">
+      <Tabs defaultValue="all_debts" className="w-full">
         <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 mb-4">
-          <TabsTrigger value="all_unsettled" className="flex items-center gap-1"><DivideSquare className="h-4 w-4"/>All Unsettled Debts</TabsTrigger>
+          <TabsTrigger value="all_debts" className="flex items-center gap-1"><DivideSquare className="h-4 w-4"/>All Debts</TabsTrigger>
           {currentUserMember && <TabsTrigger value="owed_by_me" className="flex items-center gap-1"><ArrowDownCircle className="h-4 w-4"/>I Owe</TabsTrigger>}
           {currentUserMember && <TabsTrigger value="owed_to_me" className="flex items-center gap-1"><ArrowUpCircle className="h-4 w-4"/>Owed To Me</TabsTrigger>}
         </TabsList>
-        <TabsContent value="all_unsettled">
+        <TabsContent value="all_debts">
           <DebtList
-            debts={allUnsettledDebts}
-            title="All Unsettled Household Debts"
-            emptyStateMessage="No unsettled debts in the household. Great job staying on top of things!"
+            debts={allDebtsForDisplay}
+            title="All Household Debts"
+            emptyStateMessage="No debts in the household. Great job staying on top of things!"
             emptyStateImageHint="agreement handshake"
           />
         </TabsContent>
@@ -124,7 +134,7 @@ export default function ExpenseSplittingPage() {
             <>
                 <TabsContent value="owed_by_me">
                 <DebtList
-                    debts={debtsOwedByCurrentUser}
+                    debts={debtsOwedByCurrentUserForList}
                     title={`Debts You Owe (${currentUserMember.name})`}
                     emptyStateMessage="You currently don't owe anyone anything. Nice!"
                     emptyStateImageHint="empty wallet"
@@ -132,7 +142,7 @@ export default function ExpenseSplittingPage() {
                 </TabsContent>
                 <TabsContent value="owed_to_me">
                 <DebtList
-                    debts={debtsOwedToCurrentUser}
+                    debts={debtsOwedToCurrentUserForList}
                     title={`Debts Owed To You (${currentUserMember.name})`}
                     emptyStateMessage="No one currently owes you anything."
                     emptyStateImageHint="money bag"

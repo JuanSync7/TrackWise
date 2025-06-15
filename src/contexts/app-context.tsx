@@ -191,13 +191,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const updateSharedBudget = (updatedBudget: SharedBudget) => {
-    // When updating, ensure `currentSpending` and `createdAt` are preserved from the existing budget
-    // The form only submits name, amount, period, description.
     setSharedBudgets(prev =>
       prev.map(budget => 
         budget.id === updatedBudget.id ? 
         { 
-          ...budget, // Keeps existing currentSpending and createdAt
+          ...budget,
           name: updatedBudget.name, 
           amount: updatedBudget.amount, 
           period: updatedBudget.period,
@@ -209,7 +207,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const deleteSharedBudget = (budgetId: string) => {
     setSharedBudgets(prev => prev.filter(budget => budget.id !== budgetId));
-    // Also unlink expenses from this deleted shared budget
     setExpenses(prevExpenses => 
       prevExpenses.map(exp => 
         exp.sharedBudgetId === budgetId ? { ...exp, sharedBudgetId: undefined } : exp
@@ -224,23 +221,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
      setDebts(prev => prev.map(d => d.id === debtId ? { ...d, isSettled: false, settledAt: undefined } : d));
   };
 
-  const getDebtsOwedByMember = useCallback((memberId: string) => {
-    return debts.filter(d => d.owedByMemberId === memberId && !d.isSettled);
+  const getDebtsOwedByMember = useCallback((memberId: string, includeSettled: boolean = false) => {
+    return debts.filter(d => d.owedByMemberId === memberId && (includeSettled || !d.isSettled));
   }, [debts]);
 
-  const getDebtsOwedToMember = useCallback((memberId: string) => {
-    return debts.filter(d => d.owedToMemberId === memberId && !d.isSettled);
+  const getDebtsOwedToMember = useCallback((memberId: string, includeSettled: boolean = false) => {
+    return debts.filter(d => d.owedToMemberId === memberId && (includeSettled || !d.isSettled));
   }, [debts]);
 
-  const getAllUnsettledDebts = useCallback(() => {
-    return debts.filter(d => !d.isSettled);
+  const getAllDebts = useCallback((includeSettled: boolean = false) => {
+    return includeSettled ? debts : debts.filter(d => !d.isSettled);
   }, [debts]);
 
   const getTotalHouseholdSpending = useCallback((): number => {
     let totalSpending = 0;
     const spentOnSharedBudgetsIds = new Set<string>();
 
-    // Sum expenses linked to any shared budget
     expenses.forEach(expense => {
       if (expense.sharedBudgetId && sharedBudgets.some(sb => sb.id === expense.sharedBudgetId)) {
         totalSpending += expense.amount;
@@ -248,7 +244,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
     });
     
-    // Sum expenses categorized as "Household Expenses" that were not already counted
     expenses.forEach(expense => {
       if (expense.categoryId === HOUSEHOLD_EXPENSE_CATEGORY_ID && !spentOnSharedBudgetsIds.has(expense.id)) {
         totalSpending += expense.amount;
@@ -264,8 +259,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       prevGoals.map(goal => {
         const relevantExpenses = expenses.filter(exp => {
           if (exp.categoryId !== goal.categoryId) return false;
-          // Basic period matching, can be improved
-          // For simplicity, we're not doing strict date matching for periods here
           return true; 
         });
         const currentSpending = relevantExpenses.reduce((sum, exp) => sum + exp.amount, 0);
@@ -326,7 +319,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     unsettleDebt,
     getDebtsOwedByMember,
     getDebtsOwedToMember,
-    getAllUnsettledDebts,
+    getAllDebts,
     getMemberById,
   };
 
