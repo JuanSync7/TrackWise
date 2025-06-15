@@ -9,7 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useAppContext } from '@/contexts/app-context';
 import { DEFAULT_CURRENCY } from '@/lib/constants';
 import { cn } from '@/lib/utils';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 
 interface TripMemberItemProps {
   tripMember: TripMember;
@@ -23,17 +23,22 @@ export function TripMemberItem({
   onAddContribution,
 }: TripMemberItemProps) {
   const { getTripMemberNetData, tripContributions, tripExpenses } = useAppContext();
-  const [memberNetData, setMemberNetData] = useState<TripMemberNetData>({
+  const [memberNetDataState, setMemberNetDataState] = useState<TripMemberNetData>({
     directContribution: 0,
     shareOfExpenses: 0,
     netShare: 0,
   });
 
-  useEffect(() => {
-    if (tripMember && tripMember.tripId && tripMember.id) { // Ensure id and tripId are present
-      setMemberNetData(getTripMemberNetData(tripMember.tripId, tripMember.id));
+  const calculatedNetData = useMemo(() => {
+    if (tripMember && tripMember.tripId && tripMember.id) {
+      return getTripMemberNetData(tripMember.tripId, tripMember.id);
     }
-  }, [tripMember.id, tripMember.tripId, getTripMemberNetData, tripContributions, tripExpenses]); // Changed tripMember to tripMember.id and tripMember.tripId
+    return { directContribution: 0, shareOfExpenses: 0, netShare: 0 };
+  }, [tripMember.id, tripMember.tripId, getTripMemberNetData, tripContributions, tripExpenses]); // tripMember.id and tripMember.tripId are primitive and stable
+
+  useEffect(() => {
+    setMemberNetDataState(calculatedNetData);
+  }, [calculatedNetData]);
 
   return (
     <Card className="overflow-hidden transition-shadow hover:shadow-lg">
@@ -43,10 +48,10 @@ export function TripMemberItem({
           <div>
             <CardTitle className="text-lg">{tripMember.name}</CardTitle>
             <CardDescription className="text-xs text-muted-foreground">
-              Directly Contributed: {DEFAULT_CURRENCY}{memberNetData.directContribution.toFixed(2)}
+              Directly Contributed: {DEFAULT_CURRENCY}{memberNetDataState.directContribution.toFixed(2)}
             </CardDescription>
             <CardDescription className="text-xs text-muted-foreground">
-              Share of Expenses: {DEFAULT_CURRENCY}{memberNetData.shareOfExpenses.toFixed(2)}
+              Share of Expenses: {DEFAULT_CURRENCY}{memberNetDataState.shareOfExpenses.toFixed(2)}
             </CardDescription>
           </div>
         </div>
@@ -71,11 +76,11 @@ export function TripMemberItem({
       </CardHeader>
       <CardContent className="p-4 pt-0">
         <div className="flex items-center gap-2">
-          <Scale className={cn("h-5 w-5", memberNetData.netShare >=0 ? "text-accent" : "text-destructive")} />
+          <Scale className={cn("h-5 w-5", memberNetDataState.netShare >=0 ? "text-accent" : "text-destructive")} />
           <div>
             <p className="text-sm font-medium">Net Share in Trip:</p>
-            <p className={cn("text-xl font-bold", memberNetData.netShare >=0 ? "text-accent" : "text-destructive")}>
-                {DEFAULT_CURRENCY}{memberNetData.netShare.toFixed(2)}
+            <p className={cn("text-xl font-bold", memberNetDataState.netShare >=0 ? "text-accent" : "text-destructive")}>
+                {DEFAULT_CURRENCY}{memberNetDataState.netShare.toFixed(2)}
             </p>
           </div>
         </div>

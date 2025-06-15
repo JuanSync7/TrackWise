@@ -9,7 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useAppContext } from '@/contexts/app-context';
 import { DEFAULT_CURRENCY } from '@/lib/constants';
 import { cn } from '@/lib/utils';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 
 interface MemberItemProps {
   member: Member;
@@ -22,16 +22,20 @@ export function MemberItem({
   onDelete,
   onAddContribution,
 }: MemberItemProps) {
-  const { getHouseholdMemberNetPotData, contributions, expenses, sharedBudgets } = useAppContext(); // Added dependencies for useEffect
-  const [memberNetPotData, setMemberNetPotData] = useState<HouseholdMemberNetData>({
+  const { getHouseholdMemberNetPotData, contributions, expenses, sharedBudgets } = useAppContext();
+  const [memberNetPotDataState, setMemberNetPotDataState] = useState<HouseholdMemberNetData>({
     directContributionToPot: 0,
     shareOfPotExpenses: 0,
     netPotShare: 0,
   });
 
+  const calculatedNetData = useMemo(() => {
+    return getHouseholdMemberNetPotData(member.id);
+  }, [member.id, getHouseholdMemberNetPotData, contributions, expenses, sharedBudgets]);
+
   useEffect(() => {
-    setMemberNetPotData(getHouseholdMemberNetPotData(member.id));
-  }, [member.id, getHouseholdMemberNetPotData, contributions, expenses, sharedBudgets]); // Dependencies ensure recalculation
+    setMemberNetPotDataState(calculatedNetData);
+  }, [calculatedNetData]);
 
   return (
     <Card className="overflow-hidden transition-shadow hover:shadow-lg">
@@ -41,10 +45,10 @@ export function MemberItem({
           <div>
             <CardTitle className="text-lg">{member.name}</CardTitle>
             <CardDescription className="text-xs text-muted-foreground flex items-center gap-1">
-                <TrendingUp className="h-3 w-3 text-accent"/> Directly Contributed: {DEFAULT_CURRENCY}{memberNetPotData.directContributionToPot.toFixed(2)}
+                <TrendingUp className="h-3 w-3 text-accent"/> Directly Contributed: {DEFAULT_CURRENCY}{memberNetPotDataState.directContributionToPot.toFixed(2)}
             </CardDescription>
             <CardDescription className="text-xs text-muted-foreground flex items-center gap-1">
-                 <TrendingDown className="h-3 w-3 text-destructive"/> Share of Pot Expenses: {DEFAULT_CURRENCY}{memberNetPotData.shareOfPotExpenses.toFixed(2)}
+                 <TrendingDown className="h-3 w-3 text-destructive"/> Share of Pot Expenses: {DEFAULT_CURRENCY}{memberNetPotDataState.shareOfPotExpenses.toFixed(2)}
             </CardDescription>
           </div>
         </div>
@@ -69,11 +73,11 @@ export function MemberItem({
       </CardHeader>
       <CardContent className="p-4 pt-0">
         <div className="flex items-center gap-2">
-          <Scale className={cn("h-5 w-5", memberNetPotData.netPotShare >=0 ? "text-accent" : "text-destructive")} />
+          <Scale className={cn("h-5 w-5", memberNetPotDataState.netPotShare >=0 ? "text-accent" : "text-destructive")} />
           <div>
             <p className="text-sm font-medium">Net Share in Pot:</p>
-            <p className={cn("text-xl font-bold", memberNetPotData.netPotShare >=0 ? "text-accent" : "text-destructive")}>
-                {DEFAULT_CURRENCY}{memberNetPotData.netPotShare.toFixed(2)}
+            <p className={cn("text-xl font-bold", memberNetPotDataState.netPotShare >=0 ? "text-accent" : "text-destructive")}>
+                {DEFAULT_CURRENCY}{memberNetPotDataState.netPotShare.toFixed(2)}
             </p>
           </div>
         </div>
