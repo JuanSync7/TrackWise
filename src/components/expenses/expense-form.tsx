@@ -78,11 +78,11 @@ export type ExpenseFormValues = z.infer<typeof expenseFormSchema>;
 type MemberLike = { id: string; name: string };
 
 interface ExpenseFormProps {
-  expense?: Expense; // Can be household or trip expense if shape matches
+  expense?: Expense | TripExpense; // Can be household or trip expense if shape matches
   onSave: (data: ExpenseFormValues) => void;
   onCancel?: () => void;
   isSubmitting?: boolean;
-  hideSharedBudgetLink?: boolean; 
+  hideSharedBudgetLink?: boolean;
   hideSplittingFeature?: boolean;
   availableMembersForSplitting?: MemberLike[]; // Use MemberLike
   currentUserIdForDefaultPayer?: string;
@@ -90,15 +90,15 @@ interface ExpenseFormProps {
 
 const NONE_SHARED_BUDGET_VALUE = "__NONE__";
 
-export function ExpenseForm({ 
-    expense, 
-    onSave, 
-    onCancel, 
-    isSubmitting, 
-    hideSharedBudgetLink = false, 
+export function ExpenseForm({
+    expense,
+    onSave,
+    onCancel,
+    isSubmitting,
+    hideSharedBudgetLink = false,
     hideSplittingFeature = false,
     availableMembersForSplitting = [], // Default to empty array
-    currentUserIdForDefaultPayer 
+    currentUserIdForDefaultPayer
 }: ExpenseFormProps) {
   const { categories, getCategoryById, sharedBudgets: householdSharedBudgets } = useAppContext(); // Use specific name
   const { toast } = useToast();
@@ -115,12 +115,10 @@ export function ExpenseForm({
       ? {
           ...expense,
           date: new Date(expense.date),
-          sharedBudgetId: expense.sharedBudgetId || NONE_SHARED_BUDGET_VALUE,
-          // For editing, paidByMemberId and splitWithMemberIds will come from the expense object
-          // which should have correct (generic) IDs if it's a trip expense that was already split
+          sharedBudgetId: (expense as Expense).sharedBudgetId || NONE_SHARED_BUDGET_VALUE,
           isSplit: expense.isSplit || false,
-          paidByMemberId: expense.paidByMemberId || (expense as any).paidByTripMemberId || "", 
-          splitWithMemberIds: expense.splitWithMemberIds || (expense as any).splitWithTripMemberIds || [],
+          paidByMemberId: (expense as Expense).paidByMemberId || (expense as TripExpense).paidByTripMemberId || "",
+          splitWithMemberIds: (expense as Expense).splitWithMemberIds || (expense as TripExpense).splitWithTripMemberIds || [],
         }
       : {
           description: "",
@@ -129,8 +127,8 @@ export function ExpenseForm({
           categoryId: "",
           notes: "",
           sharedBudgetId: NONE_SHARED_BUDGET_VALUE,
-          isSplit: false,
-          paidByMemberId: "", // Will be set by useEffect if applicable
+          isSplit: true, // Default to true for new expenses
+          paidByMemberId: "",
           splitWithMemberIds: [],
         },
   });
@@ -144,15 +142,25 @@ export function ExpenseForm({
 
 
   useEffect(() => {
-    // Default payer if splitting is enabled, no expense is being edited, and a current user ID is provided
-    if (watchedIsSplit && !watchedPaidByMemberId && currentUserIdForDefaultPayer && !expense) {
-        // Check if the currentUserIdForDefaultPayer is in the availableMembersForSplitting
+    // Default payer if splitting is enabled and a current user ID is provided
+    if (watchedIsSplit && !watchedPaidByMemberId && currentUserIdForDefaultPayer) {
         const isCurrentUserInList = availableMembersForSplitting.some(m => m.id === currentUserIdForDefaultPayer);
         if (isCurrentUserInList) {
             form.setValue("paidByMemberId", currentUserIdForDefaultPayer, { shouldValidate: true });
         }
     }
-  }, [watchedIsSplit, watchedPaidByMemberId, currentUserIdForDefaultPayer, form, expense, availableMembersForSplitting]);
+  }, [watchedIsSplit, watchedPaidByMemberId, currentUserIdForDefaultPayer, form, availableMembersForSplitting]);
+
+  useEffect(() => {
+    // Default "Split With Whom?" to all members if "isSplit" is true on initial load for a new expense
+    // and no members have been manually selected yet for splitting.
+    if (!expense && watchedIsSplit && availableMembersForSplitting.length > 0 ) {
+        const currentSplitIds = form.getValues("splitWithMemberIds");
+        if (!currentSplitIds || currentSplitIds.length === 0) {
+             form.setValue("splitWithMemberIds", availableMembersForSplitting.map(m => m.id), { shouldValidate: true });
+        }
+    }
+  }, [expense, watchedIsSplit, availableMembersForSplitting, form]);
 
 
   const handleSuggestCategory = useCallback(async () => {
@@ -211,7 +219,7 @@ export function ExpenseForm({
       if (watchedDescription && watchedDescription.length >= 5 && (!watchedNotes || watchedNotes.length < 20)) {
         handleSuggestNotes();
       }
-    }, 1200); 
+    }, 1200);
     return () => clearTimeout(timer);
   }, [watchedDescription, watchedNotes, handleSuggestNotes]);
 
@@ -220,11 +228,8 @@ export function ExpenseForm({
     const dataToSave: ExpenseFormValues = {
       ...data,
       sharedBudgetId: (hideSharedBudgetLink || data.sharedBudgetId === NONE_SHARED_BUDGET_VALUE) ? undefined : data.sharedBudgetId,
-      // Splitting fields are kept as is from the form; the calling component will map them if needed
     };
     onSave(dataToSave);
-    // Resetting the form after submission should be handled by the parent if it's a dialog
-    // For now, let's keep the reset for a non-edit case.
     if (!expense) {
         form.reset({
             description: "",
@@ -233,9 +238,9 @@ export function ExpenseForm({
             categoryId: "",
             notes: "",
             sharedBudgetId: NONE_SHARED_BUDGET_VALUE,
-            isSplit: false,
+            isSplit: true, // Keep default for new
             paidByMemberId: "",
-            splitWithMemberIds: [],
+            splitWithMemberIds: availableMembersForSplitting.map(m => m.id), // Default to all if new and splitting
         });
         setAiCategorySuggestion(null);
         setAiNoteSuggestion(null);
@@ -489,6 +494,11 @@ export function ExpenseForm({
                                 form.setValue("paidByMemberId", currentUserIdForDefaultPayer, { shouldValidate: true });
                             }
                           }
+                          // If splitting is re-enabled and no members are selected, select all
+                          const currentSplitIds = form.getValues("splitWithMemberIds");
+                           if ((!currentSplitIds || currentSplitIds.length === 0) && availableMembersForSplitting.length > 0) {
+                               form.setValue("splitWithMemberIds", availableMembersForSplitting.map(m => m.id), { shouldValidate: true });
+                           }
                         }
                       }}
                     />
