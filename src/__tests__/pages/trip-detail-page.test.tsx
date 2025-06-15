@@ -225,8 +225,7 @@ describe('TripDetailPage', () => {
   });
 
   it('calculates and displays correct "Net Share in Trip Pot" for each member (positive pot balance)', () => {
-    // Pot: 200. Alice contributed 100/250 = 40%. Bob contributed 150/250 = 60%.
-    // Auth User: 0/250 = 0%
+    // Pot: 200. Alice contributed 100/250 = 40%. Bob contributed 150/250 = 60%. Auth User: 0/250 = 0%
     // Alice share: 0.40 * 200 = 80
     // Bob share: 0.60 * 200 = 120
     // Auth User share: 0 * 200 = 0
@@ -290,32 +289,38 @@ describe('TripDetailPage', () => {
   });
 
 
-  it('calculates and displays correct "Net Share in Trip Pot" for each member (negative pot balance)', () => {
-    const highExpenses: TripExpense[] = [
-      { id: 'te-high', tripId: 'trip-123', description: 'Emergency Repair', amount: 300, date: formatISO(new Date()), categoryId: 'other' },
+  it('calculates and displays correct "Net Share in Trip Pot" for each member (negative pot balance with initial contributions)', () => {
+    const members: TripMember[] = [
+        { id: 'tm-alice', tripId: 'trip-123', name: 'Alice' },
+        { id: 'tm-bob', tripId: 'trip-123', name: 'Bob' },
     ];
-    // Pot: -50. Alice contributed 100/250 = 40%. Bob contributed 150/250 = 60%. Auth User: 0%
-    // Alice share: 0.40 * -50 = -20
-    // Bob share: 0.60 * -50 = -30
-    // Auth User share: 0 * -50 = 0 (still 0 as they didn't contribute)
-    renderPage({ tripExpenses: highExpenses, tripContributions: mockTripContributionsBase, tripMembers: mockTripMembersBase });
+    const contributions: TripContribution[] = [
+        { id: 'c1', tripId: 'trip-123', tripMemberId: 'tm-alice', amount: 100, date: formatISO(new Date())},
+    ]; // Alice contributes 100, Bob 0
+    const expenses: TripExpense[] = [
+      { id: 'e1', tripId: 'trip-123', description: 'Big Dinner', amount: 120, date: formatISO(new Date()), categoryId: 'food' },
+    ];
+    // Total Contributions: 100. Total Spending: 120. Remaining Pot: -20.
+    // With new logic: Deficit of 20 is shared equally by 2 members = -10 each.
+    renderPage({ 
+        tripMembers: members, 
+        tripContributions: contributions, 
+        tripExpenses: expenses,
+        getTripMemberTotalDirectContribution: (memberId) => contributions.filter(c => c.tripMemberId === memberId).reduce((sum,c)=> sum + c.amount, 0)
+    });
 
     const aliceCard = screen.getByText('Alice').closest('div[class*="card"]');
     const bobCard = screen.getByText('Bob').closest('div[class*="card"]');
-    const authUserCard = screen.getByText('Auth User').closest('div[class*="card"]');
 
-    expect(aliceCard).toHaveTextContent(`Net Share in Trip Pot:-${DEFAULT_CURRENCY}20.00`);
-    expect(bobCard).toHaveTextContent(`Net Share in Trip Pot:-${DEFAULT_CURRENCY}30.00`);
-    expect(authUserCard).toHaveTextContent(`Net Share in Trip Pot:${DEFAULT_CURRENCY}0.00`);
+    expect(aliceCard).toHaveTextContent(`Net Share in Trip Pot:-${DEFAULT_CURRENCY}10.00`);
+    expect(bobCard).toHaveTextContent(`Net Share in Trip Pot:-${DEFAULT_CURRENCY}10.00`);
 
-    const aliceShareElement = within(aliceCard!).getByText(`-${DEFAULT_CURRENCY}20.00`);
+    const aliceShareElement = within(aliceCard!).getByText(`-${DEFAULT_CURRENCY}10.00`);
     expect(aliceShareElement).toHaveClass('text-destructive');
-    const bobShareElement = within(bobCard!).getByText(`-${DEFAULT_CURRENCY}30.00`);
+    const bobShareElement = within(bobCard!).getByText(`-${DEFAULT_CURRENCY}10.00`);
     expect(bobShareElement).toHaveClass('text-destructive');
-     const authUserShareElement = within(authUserCard!).getByText(`${DEFAULT_CURRENCY}0.00`); // Should not be destructive
-    expect(authUserShareElement).not.toHaveClass('text-destructive');
-    // expect(authUserShareElement).toHaveClass('text-accent'); // Or default color if 0 // Default color will not have text-accent
   });
+
 
   it('handles deletion of a trip member', async () => {
     renderPage();

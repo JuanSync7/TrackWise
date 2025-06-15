@@ -32,15 +32,19 @@ export function TripMemberItem({
 
   let memberShareOfTripPot: number;
 
-  if (totalTripContributions > 0) {
-    memberShareOfTripPot = (directContribution / totalTripContributions) * remainingTripPot;
-  } else {
-    // If total contributions are 0
-    if (remainingTripPot < 0 && numberOfTripMembers > 0) {
-      // Share the deficit equally if pot is negative
+  if (remainingTripPot < 0) {
+    // If the pot is negative, the deficit is shared equally among all current members.
+    if (numberOfTripMembers > 0) {
       memberShareOfTripPot = remainingTripPot / numberOfTripMembers;
     } else {
-      // Pot is 0 or positive (unlikely without contributions unless externally credited), or no members
+      memberShareOfTripPot = 0; // Should ideally not happen if a member exists
+    }
+  } else { // Pot is zero or positive
+    if (totalTripContributions > 0) {
+      // Distribute positive pot proportionally to contributions
+      memberShareOfTripPot = (directContribution / totalTripContributions) * remainingTripPot;
+    } else {
+      // Pot is zero (or positive but no contributions, which is rare)
       memberShareOfTripPot = 0;
     }
   }

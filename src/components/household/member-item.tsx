@@ -16,7 +16,7 @@ interface MemberItemProps {
   onAddContribution: (memberId: string) => void;
   totalHouseholdContributions: number;
   remainingHouseholdPot: number;
-  numberOfHouseholdMembers: number; // Added to calculate equal share of deficit
+  numberOfHouseholdMembers: number; 
 }
 
 export function MemberItem({
@@ -31,15 +31,20 @@ export function MemberItem({
   const directContribution = getMemberTotalContribution(member.id);
 
   let memberShareOfPot: number;
-  if (totalHouseholdContributions > 0) {
-    memberShareOfPot = (directContribution / totalHouseholdContributions) * remainingHouseholdPot;
-  } else {
-    // If total contributions are 0
-    if (remainingHouseholdPot < 0 && numberOfHouseholdMembers > 0) {
-      // Share the deficit equally if pot is negative
+
+  if (remainingHouseholdPot < 0) {
+    // If the pot is negative, the deficit is shared equally among all current members.
+    if (numberOfHouseholdMembers > 0) {
       memberShareOfPot = remainingHouseholdPot / numberOfHouseholdMembers;
     } else {
-      // Pot is 0 or positive (unlikely without contributions), or no members
+      memberShareOfPot = 0; // Should ideally not happen if a member exists
+    }
+  } else { // Pot is zero or positive
+    if (totalHouseholdContributions > 0) {
+      // Distribute positive pot proportionally to contributions
+      memberShareOfPot = (directContribution / totalHouseholdContributions) * remainingHouseholdPot;
+    } else {
+      // Pot is zero (or positive but no contributions, which is rare)
       memberShareOfPot = 0;
     }
   }
@@ -92,5 +97,3 @@ export function MemberItem({
     </Card>
   );
 }
-
-

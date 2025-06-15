@@ -9,6 +9,8 @@ import type { AppContextType, Member, Contribution, Expense, SharedBudget } from
 import type { User as FirebaseUser } from 'firebase/auth';
 import { DEFAULT_CURRENCY, HOUSEHOLD_EXPENSE_CATEGORY_ID } from '@/lib/constants';
 import { formatISO, format as formatDateFns } from 'date-fns';
+import { within } from '@testing-library/react';
+
 
 const mockToast = jest.fn();
 jest.mock('@/hooks/use-toast', () => ({
@@ -258,26 +260,42 @@ describe('HouseholdPage', () => {
     expect(screen.getByText(/100% of pot used/i)).toBeInTheDocument(); // (300/250)*100, capped at 100 if spending > contributions
   });
 
-  it('calculates and displays correct "Net Share in Pot" for each member (negative pot balance)', () => {
-    const highExpenses: Expense[] = [
-      { id: 'exp-high', description: 'Big Repair', amount: 300, date: formatISO(new Date()), categoryId: HOUSEHOLD_EXPENSE_CATEGORY_ID, sharedBudgetId: undefined },
+  it('calculates and displays correct "Net Share in Pot" for each member (negative pot balance with initial contributions)', () => {
+    const members = [
+        { id: 'member-1', name: 'Alice' },
+        { id: 'member-2', name: 'Bob' },
     ];
-    // Pot: -50. Alice contributed 100/250 = 40%. Bob contributed 150/250 = 60%.
-    // Alice share: 0.40 * -50 = -20
-    // Bob share: 0.60 * -50 = -30
-    renderPage({ expenses: highExpenses, contributions: mockContributionsBase, members: mockMembersBase });
+    const contributions = [
+        { id: 'contrib-1', memberId: 'member-1', amount: 100, date: formatISO(new Date()), notes: 'Alice contrib' },
+        // Bob contributes 0
+    ];
+    const highExpenses: Expense[] = [
+      { id: 'exp-high', description: 'Big Repair', amount: 120, date: formatISO(new Date()), categoryId: HOUSEHOLD_EXPENSE_CATEGORY_ID },
+    ];
+    // Total Contributions: 100 (Alice)
+    // Total Spending: 120
+    // Remaining in Pot: -20
+    // Deficit of 20 shared by 2 members = -10 each
+    renderPage({ 
+        members: members, 
+        contributions: contributions, 
+        expenses: highExpenses,
+        getMemberTotalContribution: (memberId) => contributions.filter(c=>c.memberId === memberId).reduce((sum, c) => sum + c.amount, 0),
+        getTotalHouseholdSpending: () => highExpenses.reduce((sum, e) => sum + e.amount, 0)
+    });
 
     const aliceCard = screen.getByText('Alice').closest('div[class*="card"]');
     const bobCard = screen.getByText('Bob').closest('div[class*="card"]');
 
-    expect(aliceCard).toHaveTextContent(`Net Share in Pot:-${DEFAULT_CURRENCY}20.00`);
-    expect(bobCard).toHaveTextContent(`Net Share in Pot:-${DEFAULT_CURRENCY}30.00`);
+    expect(aliceCard).toHaveTextContent(`Net Share in Pot:-${DEFAULT_CURRENCY}10.00`);
+    expect(bobCard).toHaveTextContent(`Net Share in Pot:-${DEFAULT_CURRENCY}10.00`); // Bob shares the deficit
 
-    const aliceShareElement = screen.getByText(`-${DEFAULT_CURRENCY}20.00`);
+    const aliceShareElement = within(aliceCard!).getByText(`-${DEFAULT_CURRENCY}10.00`);
     expect(aliceShareElement).toHaveClass('text-destructive');
-    const bobShareElement = screen.getByText(`-${DEFAULT_CURRENCY}30.00`);
+    const bobShareElement = within(bobCard!).getByText(`-${DEFAULT_CURRENCY}10.00`);
     expect(bobShareElement).toHaveClass('text-destructive');
   });
+
 
   it('calculates "Net Share in Pot" as equally shared deficit when total contributions are zero and pot is negative', () => {
     const members: Member[] = [{ id: 'm1', name: 'Member1' }, { id: 'm2', name: 'Member2' }];
@@ -363,7 +381,8 @@ describe('HouseholdPage', () => {
     ]));
 
     // Check Member Overview
-    // Tester1: Contributed 200. Pot remaining 150. (200/200) * 150 = 150
+    // Tester1: Contributed 200. Pot remaining 150.
+    // If pot is positive, share is (direct/total) * remaining = (200/200) * 150 = 150.
     expect(csvData).toEqual(expect.arrayContaining([
       ["Member Overview"],
       ["Member Name", `Total Direct Contributions (${DEFAULT_CURRENCY})`, `Net Share in Pot (${DEFAULT_CURRENCY})`],
@@ -390,6 +409,3 @@ describe('HouseholdPage', () => {
   });
 
 });
-
-
-
