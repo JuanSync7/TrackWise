@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 import type { BudgetGoal } from '@/lib/types';
 import { usePersonalFinance } from '@/contexts/personal-finance-context';
 import { CategoryIcon } from '@/components/shared/category-icon';
-import { useState, useEffect, useMemo } from "react"; // Added useMemo
+import { useState, useEffect, useMemo } from "react";
 
 const budgetFormSchema = z.object({
   categoryId: z.string({ required_error: "Please select a category." }),
@@ -43,13 +43,17 @@ export function BudgetForm({ budgetGoal, onSave, onCancel, isSubmitting }: Budge
   const { categories, getCategoryById } = usePersonalFinance();
   const [categoryPopoverOpen, setCategoryPopoverOpen] = useState(false);
 
-  // Budgets only apply to expenses
   const expenseCategories = useMemo(() => {
     return categories.filter(cat => cat.appliesTo === 'expense' || cat.appliesTo === 'both');
   }, [categories]);
 
   const form = useForm<BudgetFormValues>({
     resolver: zodResolver(budgetFormSchema),
+    defaultValues: { // Initialize with default values for a new form
+      categoryId: "",
+      amount: 0,
+      period: "monthly",
+    }
   });
 
   useEffect(() => {
@@ -60,6 +64,8 @@ export function BudgetForm({ budgetGoal, onSave, onCancel, isSubmitting }: Budge
         period: budgetGoal.period,
       });
     } else {
+      // Reset to initial defaults if budgetGoal is not present or removed
+      // This ensures the form is in a clean state for new entries
       form.reset({
         categoryId: "",
         amount: 0,
@@ -199,5 +205,3 @@ export function BudgetForm({ budgetGoal, onSave, onCancel, isSubmitting }: Budge
     </Form>
   );
 }
-
-    
