@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -7,10 +8,10 @@ import { ExpenseList } from '@/components/expenses/expense-list';
 import type { Expense } from '@/lib/types';
 import { useAppContext } from '@/contexts/app-context';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, X } from 'lucide-react';
+import { PlusCircle, X, Download } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useToast } from "@/hooks/use-toast";
-import { format } from 'date-fns';
+import { format as formatDate } from 'date-fns';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,10 +21,12 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+} from "@/components/ui/alert-dialog";
+import { exportToCsv } from '@/lib/utils';
+import { DEFAULT_CURRENCY } from '@/lib/constants';
 
 export default function ExpensesPage() {
-  const { expenses, addExpense, updateExpense, deleteExpense: contextDeleteExpense } = useAppContext();
+  const { expenses, addExpense, updateExpense, deleteExpense: contextDeleteExpense, categories, sharedBudgets, members, getCategoryById, getMemberById } = useAppContext();
   const { toast } = useToast();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -34,7 +37,7 @@ export default function ExpensesPage() {
 
   const handleSaveExpense = async (data: any) => {
     setIsSubmitting(true);
-    const expenseData = { ...data, date: format(data.date, "yyyy-MM-dd") };
+    const expenseData = { ...data, date: formatDate(data.date, "yyyy-MM-dd") };
     try {
       if (editingExpense) {
         updateExpense({ ...editingExpense, ...expenseData });
@@ -75,15 +78,55 @@ export default function ExpensesPage() {
     setIsFormOpen(true);
   }
 
+  const handleExportExpenses = () => {
+    const headerRow = [
+      "ID", "Description", "Amount", "Currency", "Date", 
+      "Category Name", "Notes", "Shared Budget Name", "Is Split", 
+      "Paid By Member Name", "Split With Member Names"
+    ];
+
+    const dataRows = expenses.map(exp => {
+      const categoryName = getCategoryById(exp.categoryId)?.name || 'N/A';
+      const sharedBudgetName = exp.sharedBudgetId ? sharedBudgets.find(sb => sb.id === exp.sharedBudgetId)?.name || 'N/A' : '';
+      const paidByMemberName = exp.paidByMemberId ? getMemberById(exp.paidByMemberId)?.name || 'N/A' : '';
+      const splitWithMemberNames = exp.splitWithMemberIds && exp.splitWithMemberIds.length > 0
+        ? exp.splitWithMemberIds.map(id => getMemberById(id)?.name || 'Unknown Member').join('; ')
+        : '';
+
+      return [
+        exp.id,
+        exp.description,
+        exp.amount,
+        DEFAULT_CURRENCY,
+        exp.date,
+        categoryName,
+        exp.notes || '',
+        sharedBudgetName,
+        exp.isSplit ? 'Yes' : 'No',
+        paidByMemberName,
+        splitWithMemberNames
+      ];
+    });
+
+    const filename = `trackwise_expenses_${formatDate(new Date(), 'yyyy-MM-dd')}.csv`;
+    exportToCsv(filename, [headerRow, ...dataRows]);
+    toast({ title: "Expenses Exported", description: `Expenses have been exported to ${filename}` });
+  };
+
   return (
     <div className="container mx-auto">
       <PageHeader 
         title="Manage Your Expenses"
         description="Keep track of your spending and categorize transactions."
         actions={
-          <Button onClick={openFormForNew}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Add New Expense
-          </Button>
+          <div className="flex gap-2 flex-wrap">
+            <Button onClick={handleExportExpenses} variant="outline" disabled={expenses.length === 0}>
+              <Download className="mr-2 h-4 w-4" /> Export Expenses
+            </Button>
+            <Button onClick={openFormForNew}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Add New Expense
+            </Button>
+          </div>
         }
       />
 
