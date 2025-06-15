@@ -25,7 +25,7 @@ const debtFormSchema = z.object({
   initialAmount: z.coerce.number().positive({ message: "Initial amount must be positive." }),
   interestRate: z.coerce.number().min(0, "Interest rate cannot be negative.").optional(),
   minimumPayment: z.coerce.number().min(0, "Minimum payment cannot be negative.").optional(),
-  dueDate: z.string().max(50).optional(), // e.g., "15th of month", or a specific date for one-offs
+  dueDate: z.string().max(50).optional(),
   notes: z.string().max(300).optional(),
 });
 
@@ -41,12 +41,12 @@ interface DebtFormProps {
 export function DebtForm({ debt, onSave, onCancel, isSubmitting }: DebtFormProps) {
   const form = useForm<DebtFormValues>({
     resolver: zodResolver(debtFormSchema),
-    defaultValues: { // Initialize all fields, especially optional numeric ones, to prevent uncontrolled -> controlled switch
+    defaultValues: {
       name: "",
       lender: "",
       initialAmount: 0,
-      interestRate: "" as any, // Start as empty string; Zod will coerce. `as any` to satisfy TS with Zod coercion.
-      minimumPayment: "" as any, // Start as empty string
+      interestRate: "" as any, // Initialize as empty string; Zod will coerce.
+      minimumPayment: "" as any, // Initialize as empty string
       dueDate: "",
       notes: "",
     },
@@ -58,16 +58,12 @@ export function DebtForm({ debt, onSave, onCancel, isSubmitting }: DebtFormProps
         name: debt.name,
         lender: debt.lender || "",
         initialAmount: debt.initialAmount,
-        // Ensure string for form, coercion will handle it for RHF.
-        // If debt.interestRate is a number, convert to string for reset, or use ""
         interestRate: debt.interestRate === undefined || debt.interestRate === null ? "" : String(debt.interestRate),
         minimumPayment: debt.minimumPayment === undefined || debt.minimumPayment === null ? "" : String(debt.minimumPayment),
         dueDate: debt.dueDate || "",
         notes: debt.notes || "",
       });
     } else {
-      // For a new form, ensure optional numeric fields are reset to empty strings
-      // This is also covered by defaultValues now, but good for explicit reset.
       form.reset({
         name: "",
         lender: "",
@@ -80,8 +76,7 @@ export function DebtForm({ debt, onSave, onCancel, isSubmitting }: DebtFormProps
     }
   }, [debt, form]);
 
-  function onSubmit(values: z.infer<typeof debtFormSchema>) { // Use inferred type from schema for values
-    // Zod has already coerced interestRate and minimumPayment to numbers if they were strings
+  function onSubmit(values: z.infer<typeof debtFormSchema>) {
     onSave(values as DebtFormValues);
     if (!debt) {
         form.reset({ name: "", lender: "", initialAmount: 0, interestRate: "", minimumPayment: "", dueDate: "", notes: "" });
@@ -137,11 +132,11 @@ export function DebtForm({ debt, onSave, onCancel, isSubmitting }: DebtFormProps
             <FormField
             control={form.control}
             name="interestRate"
-            render={({ field }) => ( // field.value will be a number (e.g. 0 if "" was passed and coerced)
+            render={({ field }) => (
                 <FormItem>
                 <FormLabel>Interest Rate (APR %)</FormLabel>
                 <FormControl>
-                    <Input type="number" placeholder="e.g., 5.25" {...field} step="0.01" />
+                    <Input type="number" placeholder="e.g., 5.25" {...field} value={field.value ?? ""} step="0.01" />
                 </FormControl>
                 <FormMessage />
                 </FormItem>
@@ -150,11 +145,11 @@ export function DebtForm({ debt, onSave, onCancel, isSubmitting }: DebtFormProps
             <FormField
             control={form.control}
             name="minimumPayment"
-            render={({ field }) => ( // field.value will be a number
+            render={({ field }) => (
                 <FormItem>
                 <FormLabel>Minimum Payment (Optional)</FormLabel>
                 <FormControl>
-                    <Input type="number" placeholder="e.g., 150.00" {...field} step="0.01" />
+                    <Input type="number" placeholder="e.g., 150.00" {...field} value={field.value ?? ""} step="0.01" />
                 </FormControl>
                 <FormMessage />
                 </FormItem>
