@@ -3,7 +3,7 @@
 
 import type { TripSettlement, CalculatedMemberFinancials } from '@/lib/types';
 import { TripSettlementItem } from './trip-settlement-item';
-import { PotPayoutItem } from './pot-payout-item'; // New component for pot payouts
+import { PotPayoutItem } from './pot-payout-item'; // Ensure this import is used
 import { HandCoins, Scale, Wallet } from 'lucide-react'; 
 import { useAppContext } from '@/contexts/app-context';
 import { DEFAULT_CURRENCY } from '@/lib/constants';
@@ -29,32 +29,38 @@ export function TripSettlementList({ settlements, tripId, finalMemberFinancials,
     let undistributedPotCash = remainingCashInPot;
     const payouts: { tripMemberId: string, memberName: string, amount: number }[] = [];
 
+    // Get members who are net creditors to the system overall
     const membersOwedBySystem = Array.from(finalMemberFinancials.values())
-        .filter(fm => fm.finalNetShareForSettlement > EPSILON)
+        .filter(fm => fm.finalNetShareForSettlement > EPSILON) // Members who are owed money by the system
         .sort((a,b) => b.finalNetShareForSettlement - a.finalNetShareForSettlement); // Prioritize larger creditors
 
     for (const financial of membersOwedBySystem) {
       if (undistributedPotCash <= EPSILON) break;
 
       const member = getTripMemberById(financial.memberId);
-      if (!member) continue;
+      if (!member) continue; // Should not happen if data is consistent
 
+      // How much is this member already set to receive from other members directly?
       const alreadyReceivingFromDebtors = settlements
         .filter(s => s.owedToTripMemberId === financial.memberId)
         .reduce((sum, s) => sum + s.amount, 0);
       
-      // Amount this member is still owed by the system after direct debtor payments
+      // The amount this member is still owed by the *system* after direct debtor payments
+      // This is the maximum they can claim from the pot.
       const netOwedBySystemOverall = financial.finalNetShareForSettlement - alreadyReceivingFromDebtors;
 
       if (netOwedBySystemOverall > EPSILON) {
+        // The actual payout cannot exceed what's left in the pot OR what they are still owed by the system.
         const payoutAmount = Math.min(netOwedBySystemOverall, undistributedPotCash);
-        if (payoutAmount > EPSILON) {
+        
+        if (payoutAmount > EPSILON) { // Only add if there's a meaningful amount to pay out
             payouts.push({
                 tripMemberId: member.id,
                 memberName: member.name,
-                amount: parseFloat(payoutAmount.toFixed(2)),
+                amount: parseFloat(payoutAmount.toFixed(2)), // Ensure 2 decimal places
             });
             undistributedPotCash -= payoutAmount;
+            undistributedPotCash = parseFloat(undistributedPotCash.toFixed(2)); // Update remaining pot cash accurately
         }
       }
     }
@@ -99,16 +105,18 @@ export function TripSettlementList({ settlements, tripId, finalMemberFinancials,
       </div>
 
       {/* Pot Payouts */}
-      {remainingCashInPot > EPSILON && (
+      {/* Only show pot payout section if there was cash in pot to begin with AND there are payouts */}
+      {(remainingCashInPot > EPSILON || potPayouts.length > 0) && ( 
         <div>
           <h4 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
-            <Wallet className="h-4 w-4" /> Pot Distribution (Remaining: {DEFAULT_CURRENCY}{remainingCashInPot.toFixed(2)}):
+            <Wallet className="h-4 w-4" /> Pot Distribution (Initial Pot Surplus: {DEFAULT_CURRENCY}{remainingCashInPot.toFixed(2)}):
           </h4>
           {noPotPayouts ? (
             <div className="text-center py-3 border border-dashed border-muted-foreground/20 rounded-md">
                 <Wallet className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
-                <p className="text-sm text-muted-foreground">Pot cash is balanced. No further distribution needed from the pot itself.</p>
-                <p className="text-xs text-muted-foreground">(Pot surplus was handled by member-to-member payments or no surplus exists)</p>
+                <p className="text-sm text-muted-foreground">
+                    {remainingCashInPot > EPSILON ? "Pot cash surplus fully distributed via member-to-member payments or no net creditors." : "No pot surplus to distribute."}
+                </p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -122,20 +130,3 @@ export function TripSettlementList({ settlements, tripId, finalMemberFinancials,
     </div>
   );
 }
-
-// Simple component for displaying pot payouts
-// This could be a more styled component if needed
-const PotPayoutItem = ({ payout }: { payout: { tripMemberId: string, memberName: string, amount: number } }) => (
-  <div className="flex items-center justify-between p-3 rounded-md border bg-accent/10 hover:bg-accent/20 transition-colors text-sm">
-    <div className="flex items-center gap-2">
-      <Wallet className="h-5 w-5 text-accent" />
-      <span className="font-medium">Pot Pays</span>
-    </div>
-    <div className="flex items-center gap-2">
-      <span className="font-medium">{payout.memberName}</span>
-    </div>
-    <span className="font-semibold text-accent">
-      {DEFAULT_CURRENCY}{payout.amount.toFixed(2)}
-    </span>
-  </div>
-);
