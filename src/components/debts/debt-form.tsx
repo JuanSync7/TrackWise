@@ -49,8 +49,8 @@ export function DebtForm({ debt, onSave, onCancel, isSubmitting }: DebtFormProps
         name: debt.name,
         lender: debt.lender || "",
         initialAmount: debt.initialAmount,
-        interestRate: debt.interestRate,
-        minimumPayment: debt.minimumPayment,
+        interestRate: debt.interestRate === undefined ? "" : debt.interestRate,
+        minimumPayment: debt.minimumPayment === undefined ? "" : debt.minimumPayment,
         dueDate: debt.dueDate || "",
         notes: debt.notes || "",
       });
@@ -59,8 +59,8 @@ export function DebtForm({ debt, onSave, onCancel, isSubmitting }: DebtFormProps
         name: "",
         lender: "",
         initialAmount: 0,
-        interestRate: undefined,
-        minimumPayment: undefined,
+        interestRate: "", // Initialize with empty string for controlled input
+        minimumPayment: "", // Initialize with empty string
         dueDate: "",
         notes: "",
       });
@@ -70,7 +70,7 @@ export function DebtForm({ debt, onSave, onCancel, isSubmitting }: DebtFormProps
   function onSubmit(values: DebtFormValues) {
     onSave(values);
     if (!debt) {
-        form.reset({ name: "", lender: "", initialAmount: 0, interestRate: undefined, minimumPayment: undefined, dueDate: "", notes: "" });
+        form.reset({ name: "", lender: "", initialAmount: 0, interestRate: "", minimumPayment: "", dueDate: "", notes: "" });
     }
   }
 
@@ -112,7 +112,7 @@ export function DebtForm({ debt, onSave, onCancel, isSubmitting }: DebtFormProps
             <FormItem>
               <FormLabel>Lender (Optional)</FormLabel>
               <FormControl>
-                <Input placeholder="e.g., Bank of America, Sallie Mae" {...field} />
+                <Input placeholder="e.g., Bank of America, Sallie Mae" {...field} value={field.value || ""} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -127,7 +127,7 @@ export function DebtForm({ debt, onSave, onCancel, isSubmitting }: DebtFormProps
                 <FormItem>
                 <FormLabel>Interest Rate (APR %)</FormLabel>
                 <FormControl>
-                    <Input type="number" placeholder="e.g., 5.25" {...field} step="0.01" />
+                    <Input type="number" placeholder="e.g., 5.25" {...field} step="0.01" value={field.value === undefined ? "" : field.value} />
                 </FormControl>
                 <FormMessage />
                 </FormItem>
@@ -140,7 +140,7 @@ export function DebtForm({ debt, onSave, onCancel, isSubmitting }: DebtFormProps
                 <FormItem>
                 <FormLabel>Minimum Payment (Optional)</FormLabel>
                 <FormControl>
-                    <Input type="number" placeholder="e.g., 150.00" {...field} step="0.01" />
+                    <Input type="number" placeholder="e.g., 150.00" {...field} step="0.01" value={field.value === undefined ? "" : field.value} />
                 </FormControl>
                 <FormMessage />
                 </FormItem>
@@ -156,7 +156,7 @@ export function DebtForm({ debt, onSave, onCancel, isSubmitting }: DebtFormProps
             <FormItem>
               <FormLabel>Due Date / Cycle (Optional)</FormLabel>
               <FormControl>
-                <Input placeholder="e.g., 15th of month, March 30, 2025" {...field} />
+                <Input placeholder="e.g., 15th of month, March 30, 2025" {...field} value={field.value || ""} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -170,7 +170,7 @@ export function DebtForm({ debt, onSave, onCancel, isSubmitting }: DebtFormProps
             <FormItem>
               <FormLabel>Notes (Optional)</FormLabel>
               <FormControl>
-                <Textarea placeholder="Add any relevant notes or account numbers..." {...field} />
+                <Textarea placeholder="Add any relevant notes or account numbers..." {...field} value={field.value || ""} />
               </FormControl>
               <FormMessage />
             </FormItem>
