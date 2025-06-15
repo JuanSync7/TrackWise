@@ -4,7 +4,7 @@
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useCallback, useEffect } from 'react';
 import type {
-  Trip, TripMember, TripContribution, TripExpense, TripSettlement,
+  Trip, TripMember, TripContribution, TripTransaction, TripSettlement, // Renamed TripExpense
   CalculatedMemberFinancials, TripContextType, MemberDisplayFinancials
 } from '@/lib/types';
 import { POT_PAYER_ID } from '@/lib/constants';
@@ -26,7 +26,7 @@ export const TripProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [trips, setTrips] = useLocalStorage<Trip[]>('trackwise_trips', []);
   const [tripMembers, setTripMembersState] = useLocalStorage<TripMember[]>('trackwise_trip_members', []);
   const [tripContributions, setTripContributionsState] = useLocalStorage<TripContribution[]>('trackwise_trip_contributions', []);
-  const [tripExpenses, setTripExpensesState] = useLocalStorage<TripExpense[]>('trackwise_trip_expenses', []);
+  const [tripTransactions, setTripTransactionsState] = useLocalStorage<TripTransaction[]>('trackwise_trip_transactions', []); // Renamed
   
   const [tripFinancialSummaries, setTripFinancialSummaries] = useLocalStorage<Record<string, Record<string, CalculatedMemberFinancials>>>('trackwise_trip_financial_summaries', {});
   const [tripSettlementsMap, setTripSettlementsMap] = useLocalStorage<Record<string, TripSettlement[]>>('trackwise_trip_settlements_map', {});
@@ -35,7 +35,7 @@ export const TripProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const getTrips = useCallback(() => trips, [trips]);
   const getTripMembers = useCallback((tripId: string): TripMember[] => tripMembers.filter(member => member.tripId === tripId), [tripMembers]);
   const getTripMemberById = useCallback((tripMemberId: string) => tripMembers.find(member => member.id === tripMemberId), [tripMembers]);
-  const getTripExpenses = useCallback((tripIdToFilter: string): TripExpense[] => tripExpenses.filter(expense => expense.tripId === tripIdToFilter), [tripExpenses]);
+  const getTripTransactions = useCallback((tripIdToFilter: string): TripTransaction[] => tripTransactions.filter(transaction => transaction.tripId === tripIdToFilter), [tripTransactions]); // Renamed
   const getTripSettlements = useCallback((tripId: string) => tripSettlementsMap[tripId] || [], [tripSettlementsMap]);
 
   const _calculateAndStoreTripSettlements = useCallback((tripId: string) => {
@@ -56,8 +56,8 @@ export const TripProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         .reduce((sum, tc) => sum + tc.amount, 0),
     }));
 
-    const expensesForThisTrip = tripExpenses.filter(te => te.tripId === tripId);
-    const expenseInputs: ExpenseInput[] = expensesForThisTrip.map(exp => ({
+    const transactionsForThisTrip = tripTransactions.filter(te => te.tripId === tripId && te.transactionType === 'expense'); // Only expenses for settlement
+    const expenseInputs: ExpenseInput[] = transactionsForThisTrip.map(exp => ({
       amount: exp.amount, isSplit: !!exp.isSplit,
       splitWithTripMemberIds: exp.splitWithTripMemberIds || [], paidByMemberId: exp.paidByTripMemberId,
     }));
@@ -75,15 +75,15 @@ export const TripProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       ...s, id: uuidv4(), tripId: tripId,
     }));
     setTripSettlementsMap(prevMap => ({ ...prevMap, [tripId]: finalSettlements }));
-  }, [tripMembers, tripContributions, tripExpenses, setTripFinancialSummaries, setTripSettlementsMap]);
+  }, [tripMembers, tripContributions, tripTransactions, setTripFinancialSummaries, setTripSettlementsMap]); // Renamed
 
   const triggerTripSettlementCalculation = useCallback((tripId: string) => {
     _calculateAndStoreTripSettlements(tripId);
   }, [_calculateAndStoreTripSettlements]);
 
-  useEffect(() => { // Recalculate all trip settlements if global trip-related data changes
+  useEffect(() => {
     trips.forEach(trip => triggerTripSettlementCalculation(trip.id));
-  }, [tripMembers, tripContributions, tripExpenses, trips, triggerTripSettlementCalculation]);
+  }, [tripMembers, tripContributions, tripTransactions, trips, triggerTripSettlementCalculation]); // Renamed
 
 
   const addTrip = useCallback((tripData: Omit<Trip, 'id' | 'createdAt'>) => {
@@ -97,16 +97,15 @@ export const TripProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const deleteTripMember = useCallback((tripMemberId: string, tripId: string) => {
     setTripMembersState(prev => prev.filter(member => member.id !== tripMemberId));
     setTripContributionsState(prevContributions => prevContributions.filter(contrib => contrib.tripMemberId !== tripMemberId || contrib.tripId !== tripId));
-    setTripExpensesState(prevExpenses => prevExpenses.map(exp => {
-      if (exp.tripId === tripId) {
-        const newSplitWith = exp.splitWithTripMemberIds?.filter(id => id !== tripMemberId);
-        return { ...exp, paidByTripMemberId: exp.paidByTripMemberId === tripMemberId ? POT_PAYER_ID : exp.paidByTripMemberId,
-                 splitWithTripMemberIds: newSplitWith, isSplit: !!(newSplitWith && newSplitWith.length > 0 && exp.isSplit) };
+    setTripTransactionsState(prevTransactions => prevTransactions.map(trans => { // Renamed
+      if (trans.tripId === tripId) {
+        const newSplitWith = trans.splitWithTripMemberIds?.filter(id => id !== tripMemberId);
+        return { ...trans, paidByTripMemberId: trans.paidByTripMemberId === tripMemberId ? POT_PAYER_ID : trans.paidByTripMemberId,
+                 splitWithTripMemberIds: newSplitWith, isSplit: !!(newSplitWith && newSplitWith.length > 0 && trans.isSplit) };
       }
-      return exp;
+      return trans;
     }));
-    // Settlement recalculation is handled by useEffect watching tripMembers, etc.
-  }, [setTripMembersState, setTripContributionsState, setTripExpensesState]);
+  }, [setTripMembersState, setTripContributionsState, setTripTransactionsState]);
 
   const addTripContribution = useCallback((tripId: string, tripMemberId: string, contributionData: Omit<TripContribution, 'id' | 'tripId' | 'tripMemberId'>) => {
     const newContrib: TripContribution = { ...contributionData, id: uuidv4(), tripId, tripMemberId, date: formatISO(contributionData.date) };
@@ -121,17 +120,17 @@ export const TripProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     tripContributions.filter(tc => tc.tripMemberId === tripMemberId && (!tripIdToFilter || tc.tripId === tripIdToFilter)).reduce((s, tc) => s + tc.amount, 0),
   [tripContributions]);
 
-  const addTripExpense = useCallback((expenseData: Omit<TripExpense, 'id'>) => {
-    setTripExpensesState(prev => [...prev, { ...expenseData, id: uuidv4() }]);
-  }, [setTripExpensesState]);
+  const addTripTransaction = useCallback((transactionData: Omit<TripTransaction, 'id'>) => { // Renamed
+    setTripTransactionsState(prev => [...prev, { ...transactionData, id: uuidv4() }]);
+  }, [setTripTransactionsState]);
 
-  const updateTripExpense = useCallback((updatedExpense: TripExpense) => { // Added
-    setTripExpensesState(prev => prev.map(exp => exp.id === updatedExpense.id ? updatedExpense : exp));
-  }, [setTripExpensesState]);
+  const updateTripTransaction = useCallback((updatedTransaction: TripTransaction) => { // Renamed
+    setTripTransactionsState(prev => prev.map(trans => trans.id === updatedTransaction.id ? updatedTransaction : trans));
+  }, [setTripTransactionsState]);
 
-  const deleteTripExpense = useCallback((expenseId: string) => { // Added
-    setTripExpensesState(prev => prev.filter(exp => exp.id !== expenseId));
-  }, [setTripExpensesState]);
+  const deleteTripTransaction = useCallback((transactionId: string) => { // Renamed
+    setTripTransactionsState(prev => prev.filter(trans => trans.id !== transactionId));
+  }, [setTripTransactionsState]);
 
   const getTripMemberNetData = useCallback((tripId: string, tripMemberId: string): MemberDisplayFinancials => {
     const financials = tripFinancialSummaries[tripId]?.[tripMemberId];
@@ -147,12 +146,12 @@ export const TripProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [tripFinancialSummaries]);
 
   const value: TripContextType = {
-    trips, tripMembers, tripContributions, tripExpenses,
+    trips, tripMembers, tripContributions, tripTransactions, // Renamed
     tripFinancialSummaries, tripSettlementsMap,
     addTrip, getTripById, getTrips,
     addTripMember, getTripMembers, deleteTripMember, getTripMemberById,
     addTripContribution, getTripContributionsForMember, getTripMemberTotalDirectContribution,
-    addTripExpense, updateTripExpense, deleteTripExpense, getTripExpenses,
+    addTripTransaction, updateTripTransaction, deleteTripTransaction, getTripTransactions, // Renamed
     getTripMemberNetData, getTripSettlements, triggerTripSettlementCalculation,
   };
 
@@ -166,3 +165,5 @@ export const useTrips = (): TripContextType => {
   }
   return context;
 };
+
+    

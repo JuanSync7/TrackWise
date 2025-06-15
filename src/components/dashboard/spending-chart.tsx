@@ -3,30 +3,31 @@
 
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import type { Expense, Category } from '@/lib/types';
-import { usePersonalFinance } from '@/contexts/personal-finance-context'; // Changed context
+import { usePersonalFinance } from '@/contexts/personal-finance-context';
 import { DEFAULT_CURRENCY } from '@/lib/constants';
 import { useMemo } from 'react';
 
-interface SpendingChartProps {
-  // Props are no longer needed as context is used directly
-}
+interface SpendingChartProps {}
 
 interface ChartData {
   name: string;
-  total: number; // Keep 'total' for the Bar dataKey
+  total: number;
   fill: string;
 }
 
 export function SpendingChart() {
-  const { expenses, categories } = usePersonalFinance(); // Changed context
+  const { transactions, categories } = usePersonalFinance();
+
+  const expenseTransactions = useMemo(() => {
+    return transactions.filter(t => t.transactionType === 'expense');
+  }, [transactions]);
 
   const chartData = useMemo(() => {
     const dataMap = new Map<string, number>();
-    expenses.forEach(expense => {
-      const category = categories.find(c => c.id === expense.categoryId);
+    expenseTransactions.forEach(transaction => {
+      const category = categories.find(c => c.id === transaction.categoryId);
       if (category) {
-        dataMap.set(category.name, (dataMap.get(category.name) || 0) + expense.amount);
+        dataMap.set(category.name, (dataMap.get(category.name) || 0) + transaction.amount);
       }
     });
 
@@ -35,15 +36,15 @@ export function SpendingChart() {
       total,
       fill: categories.find(c => c.name === name)?.color || '#8884d8',
     }));
-  }, [expenses, categories]);
+  }, [expenseTransactions, categories]);
 
 
-  if (expenses.length === 0) {
+  if (expenseTransactions.length === 0) {
     return (
       <Card className="shadow-sm hover:shadow-md transition-shadow duration-300 col-span-1 md:col-span-2">
         <CardHeader>
-          <CardTitle>Spending Overview</CardTitle>
-          <CardDescription>Your spending by category will appear here.</CardDescription>
+          <CardTitle>Expense Overview</CardTitle>
+          <CardDescription>Your expenses by category will appear here.</CardDescription>
         </CardHeader>
         <CardContent className="h-[350px] flex items-center justify-center">
           <p className="text-muted-foreground">No expense data yet. Add some expenses to see your spending chart!</p>
@@ -55,8 +56,8 @@ export function SpendingChart() {
   return (
     <Card className="shadow-sm hover:shadow-md transition-shadow duration-300 col-span-1 md:col-span-2">
       <CardHeader>
-        <CardTitle>Spending Overview</CardTitle>
-        <CardDescription>Total spending by category this month.</CardDescription>
+        <CardTitle>Expense Overview</CardTitle>
+        <CardDescription>Total expenses by category this month.</CardDescription>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={350}>
@@ -85,3 +86,5 @@ export function SpendingChart() {
     </Card>
   );
 }
+
+    

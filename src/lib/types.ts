@@ -1,44 +1,51 @@
 
 import type { LucideIcon } from 'lucide-react';
 
+export type TransactionType = 'expense' | 'income';
+export type RecurrencePeriod = 'daily' | 'weekly' | 'monthly' | 'yearly';
+
 export interface Category {
   id: string;
   name: string;
   iconName: string;
   color: string;
+  appliesTo: 'expense' | 'income' | 'both';
 }
 
-// Base Expense type
-interface BaseExpense {
+// Base Transaction type
+interface BaseTransaction {
   id: string;
   description: string;
   amount: number;
   date: string; // ISO string date
   categoryId: string;
   notes?: string;
+  transactionType: TransactionType;
+  isRecurring?: boolean;
+  recurrencePeriod?: RecurrencePeriod;
+  recurrenceEndDate?: string; // ISO string date
+  nextRecurrenceDate?: string; // ISO string date, calculated for display/reminders
 }
 
-// Personal Expense
-export interface Expense extends BaseExpense {
-  // Personal expenses don't typically have sharedBudgetId, isSplit, etc.
-  // unless it's a personal expense being split with non-household members,
-  // but for this app's structure, we'll keep them simpler.
+// Personal Transaction
+export interface Transaction extends BaseTransaction {
+  // Personal transactions will use the full BaseTransaction spec
 }
 
-// Household Expense (includes shared features)
-export interface HouseholdExpense extends BaseExpense {
+// Household Transaction (includes shared features)
+export interface HouseholdTransaction extends BaseTransaction {
   sharedBudgetId?: string;
   isSplit?: boolean;
-  paidByMemberId?: string; // Can be a household member ID or POT_PAYER_ID
-  splitWithMemberIds?: string[]; // Household member IDs
+  paidByMemberId?: string;
+  splitWithMemberIds?: string[];
 }
 
-// Trip Expense (similar to HouseholdExpense but for trips)
-export interface TripExpense extends BaseExpense {
+// Trip Transaction (similar to HouseholdTransaction but for trips)
+export interface TripTransaction extends BaseTransaction {
   tripId: string;
   isSplit?: boolean;
-  paidByTripMemberId?: string; // Can be a trip member ID or POT_PAYER_ID
-  splitWithTripMemberIds?: string[]; // Trip member IDs
+  paidByTripMemberId?: string;
+  splitWithTripMemberIds?: string[];
 }
 
 
@@ -56,11 +63,11 @@ export interface Member {
   name: string;
 }
 
-export interface Contribution { // To household pot
+export interface Contribution {
   id: string;
   memberId: string;
   amount: number;
-  date: string; // ISO string date
+  date: string;
   notes?: string;
 }
 
@@ -89,23 +96,22 @@ export interface SharedBudget {
   amount: number;
   period: 'monthly' | 'yearly' | 'weekly';
   description?: string;
-  createdAt: string; // ISO string date
+  createdAt: string;
   currentSpending: number;
 }
 
-export interface Debt { // Inter-member debt, not involving household pot directly
+export interface Debt {
   id: string;
-  expenseId: string; // ID of the HouseholdExpense that generated this debt
+  expenseId: string;
   expenseDescription: string;
   amount: number;
   owedByMemberId: string;
   owedToMemberId: string;
   isSettled: boolean;
-  createdAt: string; // ISO string date for when the debt was created
-  settledAt?: string; // ISO string date for when the debt was settled
+  createdAt: string;
+  settledAt?: string;
 }
 
-// Using TripSettlement type for household settlements as structure is identical
 export type HouseholdSettlement = Omit<TripSettlement, 'tripId'>;
 
 
@@ -114,7 +120,7 @@ export interface ShoppingListItem {
   itemName: string;
   quantity: string;
   notes?: string;
-  addedAt: string; // ISO string date
+  addedAt: string;
   isPurchased: boolean;
 }
 // --- End Household Specific Types ---
@@ -125,7 +131,7 @@ export interface Trip {
   id: string;
   name: string;
   description?: string;
-  createdAt: string; // ISO string date
+  createdAt: string;
 }
 
 export interface TripMember {
@@ -134,12 +140,12 @@ export interface TripMember {
   name: string;
 }
 
-export interface TripContribution { // To trip pot
+export interface TripContribution {
   id: string;
   tripId: string;
   tripMemberId: string;
   amount: number;
-  date: string; // ISO string date
+  date: string;
   notes?: string;
 }
 
@@ -156,12 +162,12 @@ export interface TripSettlement {
 // --- Context Types ---
 
 export interface PersonalFinanceContextType {
-  expenses: Expense[];
+  transactions: Transaction[];
   categories: Category[];
   budgetGoals: BudgetGoal[];
-  addExpense: (expense: Omit<Expense, 'id'>) => void;
-  updateExpense: (expense: Expense) => void;
-  deleteExpense: (expenseId: string) => void;
+  addTransaction: (transaction: Omit<Transaction, 'id'>) => void;
+  updateTransaction: (transaction: Transaction) => void;
+  deleteTransaction: (transactionId: string) => void;
   addBudgetGoal: (goal: Omit<BudgetGoal, 'id' | 'currentSpending'>) => void;
   updateBudgetGoal: (goal: BudgetGoal) => void;
   deleteBudgetGoal: (goalId: string) => void;
@@ -170,10 +176,10 @@ export interface PersonalFinanceContextType {
 
 export interface HouseholdContextType {
   members: Member[];
-  householdExpenses: HouseholdExpense[];
-  contributions: Contribution[]; // Contributions to household pot
+  householdTransactions: HouseholdTransaction[];
+  contributions: Contribution[];
   sharedBudgets: SharedBudget[];
-  debts: Debt[]; // Inter-member debts from household expense splits
+  debts: Debt[];
   shoppingListItems: ShoppingListItem[];
   householdFinancialSummaries: Record<string, CalculatedMemberFinancials>;
   householdOverallSettlements: HouseholdSettlement[];
@@ -182,9 +188,9 @@ export interface HouseholdContextType {
   deleteMember: (memberId: string) => void;
   getMemberById: (memberId: string) => Member | undefined;
 
-  addHouseholdExpense: (expense: Omit<HouseholdExpense, 'id'>) => void;
-  updateHouseholdExpense: (expense: HouseholdExpense) => void;
-  deleteHouseholdExpense: (expenseId: string) => void;
+  addHouseholdTransaction: (transaction: Omit<HouseholdTransaction, 'id'>) => void;
+  updateHouseholdTransaction: (transaction: HouseholdTransaction) => void;
+  deleteHouseholdTransaction: (transactionId: string) => void;
 
   addContribution: (contribution: Omit<Contribution, 'id'>) => void;
   getMemberContributions: (memberId: string) => Contribution[];
@@ -213,10 +219,10 @@ export interface HouseholdContextType {
 export interface TripContextType {
   trips: Trip[];
   tripMembers: TripMember[];
-  tripContributions: TripContribution[]; // Contributions to specific trip pots
-  tripExpenses: TripExpense[];
-  tripFinancialSummaries: Record<string, Record<string, CalculatedMemberFinancials>>; // Outer: tripId, Inner: tripMemberId
-  tripSettlementsMap: Record<string, TripSettlement[]>; // Keyed by tripId
+  tripContributions: TripContribution[];
+  tripTransactions: TripTransaction[];
+  tripFinancialSummaries: Record<string, Record<string, CalculatedMemberFinancials>>;
+  tripSettlementsMap: Record<string, TripSettlement[]>;
 
   addTrip: (tripData: Omit<Trip, 'id' | 'createdAt'>) => void;
   getTripById: (tripId: string) => Trip | undefined;
@@ -228,23 +234,30 @@ export interface TripContextType {
   getTripMemberById: (tripMemberId: string) => TripMember | undefined;
 
   addTripContribution: (tripId: string, tripMemberId: string, contributionData: Omit<TripContribution, 'id' | 'tripId' | 'tripMemberId'>) => void;
-  getTripContributionsForMember: (tripMemberId: string, tripId?: string) => TripContribution[]; // Optional tripId to filter
+  getTripContributionsForMember: (tripMemberId: string, tripId?: string) => TripContribution[];
   getTripMemberTotalDirectContribution: (tripMemberId: string, tripIdToFilter?: string) => number;
 
-  addTripExpense: (expenseData: Omit<TripExpense, 'id'>) => void;
-  updateTripExpense: (expenseData: TripExpense) => void; // Added
-  deleteTripExpense: (expenseId: string) => void; // Added
-  getTripExpenses: (tripId: string) => TripExpense[];
+  addTripTransaction: (transactionData: Omit<TripTransaction, 'id'>) => void;
+  updateTripTransaction: (transactionData: TripTransaction) => void;
+  deleteTripTransaction: (transactionId: string) => void;
+  getTripTransactions: (tripId: string) => TripTransaction[];
   
   getTripMemberNetData: (tripId: string, tripMemberId: string) => MemberDisplayFinancials;
   getTripSettlements: (tripId: string) => TripSettlement[];
   triggerTripSettlementCalculation: (tripId: string) => void;
 }
 
-// This AppContextType might become very minimal or be removed if all data is delegated.
-// For now, let's assume it might hold some truly global, non-domain-specific state or functions if any arise.
-// However, the goal is to move everything to the domain-specific contexts.
 export interface AppContextType {
-  // Placeholder for any truly global app settings or functions in the future.
-  // For now, it will be empty as we delegate everything.
+  // Currently empty as state is delegated
 }
+
+export interface NavItem {
+  title: string;
+  href: string;
+  icon: LucideIcon;
+  disabled?: boolean;
+  external?: boolean;
+  submenu?: NavItem[];
+}
+
+    

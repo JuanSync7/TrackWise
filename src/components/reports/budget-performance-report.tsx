@@ -5,12 +5,12 @@ import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { usePersonalFinance } from '@/contexts/personal-finance-context'; // Changed context
+import { usePersonalFinance } from '@/contexts/personal-finance-context';
 import { DEFAULT_CURRENCY } from '@/lib/constants';
 import { format, startOfMonth, endOfMonth, isWithinInterval, parseISO } from 'date-fns';
 import { CategoryIcon } from '@/components/shared/category-icon';
 import { cn } from '@/lib/utils';
-import type { Category, Expense } from '@/lib/types'; // Use personal Expense type for matching
+import type { Category, Transaction } from '@/lib/types';
 
 interface BudgetPerformanceData {
   category: Category | undefined;
@@ -22,7 +22,7 @@ interface BudgetPerformanceData {
 }
 
 export function BudgetPerformanceReport() {
-  const { budgetGoals, expenses, getCategoryById } = usePersonalFinance(); // Changed context
+  const { budgetGoals, transactions, getCategoryById } = usePersonalFinance();
 
   const performanceData = useMemo(() => {
     const now = new Date();
@@ -33,15 +33,15 @@ export function BudgetPerformanceReport() {
 
     return monthlyGoals.map(goal => {
       const category = getCategoryById(goal.categoryId);
-      const spendingThisMonth = expenses // Personal expenses
-        .filter(expense => {
-            if (expense.categoryId !== goal.categoryId) return false;
+      const spendingThisMonth = transactions
+        .filter(transaction => {
+            if (transaction.transactionType !== 'expense' || transaction.categoryId !== goal.categoryId) return false;
             try {
-                const expenseDate = parseISO(expense.date);
-                return isWithinInterval(expenseDate, { start: currentMonthStart, end: currentMonthEnd });
+                const transactionDate = parseISO(transaction.date);
+                return isWithinInterval(transactionDate, { start: currentMonthStart, end: currentMonthEnd });
             } catch (e) { return false; }
         })
-        .reduce((sum, expense) => sum + expense.amount, 0);
+        .reduce((sum, transaction) => sum + transaction.amount, 0);
 
       const difference = goal.amount - spendingThisMonth;
       let status: BudgetPerformanceData['status'] = 'On Track';
@@ -58,7 +58,7 @@ export function BudgetPerformanceReport() {
         status,
       };
     });
-  }, [budgetGoals, expenses, getCategoryById]);
+  }, [budgetGoals, transactions, getCategoryById]);
 
   if (budgetGoals.filter(g => g.period === 'monthly').length === 0) {
     return (
@@ -129,3 +129,5 @@ export function BudgetPerformanceReport() {
     </Card>
   );
 }
+
+    

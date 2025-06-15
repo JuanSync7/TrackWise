@@ -1,20 +1,21 @@
-
 'use server';
 
 /**
- * @fileOverview An AI agent that suggests notes for an expense based on its description.
+ * @fileOverview An AI agent that suggests notes for a transaction based on its description.
  *
- * - suggestExpenseNotes - A function that suggests notes for an expense.
+ * - suggestExpenseNotes - A function that suggests notes for a transaction.
  * - SuggestExpenseNotesInput - The input type for the suggestExpenseNotes function.
  * - SuggestExpenseNotesOutput - The return type for the suggestExpenseNotes function.
  */
+// Note: "Expense" is kept in function/type names for now as it's specifically about expense-like details.
+// If income notes were different, a separate flow might be better.
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const SuggestExpenseNotesInputSchema = z.object({
-  description: z.string().describe('The description of the expense.'),
-  currentNotes: z.string().optional().describe('Any existing notes for the expense.'),
+  description: z.string().describe('The description of the transaction.'),
+  currentNotes: z.string().optional().describe('Any existing notes for the transaction.'),
 });
 export type SuggestExpenseNotesInput = z.infer<
   typeof SuggestExpenseNotesInputSchema
@@ -23,7 +24,7 @@ export type SuggestExpenseNotesInput = z.infer<
 const SuggestExpenseNotesOutputSchema = z.object({
   suggestedNote: z
     .string()
-    .describe('The suggested note for the expense.'),
+    .describe('The suggested note for the transaction.'),
   reasoning: z
     .string()
     .optional()
@@ -43,10 +44,10 @@ const prompt = ai.definePrompt({
   name: 'suggestExpenseNotesPrompt',
   input: {schema: SuggestExpenseNotesInputSchema},
   output: {schema: SuggestExpenseNotesOutputSchema},
-  prompt: `You are an intelligent assistant helping a user add notes to their expenses.
-Given the expense description, suggest a concise and relevant note.
+  prompt: `You are an intelligent assistant helping a user add notes to their financial transactions.
+Given the transaction description, suggest a concise and relevant note.
 
-Expense Description: {{{description}}}
+Transaction Description: {{{description}}}
 
 {{#if currentNotes}}
 The user has already started writing these notes: {{{currentNotes}}}
@@ -58,6 +59,7 @@ Suggest a new note based on the description.
 Keep the suggested note brief, typically a few words to a short sentence.
 Example: If description is "Coffee with Sarah", suggested note could be "Networking meeting" or "Catch up with friend".
 If description is "Monthly Metro Pass", suggested note could be "Public transport subscription".
+If description is "Client Payment - Project X", suggested note could be "Invoice #123 paid".
 `,
 });
 

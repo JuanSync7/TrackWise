@@ -1,10 +1,10 @@
 
 "use client";
 
-import React, { useState, useMemo, useEffect, useCallback, Suspense } from 'react'; // Added React, Suspense
+import React, { useState, useMemo, useEffect, useCallback, Suspense } from 'react';
 import { PageHeader } from '@/components/shared/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Users, DollarSign, WalletCards, DivideSquare, ListChecks, Download, Shuffle, Wallet, Receipt, Loader2 } from 'lucide-react'; // Added Loader2
+import { PlusCircle, Users, DollarSign, WalletCards, DivideSquare, ListChecks, Download, Shuffle, Wallet, Receipt, Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -16,14 +16,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useHousehold } from '@/contexts/household-context'; // Changed context
-import { usePersonalFinance } from '@/contexts/personal-finance-context'; // For categories if needed by ExpenseForm
+import { useHousehold } from '@/contexts/household-context';
+import { usePersonalFinance } from '@/contexts/personal-finance-context';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from "@/hooks/use-toast";
-import type { Member, Contribution, HouseholdExpense, HouseholdSettlement, CalculatedMemberFinancials, MemberDisplayFinancials } from '@/lib/types';
-// import { MemberForm } from '@/components/household/member-form'; // Dynamic
-// import { ContributionForm, type ContributionFormValues } from '@/components/household/contribution-form'; // Dynamic
-// import { ExpenseForm, type ExpenseFormValues as ExpenseFormValuesType } from '@/components/expenses/expense-form'; // Dynamic
+import type { Member, Contribution, HouseholdTransaction, HouseholdSettlement, MemberDisplayFinancials, TransactionType } from '@/lib/types'; // Renamed HouseholdExpense
 import { MemberList } from '@/components/household/member-list';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -31,40 +28,40 @@ import { format } from 'date-fns';
 import { DEFAULT_CURRENCY, HOUSEHOLD_EXPENSE_CATEGORY_ID, POT_PAYER_ID } from '@/lib/constants';
 import Link from 'next/link';
 import { cn, exportToCsv } from '@/lib/utils';
-import { TripSettlementList } from '@/components/trips/trip-settlement-list'; // Reused for household settlements
+import { TripSettlementList } from '@/components/trips/trip-settlement-list';
 
 const MemberForm = React.lazy(() => import('@/components/household/member-form').then(module => ({ default: module.MemberForm })));
 const ContributionForm = React.lazy(() => import('@/components/household/contribution-form').then(module => ({ default: module.ContributionForm })));
 type ContributionFormValues = import('@/components/household/contribution-form').ContributionFormValues;
-const ExpenseForm = React.lazy(() => import('@/components/expenses/expense-form').then(module => ({ default: module.ExpenseForm })));
-type ExpenseFormValuesType = import('@/components/expenses/expense-form').ExpenseFormValues;
+const TransactionForm = React.lazy(() => import('@/components/transactions/transaction-form').then(module => ({ default: module.TransactionForm }))); // Renamed ExpenseForm
+type TransactionFormValuesType = import('@/components/transactions/transaction-form').TransactionFormValues; // Renamed
 
 
 export default function HouseholdPage() {
   const {
     members, addMember, deleteMember: contextDeleteMember, getMemberById,
     contributions, addContribution,
-    householdExpenses, addHouseholdExpense, sharedBudgets,
+    householdTransactions, addHouseholdTransaction, sharedBudgets, // Renamed
     householdFinancialSummaries, householdOverallSettlements,
     getHouseholdMemberNetData, triggerHouseholdSettlementCalculation,
   } = useHousehold();
-  const { getCategoryById } = usePersonalFinance(); // For ExpenseForm category dropdown
+  const { getCategoryById } = usePersonalFinance();
   const { user: authUser } = useAuth();
   const { toast } = useToast();
 
   const [isMemberFormOpen, setIsMemberFormOpen] = useState(false);
   const [isContributionFormOpen, setIsContributionFormOpen] = useState(false);
-  const [isExpenseFormOpen, setIsExpenseFormOpen] = useState(false);
+  const [isExpenseFormOpen, setIsExpenseFormOpen] = useState(false); // This form is now TransactionForm
   const [selectedMemberForContribution, setSelectedMemberForContribution] = useState<Member | null>(null);
   const [isSubmittingMember, setIsSubmittingMember] = useState(false);
   const [isSubmittingContribution, setIsSubmittingContribution] = useState(false);
-  const [isSubmittingExpense, setIsSubmittingExpense] = useState(false);
+  const [isSubmittingTransaction, setIsSubmittingTransaction] = useState(false); // Renamed
   const [memberToDelete, setMemberToDelete] = useState<string | null>(null);
 
 
-  useEffect(() => { // Ensure settlements are calculated on initial load and when data changes
+  useEffect(() => {
     triggerHouseholdSettlementCalculation();
-  }, [members, contributions, householdExpenses, triggerHouseholdSettlementCalculation]);
+  }, [members, contributions, householdTransactions, triggerHouseholdSettlementCalculation]); // Renamed
 
 
   const currentUserAsHouseholdMember = useMemo(() => {
@@ -133,50 +130,53 @@ export default function HouseholdPage() {
     }
   }, [selectedMemberForContribution, addContribution, toast]);
 
-  const handleSaveExpense = useCallback(async (data: ExpenseFormValuesType) => {
-    setIsSubmittingExpense(true);
-    let expenseData: Omit<HouseholdExpense, 'id'> = {
+  const handleSaveHouseholdTransaction = useCallback(async (data: TransactionFormValuesType) => { // Renamed
+    setIsSubmittingTransaction(true); // Renamed
+    let transactionData: Omit<HouseholdTransaction, 'id'> = { // Renamed
       description: data.description,
       amount: data.amount,
       date: format(data.date, "yyyy-MM-dd"),
       categoryId: data.categoryId,
       notes: data.notes,
+      transactionType: data.transactionType, // Added
       sharedBudgetId: data.sharedBudgetId === NONE_SHARED_BUDGET_VALUE ? undefined : data.sharedBudgetId,
-      isSplit: data.isSplit,
-      paidByMemberId: data.paidByMemberId,
-      splitWithMemberIds: data.splitWithMemberIds,
+      isSplit: data.transactionType === 'expense' ? data.isSplit : false,
+      paidByMemberId: data.transactionType === 'expense' ? data.paidByMemberId : undefined,
+      splitWithMemberIds: data.transactionType === 'expense' ? data.splitWithMemberIds : [],
     };
 
-    if (!expenseData.categoryId && (!expenseData.sharedBudgetId)) {
-      expenseData.categoryId = HOUSEHOLD_EXPENSE_CATEGORY_ID;
+    // Default category for household transactions if not linked to shared budget and no category selected
+    if (transactionData.transactionType === 'expense' && !transactionData.categoryId && !transactionData.sharedBudgetId) {
+      transactionData.categoryId = HOUSEHOLD_EXPENSE_CATEGORY_ID;
     }
-    if (expenseData.isSplit && !expenseData.paidByMemberId) {
-        expenseData.paidByMemberId = POT_PAYER_ID;
+    // Default payer to POT if split and no payer selected (for expenses)
+    if (transactionData.transactionType === 'expense' && transactionData.isSplit && !transactionData.paidByMemberId) {
+        transactionData.paidByMemberId = POT_PAYER_ID;
     }
 
     try {
-      addHouseholdExpense(expenseData);
-      toast({ title: "Shared Expense Added", description: "Your new shared expense has been successfully recorded." });
+      addHouseholdTransaction(transactionData); // Renamed
+      toast({ title: "Shared Transaction Added", description: "Your new shared transaction has been successfully recorded." }); // Updated
       setIsExpenseFormOpen(false);
     } catch (error) {
-      toast({ variant: "destructive", title: "Save Failed", description: "Could not save shared expense. Please try again." });
+      toast({ variant: "destructive", title: "Save Failed", description: "Could not save shared transaction. Please try again." });
     } finally {
-      setIsSubmittingExpense(false);
+      setIsSubmittingTransaction(false); // Renamed
     }
-  }, [addHouseholdExpense, toast]);
+  }, [addHouseholdTransaction, toast]); // Renamed
 
 
   const householdFinancialSummary = useMemo(() => {
     let totalCashInPot = 0;
-    let totalMemberPaidExpenses = 0;
+    let totalMemberPaidExpenses = 0; // Only expenses
     Object.values(householdFinancialSummaries).forEach(financials => {
       totalCashInPot += financials.directCashContribution;
       totalMemberPaidExpenses += financials.amountPersonallyPaidForGroup;
     });
 
-    const totalPotPaidExpenses = householdExpenses
-      .filter(exp => exp.paidByMemberId === POT_PAYER_ID)
-      .reduce((sum, exp) => sum + exp.amount, 0);
+    const totalPotPaidExpenses = householdTransactions // Renamed
+      .filter(trans => trans.transactionType === 'expense' && trans.paidByMemberId === POT_PAYER_ID)
+      .reduce((sum, trans) => sum + trans.amount, 0);
 
     const remainingCashInPot = totalCashInPot - totalPotPaidExpenses;
     const potUsagePercentage = totalCashInPot > 0 ? Math.min((totalPotPaidExpenses / totalCashInPot) * 100, 100) : 0;
@@ -188,7 +188,7 @@ export default function HouseholdPage() {
       remainingCashInPot,
       potUsagePercentage,
     };
-  }, [householdFinancialSummaries, householdExpenses]);
+  }, [householdFinancialSummaries, householdTransactions]); // Renamed
 
 
   const handleExportHouseholdData = useCallback(() => {
@@ -239,25 +239,25 @@ export default function HouseholdPage() {
       csvRows.push([memberName, contrib.amount.toFixed(2), contrib.date, contrib.notes || '']);
     });
     csvRows.push([]);
-    csvRows.push(["Household Expenses (All Payers)"]);
-    csvRows.push(["Description", `Amount (${DEFAULT_CURRENCY})`, "Date", "Category/Linked Budget", "Paid By"]);
-    householdExpenses.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .forEach(exp => {
+    csvRows.push(["Household Transactions (All Payers)"]);
+    csvRows.push(["Description", `Amount (${DEFAULT_CURRENCY})`, "Date", "Type", "Category/Linked Budget", "Paid By"]); // Added Type
+    householdTransactions.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()) // Renamed
+    .forEach(trans => { // Renamed
       let source = "Unknown";
-      if (exp.sharedBudgetId) {
-        const budget = sharedBudgets.find(sb => sb.id === exp.sharedBudgetId);
-        source = budget ? `Shared Budget: ${budget.name}` : `Shared Budget: ID ${exp.sharedBudgetId}`;
-      } else if (exp.categoryId) {
-        const category = getCategoryById(exp.categoryId); // From PersonalFinanceContext
-        source = category ? `Category: ${category.name}` : `Category: ID ${exp.categoryId}`;
+      if (trans.sharedBudgetId) {
+        const budget = sharedBudgets.find(sb => sb.id === trans.sharedBudgetId);
+        source = budget ? `Shared Budget: ${budget.name}` : `Shared Budget: ID ${trans.sharedBudgetId}`;
+      } else if (trans.categoryId) {
+        const category = getCategoryById(trans.categoryId);
+        source = category ? `Category: ${category.name}` : `Category: ID ${trans.categoryId}`;
       }
-      const payerName = exp.paidByMemberId === POT_PAYER_ID ? "Household Pot" : (members.find(m=>m.id === exp.paidByMemberId)?.name || "Unknown Member");
-      csvRows.push([exp.description, exp.amount.toFixed(2), exp.date, source, payerName]);
+      const payerName = trans.paidByMemberId === POT_PAYER_ID ? "Household Pot" : (members.find(m=>m.id === trans.paidByMemberId)?.name || "Unknown Member");
+      csvRows.push([trans.description, trans.amount.toFixed(2), trans.date, trans.transactionType, source, payerName]); // Added type
     });
 
     exportToCsv(filename, csvRows);
     toast({ title: "Household Data Exported", description: `Data exported to ${filename}` });
-  }, [members, contributions, householdExpenses, sharedBudgets, householdOverallSettlements, householdFinancialSummary, getHouseholdMemberNetData, getCategoryById, toast]);
+  }, [members, contributions, householdTransactions, sharedBudgets, householdOverallSettlements, householdFinancialSummary, getHouseholdMemberNetData, getCategoryById, toast]); // Renamed
 
   const NONE_SHARED_BUDGET_VALUE = "__NONE__";
 
@@ -269,11 +269,11 @@ export default function HouseholdPage() {
         description="Manage members, track contributions, and oversee shared finances."
         actions={
           <div className="flex gap-2 flex-wrap">
-            <Button variant="outline" onClick={handleExportHouseholdData} disabled={members.length === 0 && contributions.length === 0 && householdExpenses.length === 0}>
+            <Button variant="outline" onClick={handleExportHouseholdData} disabled={members.length === 0 && contributions.length === 0 && householdTransactions.length === 0}>
                 <Download className="mr-2 h-4 w-4" /> Export Household Data
             </Button>
             <Button variant="outline" onClick={() => setIsExpenseFormOpen(true)}>
-              <ListChecks className="mr-2 h-4 w-4" /> Add Shared Expense
+              <ListChecks className="mr-2 h-4 w-4" /> Add Shared Transaction
             </Button>
             <Button onClick={openMemberFormForNew}>
               <PlusCircle className="mr-2 h-4 w-4" /> Add New Member
@@ -328,16 +328,16 @@ export default function HouseholdPage() {
       <Dialog open={isExpenseFormOpen} onOpenChange={setIsExpenseFormOpen}>
         <DialogContent className="sm:max-w-[425px] md:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Add New Shared Expense</DialogTitle>
+            <DialogTitle>Add New Shared Transaction</DialogTitle>
             <DialogDescription>
-              Fill in the details for a new shared household expense. Select "Paid from Pot" if the communal fund is used.
+              Fill in the details for a new shared household transaction. Select "Paid from Pot" if the communal fund is used for expenses.
             </DialogDescription>
           </DialogHeader>
           <Suspense fallback={<div className="flex justify-center items-center h-96"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
-            <ExpenseForm
-              onSave={handleSaveExpense}
+            <TransactionForm
+              onSave={handleSaveHouseholdTransaction} // Renamed
               onCancel={() => setIsExpenseFormOpen(false)}
-              isSubmitting={isSubmittingExpense}
+              isSubmitting={isSubmittingTransaction} // Renamed
               showSharedBudgetLink={true}
               showSplittingFeature={true}
               availableMembersForSplitting={members}
@@ -354,7 +354,7 @@ export default function HouseholdPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently remove the member, their contributions, and any associated expense splits from the household. Settlements will be recalculated.
+              This action cannot be undone. This will permanently remove the member, their contributions, and any associated transaction splits from the household. Settlements will be recalculated.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -394,7 +394,7 @@ export default function HouseholdPage() {
             <CardContent>
                 <TripSettlementList
                     settlements={householdOverallSettlements}
-                    tripId="household_pot_settlement" // Contextual ID for household
+                    tripId="household_pot_settlement" 
                     finalMemberFinancials={householdFinancialSummaries}
                     remainingCashInPot={householdFinancialSummary.remainingCashInPot}
                 />
@@ -417,11 +417,11 @@ export default function HouseholdPage() {
                     <span className="font-semibold text-accent">{DEFAULT_CURRENCY}{householdFinancialSummary.totalCashInPot.toFixed(2)}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Total Member-Paid (Group):</span>
+                    <span className="text-sm text-muted-foreground">Total Member-Paid (Group Expenses):</span>
                     <span className="font-semibold">{DEFAULT_CURRENCY}{householdFinancialSummary.totalMemberPaidExpenses.toFixed(2)}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Total Spent from Pot:</span>
+                    <span className="text-sm text-muted-foreground">Total Spent from Pot (Expenses):</span>
                     <span className="font-semibold text-destructive">{DEFAULT_CURRENCY}{householdFinancialSummary.totalPotPaidExpenses.toFixed(2)}</span>
                 </div>
                  <hr className="my-1 border-border"/>
@@ -441,17 +441,17 @@ export default function HouseholdPage() {
            <Card>
             <CardHeader>
               <CardTitle  className="flex items-center gap-2">
-                <Receipt className="h-6 w-6 text-primary" /> {/* Changed icon */}
-                All Shared Expenses
+                <Receipt className="h-6 w-6 text-primary" />
+                All Shared Transactions
               </CardTitle>
-              <CardDescription>Log and view all expenses shared within the household, regardless of payer.</CardDescription>
+              <CardDescription>Log and view all transactions shared within the household, regardless of payer.</CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">Track shared utilities, groceries, rent, etc. that are attributed to the household, whether paid from the pot or by an individual for the group.</p>
             </CardContent>
              <CardFooter>
                 <Button className="w-full" onClick={() => setIsExpenseFormOpen(true)}>
-                  <ListChecks className="mr-2 h-4 w-4" /> Add/View Shared Expenses
+                  <ListChecks className="mr-2 h-4 w-4" /> Add/View Shared Transactions
                 </Button>
             </CardFooter>
           </Card>
@@ -515,3 +515,5 @@ export default function HouseholdPage() {
     </div>
   );
 }
+
+    

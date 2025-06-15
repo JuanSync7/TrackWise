@@ -1,23 +1,20 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback, Suspense } from 'react'; // Added React, Suspense
+import React, { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/shared/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Users, Banknote, ListChecks, ArrowLeft, Shuffle, Wallet, Receipt, Loader2 } from 'lucide-react'; // Removed HandCoins, CircleDollarSign, Added Loader2
+import { PlusCircle, Users, Banknote, ListChecks, ArrowLeft, Shuffle, Wallet, Receipt, Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'; // Removed CardFooter
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { useTrips } from '@/contexts/trip-context'; // Changed context
-import { usePersonalFinance } from '@/contexts/personal-finance-context'; // For categories
+import { useTrips } from '@/contexts/trip-context';
+import { usePersonalFinance } from '@/contexts/personal-finance-context';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from "@/hooks/use-toast";
-import type { Trip, TripMember, TripContribution, TripExpense, TripSettlement, CalculatedMemberFinancials, MemberDisplayFinancials } from '@/lib/types';
-// import { TripMemberForm, type TripMemberFormValues } from '@/components/trips/trip-member-form'; // Dynamic
-// import { TripContributionForm, type TripContributionFormValues } from '@/components/trips/trip-contribution-form'; // Dynamic
-// import { ExpenseForm, type ExpenseFormValues as GenericExpenseFormValues } from '@/components/expenses/expense-form'; // Dynamic
+import type { Trip, TripMember, TripContribution, TripTransaction, TripSettlement, CalculatedMemberFinancials, MemberDisplayFinancials } from '@/lib/types'; // Renamed
 import { TripMemberList } from '@/components/trips/trip-member-list';
 import { TripSettlementList } from '@/components/trips/trip-settlement-list';
 import { DEFAULT_CURRENCY, POT_PAYER_ID } from '@/lib/constants';
@@ -29,8 +26,8 @@ const TripMemberForm = React.lazy(() => import('@/components/trips/trip-member-f
 type TripMemberFormValues = import('@/components/trips/trip-member-form').TripMemberFormValues;
 const TripContributionForm = React.lazy(() => import('@/components/trips/trip-contribution-form').then(module => ({ default: module.TripContributionForm })));
 type TripContributionFormValues = import('@/components/trips/trip-contribution-form').TripContributionFormValues;
-const ExpenseForm = React.lazy(() => import('@/components/expenses/expense-form').then(module => ({ default: module.ExpenseForm })));
-type GenericExpenseFormValues = import('@/components/expenses/expense-form').ExpenseFormValues;
+const TransactionForm = React.lazy(() => import('@/components/transactions/transaction-form').then(module => ({ default: module.TransactionForm }))); // Renamed
+type GenericTransactionFormValues = import('@/components/transactions/transaction-form').TransactionFormValues; // Renamed
 
 
 export default function TripDetailPage() {
@@ -44,27 +41,27 @@ export default function TripDetailPage() {
     addTripContribution,
     tripMembers: globalTripMembers,
     tripContributions: globalTripContributions,
-    addTripExpense,
-    tripExpenses: globalTripExpenses,
+    addTripTransaction, // Renamed
+    tripTransactions: globalTripTransactions, // Renamed
     getTripMembers,
-    getTripExpenses,
+    getTripTransactions, // Renamed
     getTripSettlements,
     triggerTripSettlementCalculation,
     tripFinancialSummaries,
     getTripMemberNetData,
   } = useTrips();
-  const { getCategoryById } = usePersonalFinance(); // For ExpenseForm categories
+  const { getCategoryById } = usePersonalFinance();
   const { user: authUser } = useAuth();
   const { toast } = useToast();
 
   const [trip, setTrip] = useState<Trip | undefined>(undefined);
   const [isMemberFormOpen, setIsMemberFormOpen] = useState(false);
   const [isContributionFormOpen, setIsContributionFormOpen] = useState(false);
-  const [isExpenseFormOpen, setIsExpenseFormOpen] = useState(false);
+  const [isTransactionFormOpen, setIsTransactionFormOpen] = useState(false); // Renamed
   const [selectedTripMemberForContribution, setSelectedTripMemberForContribution] = useState<TripMember | null>(null);
   const [isSubmittingMember, setIsSubmittingMember] = useState(false);
   const [isSubmittingContribution, setIsSubmittingContribution] = useState(false);
-  const [isSubmittingExpense, setIsSubmittingExpense] = useState(false);
+  const [isSubmittingTransaction, setIsSubmittingTransaction] = useState(false); // Renamed
   const [tripMemberToDelete, setTripMemberToDelete] = useState<string | null>(null);
 
   const memoizedTripMembers = useMemo(() => {
@@ -103,7 +100,7 @@ export default function TripDetailPage() {
     if (tripId) {
       triggerTripSettlementCalculation(tripId);
     }
-  }, [tripId, globalTripMembers, globalTripContributions, globalTripExpenses, triggerTripSettlementCalculation]);
+  }, [tripId, globalTripMembers, globalTripContributions, globalTripTransactions, triggerTripSettlementCalculation]); // Renamed
 
 
   const currentAuthUserAsTripMember = useMemo(() => {
@@ -165,30 +162,31 @@ export default function TripDetailPage() {
     }
   }, [selectedTripMemberForContribution, tripId, addTripContribution, toast]);
 
-  const handleSaveTripExpense = useCallback(async (formData: GenericExpenseFormValues) => {
+  const handleSaveTripTransaction = useCallback(async (formData: GenericTransactionFormValues) => { // Renamed
     if (!tripId) return;
-    setIsSubmittingExpense(true);
+    setIsSubmittingTransaction(true); // Renamed
     try {
-      const tripExpenseData: Omit<TripExpense, 'id' | 'tripId'> & { tripId: string } = {
+      const tripTransactionData: Omit<TripTransaction, 'id' | 'tripId'> & { tripId: string } = { // Renamed
         tripId: tripId,
         description: formData.description,
         amount: formData.amount,
         date: formatDate(formData.date, "yyyy-MM-dd"),
         categoryId: formData.categoryId,
         notes: formData.notes,
-        isSplit: formData.isSplit,
-        paidByTripMemberId: formData.paidByMemberId,
-        splitWithTripMemberIds: formData.splitWithMemberIds,
+        transactionType: formData.transactionType, // Added
+        isSplit: formData.transactionType === 'expense' ? formData.isSplit : false,
+        paidByTripMemberId: formData.transactionType === 'expense' ? formData.paidByMemberId : undefined,
+        splitWithTripMemberIds: formData.transactionType === 'expense' ? formData.splitWithMemberIds : [],
       };
-      addTripExpense(tripExpenseData);
-      toast({ title: "Trip Expense Added", description: `Expense "${formData.description}" recorded for the trip.` });
-      setIsExpenseFormOpen(false);
+      addTripTransaction(tripTransactionData); // Renamed
+      toast({ title: "Trip Transaction Added", description: `Transaction "${formData.description}" recorded for the trip.` }); // Updated
+      setIsTransactionFormOpen(false); // Renamed
     } catch (error) {
-      toast({ variant: "destructive", title: "Save Failed", description: "Could not save trip expense." });
+      toast({ variant: "destructive", title: "Save Failed", description: "Could not save trip transaction." });
     } finally {
-      setIsSubmittingExpense(false);
+      setIsSubmittingTransaction(false); // Renamed
     }
-  }, [tripId, addTripExpense, toast]);
+  }, [tripId, addTripTransaction, toast]); // Renamed
 
  const tripFinancialSummary = useMemo(() => {
     let totalCashInPot = 0;
@@ -199,8 +197,8 @@ export default function TripDetailPage() {
       totalMemberPaidExpenses += financials.amountPersonallyPaidForGroup;
     });
 
-    const expensesForThisTrip = globalTripExpenses.filter(exp => exp.tripId === tripId);
-    const totalPotPaidExpenses = expensesForThisTrip
+    const expenseTransactionsForThisTrip = globalTripTransactions.filter(trans => trans.tripId === tripId && trans.transactionType === 'expense'); // Renamed
+    const totalPotPaidExpenses = expenseTransactionsForThisTrip
       .filter(exp => exp.paidByTripMemberId === POT_PAYER_ID)
       .reduce((sum, exp) => sum + exp.amount, 0);
 
@@ -214,7 +212,7 @@ export default function TripDetailPage() {
       remainingCashInPot,
       potUsagePercentage,
     };
-  }, [currentTripFinancials, globalTripExpenses, tripId]);
+  }, [currentTripFinancials, globalTripTransactions, tripId]); // Renamed
 
 
   if (!trip) {
@@ -232,8 +230,8 @@ export default function TripDetailPage() {
         description={trip.description || "Manage your trip's finances and members."}
         actions={
           <div className="flex gap-2 flex-wrap">
-            <Button variant="outline" onClick={() => setIsExpenseFormOpen(true)}>
-              <ListChecks className="mr-2 h-4 w-4" /> Add Trip Expense
+            <Button variant="outline" onClick={() => setIsTransactionFormOpen(true)}> {/* Renamed */}
+              <ListChecks className="mr-2 h-4 w-4" /> Add Trip Transaction {/* Renamed */}
             </Button>
             <Button variant="outline" onClick={() => setIsMemberFormOpen(true)}>
               <PlusCircle className="mr-2 h-4 w-4" /> Add Trip Member
@@ -286,21 +284,21 @@ export default function TripDetailPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isExpenseFormOpen} onOpenChange={setIsExpenseFormOpen}>
+      <Dialog open={isTransactionFormOpen} onOpenChange={setIsTransactionFormOpen}> {/* Renamed */}
         <DialogContent className="sm:max-w-[425px] md:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Add New Trip Expense</DialogTitle>
+            <DialogTitle>Add New Trip Transaction</DialogTitle> {/* Renamed */}
             <DialogDescription>
-              Fill in details for a new trip expense. Select "Paid from Pot" if communal funds were used.
+              Fill in details for a new trip transaction. Select "Paid from Pot" if communal funds were used for an expense.
             </DialogDescription>
           </DialogHeader>
           <Suspense fallback={<div className="flex justify-center items-center h-96"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
-            <ExpenseForm
-              onSave={handleSaveTripExpense}
-              onCancel={() => setIsExpenseFormOpen(false)}
-              isSubmitting={isSubmittingExpense}
-              showSharedBudgetLink={false} // No shared household budgets for trips
-              showSplittingFeature={true} // Splitting is key for trips
+            <TransactionForm
+              onSave={handleSaveTripTransaction} // Renamed
+              onCancel={() => setIsTransactionFormOpen(false)} // Renamed
+              isSubmitting={isSubmittingTransaction} // Renamed
+              showSharedBudgetLink={false}
+              showSplittingFeature={true}
               availableMembersForSplitting={memoizedTripMembers}
               currentUserIdForDefaultPayer={currentAuthUserAsTripMember?.id}
               allowPotPayer={true}
@@ -315,7 +313,7 @@ export default function TripDetailPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will remove the member, their contributions, and adjust expense splits from this trip. This action cannot be undone. Settlements will be recalculated.
+              This will remove the member, their contributions, and adjust transaction splits from this trip. This action cannot be undone. Settlements will be recalculated.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -378,11 +376,11 @@ export default function TripDetailPage() {
                     <span className="font-semibold text-accent">{DEFAULT_CURRENCY}{tripFinancialSummary.totalCashInPot.toFixed(2)}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Total Member-Paid (Group):</span>
+                    <span className="text-sm text-muted-foreground">Total Member-Paid (Group Expenses):</span>
                     <span className="font-semibold">{DEFAULT_CURRENCY}{tripFinancialSummary.totalMemberPaidExpenses.toFixed(2)}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Total Spent from Pot:</span>
+                    <span className="text-sm text-muted-foreground">Total Spent from Pot (Expenses):</span>
                     <span className="font-semibold text-destructive">{DEFAULT_CURRENCY}{tripFinancialSummary.totalPotPaidExpenses.toFixed(2)}</span>
                 </div>
                  <hr className="my-1 border-border"/>
@@ -403,3 +401,5 @@ export default function TripDetailPage() {
     </div>
   );
 }
+
+    

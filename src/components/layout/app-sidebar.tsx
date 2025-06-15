@@ -17,16 +17,16 @@ import {
 import { Button } from "@/components/ui/button";
 import type { NavItem } from "@/lib/types";
 import { APP_NAME } from "@/lib/constants";
-import { LayoutDashboard, ListChecks, PiggyBank, Settings, BarChart3, LogOut, Briefcase, Users, PlaneTakeoff, Loader2 } from "lucide-react"; // Added PlaneTakeoff
+import { LayoutDashboard, ArrowRightLeft, PiggyBank, Settings, BarChart3, LogOut, Briefcase, Users, PlaneTakeoff, Loader2 } from "lucide-react"; // Replaced ListChecks with ArrowRightLeft
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
 
 const navItems: NavItem[] = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { title: "Expenses", href: "/expenses", icon: ListChecks },
+  { title: "Transactions", href: "/transactions", icon: ArrowRightLeft }, // Updated
   { title: "Budgets", href: "/budgets", icon: PiggyBank },
   { title: "Household", href: "/household", icon: Users },
-  { title: "Trips", href: "/trips", icon: PlaneTakeoff }, // New Trips item
+  { title: "Trips", href: "/trips", icon: PlaneTakeoff },
   { title: "Reports", href: "/reports", icon: BarChart3 },
   { title: "Settings", href: "/settings", icon: Settings },
 ];
@@ -97,3 +97,5 @@ export function AppSidebar() {
     </Sidebar>
   );
 }
+
+    

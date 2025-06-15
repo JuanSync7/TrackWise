@@ -20,9 +20,9 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import type { BudgetGoal } from '@/lib/types';
-import { usePersonalFinance } from '@/contexts/personal-finance-context'; // Changed context
+import { usePersonalFinance } from '@/contexts/personal-finance-context';
 import { CategoryIcon } from '@/components/shared/category-icon';
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react"; // Added useMemo
 
 const budgetFormSchema = z.object({
   categoryId: z.string({ required_error: "Please select a category." }),
@@ -40,8 +40,13 @@ interface BudgetFormProps {
 }
 
 export function BudgetForm({ budgetGoal, onSave, onCancel, isSubmitting }: BudgetFormProps) {
-  const { categories, getCategoryById } = usePersonalFinance(); // Changed context
+  const { categories, getCategoryById } = usePersonalFinance();
   const [categoryPopoverOpen, setCategoryPopoverOpen] = useState(false);
+
+  // Budgets only apply to expenses
+  const expenseCategories = useMemo(() => {
+    return categories.filter(cat => cat.appliesTo === 'expense' || cat.appliesTo === 'both');
+  }, [categories]);
 
   const form = useForm<BudgetFormValues>({
     resolver: zodResolver(budgetFormSchema),
@@ -81,7 +86,7 @@ export function BudgetForm({ budgetGoal, onSave, onCancel, isSubmitting }: Budge
           name="categoryId"
           render={({ field }) => (
             <FormItem className="flex flex-col">
-              <FormLabel>Category</FormLabel>
+              <FormLabel>Category (for Expenses)</FormLabel>
               <Popover open={categoryPopoverOpen} onOpenChange={setCategoryPopoverOpen}>
                 <PopoverTrigger asChild>
                   <FormControl>
@@ -110,7 +115,7 @@ export function BudgetForm({ budgetGoal, onSave, onCancel, isSubmitting }: Budge
                     <CommandList>
                     <CommandEmpty>No category found.</CommandEmpty>
                     <CommandGroup>
-                      {categories.map((category) => (
+                      {expenseCategories.map((category) => (
                         <CommandItem
                           value={category.name}
                           key={category.id}
@@ -194,3 +199,5 @@ export function BudgetForm({ budgetGoal, onSave, onCancel, isSubmitting }: Budge
     </Form>
   );
 }
+
+    

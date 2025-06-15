@@ -1,14 +1,12 @@
 
 "use client";
 
-import React, { useState, useEffect, Suspense } from 'react'; // Added React, Suspense
+import React, { useState, useEffect, Suspense } from 'react';
 import { PageHeader } from '@/components/shared/page-header';
-// import { BudgetForm } from '@/components/budgets/budget-form'; // Dynamic import
-import { BudgetList } from '@/components/budgets/budget-list';
 import type { BudgetGoal } from '@/lib/types';
-import { usePersonalFinance } from '@/contexts/personal-finance-context'; // Changed context
+import { usePersonalFinance } from '@/contexts/personal-finance-context';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Download, Loader2 } from 'lucide-react'; // Added Loader2
+import { PlusCircle, Download, Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -22,7 +20,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { BudgetGoalPieChart } from '@/components/dashboard/budget-goal-pie-chart';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { BudgetList } from '@/components/budgets/budget-list'; // BudgetList should still work as is
 import { exportToCsv } from '@/lib/utils';
 import { format as formatDate } from 'date-fns';
 import { DEFAULT_CURRENCY } from '@/lib/constants';
@@ -31,7 +29,7 @@ const BudgetForm = React.lazy(() => import('@/components/budgets/budget-form').t
 
 
 export default function BudgetsPage() {
-  const { budgetGoals, addBudgetGoal, updateBudgetGoal, deleteBudgetGoal: contextDeleteBudget, getCategoryById } = usePersonalFinance(); // Changed context
+  const { budgetGoals, addBudgetGoal, updateBudgetGoal, deleteBudgetGoal: contextDeleteBudget, getCategoryById } = usePersonalFinance();
   const { toast } = useToast();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -90,7 +88,7 @@ export default function BudgetsPage() {
 
   const handleExportBudgetGoals = () => {
     const headerRow = [
-      "ID", "Category Name", "Budgeted Amount", "Period", "Current Spending", "Currency"
+      "ID", "Category Name", "Budgeted Amount", "Period", "Current Spending (Expenses)", "Currency"
     ];
 
     const dataRows = budgetGoals.map(goal => {
@@ -100,7 +98,7 @@ export default function BudgetsPage() {
         categoryName,
         goal.amount,
         goal.period,
-        goal.currentSpending,
+        goal.currentSpending, // currentSpending in BudgetGoal refers to expenses
         DEFAULT_CURRENCY
       ];
     });
@@ -176,3 +174,5 @@ export default function BudgetsPage() {
     </div>
   );
 }
+
+    

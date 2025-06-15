@@ -3,15 +3,16 @@
 
 import { PageHeader } from '@/components/shared/page-header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { usePersonalFinance } from '@/contexts/personal-finance-context'; // Changed context
+import { usePersonalFinance } from '@/contexts/personal-finance-context';
 import { CategoryIcon } from '@/components/shared/category-icon';
 import { Button } from '@/components/ui/button';
-import { List, Palette, Bell, ShieldCheck, Trash2, Edit3, PlusCircle, Moon, Sun } from 'lucide-react';
+import { List, Palette, Bell, ShieldCheck, Trash2, Edit3, PlusCircle, Moon, Sun, TrendingUp, TrendingDown, Check } from 'lucide-react'; // Added Check
 import { useTheme } from "next-themes";
 import { useEffect, useState } from 'react';
+import { Badge } from '@/components/ui/badge'; // Added Badge
 
 export default function SettingsPage() {
-  const { categories } = usePersonalFinance(); // Changed context
+  const { categories } = usePersonalFinance();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
@@ -37,7 +38,7 @@ export default function SettingsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><List className="h-5 w-5 text-primary"/> Manage Categories</CardTitle>
-            <CardDescription>View and manage your expense categories.</CardDescription>
+            <CardDescription>View and manage your transaction categories.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 max-h-60 overflow-y-auto">
             {categories.map(category => (
@@ -45,6 +46,9 @@ export default function SettingsPage() {
                 <div className="flex items-center gap-2">
                   <CategoryIcon category={category} size="sm" />
                   <span>{category.name}</span>
+                  {category.appliesTo === 'income' && <Badge variant="outline" className="text-xs border-accent text-accent"><TrendingUp className="mr-1 h-3 w-3"/>Income</Badge>}
+                  {category.appliesTo === 'expense' && <Badge variant="outline" className="text-xs border-destructive text-destructive"><TrendingDown className="mr-1 h-3 w-3"/>Expense</Badge>}
+                  {category.appliesTo === 'both' && <Badge variant="outline" className="text-xs"><Check className="mr-1 h-3 w-3"/>Both</Badge>}
                 </div>
                 <div className="flex items-center gap-1">
                   <Button variant="ghost" size="icon" className="h-7 w-7" disabled>
@@ -105,3 +109,5 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+    

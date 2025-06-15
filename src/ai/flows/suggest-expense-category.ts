@@ -1,9 +1,10 @@
+
 'use server';
 
 /**
- * @fileOverview An AI agent that suggests an expense category based on the expense description.
+ * @fileOverview An AI agent that suggests an expense category based on the transaction description.
  *
- * - suggestExpenseCategory - A function that suggests the expense category.
+ * - suggestExpenseCategory - A function that suggests the transaction category.
  * - SuggestExpenseCategoryInput - The input type for the suggestExpenseCategory function.
  * - SuggestExpenseCategoryOutput - The return type for the suggestExpenseCategory function.
  */
@@ -12,7 +13,7 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const SuggestExpenseCategoryInputSchema = z.object({
-  description: z.string().describe('The description of the expense.'),
+  description: z.string().describe('The description of the transaction (likely an expense).'),
   availableCategories: z
     .string()
     .array()
@@ -66,3 +67,5 @@ const suggestExpenseCategoryFlow = ai.defineFlow(
     return output!;
   }
 );
+
+    
