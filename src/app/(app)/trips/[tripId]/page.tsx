@@ -29,10 +29,12 @@ export default function TripDetailPage() {
   
   const { 
     getTripById, 
-    getTripMembers, addTripMember, deleteTripMember: contextDeleteTripMember, getTripMemberById,
+    addTripMember, deleteTripMember: contextDeleteTripMember, getTripMemberById,
     addTripContribution, getTripMemberTotalDirectContribution,
-    tripMembers, // From context
-    addTripExpense, getTripExpenses // Trip expense functions
+    tripMembers, // From context for general updates
+    tripExpenses, // From context for general updates
+    addTripExpense, getTripExpenses, // Trip expense functions
+    getTripMembers // Specific function to get members for THIS trip
   } = useAppContext();
   const { toast } = useToast();
 
@@ -66,7 +68,7 @@ export default function TripDetailPage() {
     if (tripId) {
         setCurrentTripMembers(getTripMembers(tripId));
     }
-  }, [getTripMembers, tripId, tripMembers]);
+  }, [getTripMembers, tripId, tripMembers]); // Listen to global tripMembers for updates
 
   const handleSaveTripMember = async (data: TripMemberFormValues) => {
     if (!tripId) return;
@@ -143,12 +145,12 @@ export default function TripDetailPage() {
 
   const totalTripContributions = useMemo(() => {
     return currentTripMembers.reduce((sum, member) => sum + getTripMemberTotalDirectContribution(member.id), 0);
-  }, [currentTripMembers, getTripMemberTotalDirectContribution]);
+  }, [currentTripMembers, getTripMemberTotalDirectContribution, tripContributions]); // Also listen to global tripContributions
 
   const currentTripExpenses = useMemo(() => {
     if (!tripId) return [];
     return getTripExpenses(tripId);
-  }, [tripId, getTripExpenses, tripExpenses]); // Listen to tripExpenses from context
+  }, [tripId, getTripExpenses, tripExpenses]); // Listen to global tripExpenses from context
 
   const totalTripSpending = useMemo(() => {
     return currentTripExpenses.reduce((sum, exp) => sum + exp.amount, 0);
@@ -235,8 +237,6 @@ export default function TripDetailPage() {
             onSave={handleSaveTripExpense}
             onCancel={() => setIsExpenseFormOpen(false)}
             isSubmitting={isSubmittingExpense}
-            // Note: ExpenseForm still uses general categories and household members for splitting.
-            // Trip-specific member selection for paidBy/splitWith is a future enhancement.
           />
         </DialogContent>
       </Dialog>
@@ -311,7 +311,6 @@ export default function TripDetailPage() {
                  <p className="text-xs text-muted-foreground pt-1">Trip spending is tracked via expenses logged on this page.</p>
             </CardContent>
            </Card>
-            {/* Placeholder for future cards like Trip Shared Budgets, Trip Expense Splitting, Trip Shopping List */}
         </div>
       </div>
     </div>
