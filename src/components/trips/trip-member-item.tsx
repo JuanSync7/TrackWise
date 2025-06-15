@@ -16,7 +16,7 @@ interface TripMemberItemProps {
   onAddContribution: (tripMemberId: string) => void;
   totalTripContributions: number;
   remainingTripPot: number;
-  numberOfTripMembers: number; // Added to calculate equal share of deficit
+  numberOfTripMembers: number; 
 }
 
 export function TripMemberItem({
@@ -31,6 +31,7 @@ export function TripMemberItem({
   const directContribution = getTripMemberTotalDirectContribution(tripMember.id);
 
   let memberShareOfTripPot: number;
+
   if (totalTripContributions > 0) {
     memberShareOfTripPot = (directContribution / totalTripContributions) * remainingTripPot;
   } else {
@@ -39,7 +40,7 @@ export function TripMemberItem({
       // Share the deficit equally if pot is negative
       memberShareOfTripPot = remainingTripPot / numberOfTripMembers;
     } else {
-      // Pot is 0 or positive, or no members
+      // Pot is 0 or positive (unlikely without contributions unless externally credited), or no members
       memberShareOfTripPot = 0;
     }
   }
@@ -86,7 +87,7 @@ export function TripMemberItem({
           </div>
         </div>
         <p className="text-xs text-muted-foreground mt-1">
-          This is their pro-rata share of the current trip pot balance.
+          This is their share of the current trip pot balance.
         </p>
       </CardContent>
     </Card>
