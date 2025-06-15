@@ -17,13 +17,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Check, ChevronsUpDown, Sparkles as AiSparklesIcon, Users, Landmark, CheckSquare, Square, MessageSquarePlus, Edit } from "lucide-react";
+import { CalendarIcon, Check, ChevronsUpDown, Sparkles as AiSparklesIcon, Users, Landmark, CheckSquare, Square, MessageSquarePlus, Edit, CircleDollarSign } from "lucide-react"; // Added CircleDollarSign
 import { Calendar } from "@/components/ui/calendar";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import type { Expense, SharedBudget, Member, TripMember } from "@/lib/types"; // Added TripMember
+import type { Expense, SharedBudget, Member, TripMember } from "@/lib/types";
 import { useAppContext } from "@/contexts/app-context";
 import { format } from "date-fns";
 import { useEffect, useState, useCallback, useMemo }  from "react";
@@ -33,6 +33,7 @@ import { useToast } from "@/hooks/use-toast";
 import { CategoryIcon } from '@/components/shared/category-icon';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { POT_PAYER_ID } from "@/lib/constants"; // Import POT_PAYER_ID
 
 const expenseFormSchemaBase = z.object({
   description: z.string().min(2, { message: "Description must be at least 2 characters." }).max(100),
@@ -40,10 +41,10 @@ const expenseFormSchemaBase = z.object({
   date: z.date({ required_error: "A date is required." }),
   categoryId: z.string({ required_error: "Please select a category." }),
   notes: z.string().max(200).optional(),
-  sharedBudgetId: z.string().optional(), // For household shared budgets
+  sharedBudgetId: z.string().optional(),
   isSplit: z.boolean().optional().default(false),
-  paidByMemberId: z.string().optional(), // Generic ID for who paid (could be Member['id'] or TripMember['id'])
-  splitWithMemberIds: z.array(z.string()).optional().default([]), // Array of generic IDs
+  paidByMemberId: z.string().optional(),
+  splitWithMemberIds: z.array(z.string()).optional().default([]),
 });
 
 const expenseFormSchema = expenseFormSchemaBase.superRefine((data, ctx) => {
@@ -51,7 +52,7 @@ const expenseFormSchema = expenseFormSchemaBase.superRefine((data, ctx) => {
     if (!data.paidByMemberId) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Please select who paid.",
+        message: "Please select who paid or if it was paid from the pot.",
         path: ["paidByMemberId"],
       });
     }
@@ -61,10 +62,10 @@ const expenseFormSchema = expenseFormSchemaBase.superRefine((data, ctx) => {
         message: "Please select at least one member to split with.",
         path: ["splitWithMemberIds"],
       });
-    } else if (data.paidByMemberId && !data.splitWithMemberIds.includes(data.paidByMemberId)) {
+    } else if (data.paidByMemberId && data.paidByMemberId !== POT_PAYER_ID && !data.splitWithMemberIds.includes(data.paidByMemberId)) {
         ctx.addIssue({
             code: z.ZodIssueCode.custom,
-            message: "The payer must be included in the list of members to split with.",
+            message: "The individual payer must be included in the list of members to split with.",
             path: ["splitWithMemberIds"],
         });
     }
@@ -74,18 +75,18 @@ const expenseFormSchema = expenseFormSchemaBase.superRefine((data, ctx) => {
 
 export type ExpenseFormValues = z.infer<typeof expenseFormSchema>;
 
-// MemberLike type for props
 type MemberLike = { id: string; name: string };
 
 interface ExpenseFormProps {
-  expense?: Expense | TripExpense; 
+  expense?: Expense | TripExpense;
   onSave: (data: ExpenseFormValues) => void;
   onCancel?: () => void;
   isSubmitting?: boolean;
   hideSharedBudgetLink?: boolean;
   hideSplittingFeature?: boolean;
-  availableMembersForSplitting?: MemberLike[]; 
+  availableMembersForSplitting?: MemberLike[];
   currentUserIdForDefaultPayer?: string;
+  allowPotPayer?: boolean; // New prop to enable "Paid from Pot"
 }
 
 const NONE_SHARED_BUDGET_VALUE = "__NONE__";
@@ -97,10 +98,11 @@ export function ExpenseForm({
     isSubmitting,
     hideSharedBudgetLink = false,
     hideSplittingFeature = false,
-    availableMembersForSplitting = [], 
-    currentUserIdForDefaultPayer
+    availableMembersForSplitting = [],
+    currentUserIdForDefaultPayer,
+    allowPotPayer = false, // Default to false for general expenses, true for household/trip
 }: ExpenseFormProps) {
-  const { categories, getCategoryById, sharedBudgets: householdSharedBudgets } = useAppContext(); 
+  const { categories, getCategoryById, sharedBudgets: householdSharedBudgets } = useAppContext();
   const { toast } = useToast();
   const [aiCategorySuggestion, setAiCategorySuggestion] = useState<SuggestExpenseCategoryOutput | null>(null);
   const [isSuggestingCategory, setIsSuggestingCategory] = useState(false);
@@ -117,7 +119,7 @@ export function ExpenseForm({
           date: new Date(expense.date),
           sharedBudgetId: (expense as Expense).sharedBudgetId || NONE_SHARED_BUDGET_VALUE,
           isSplit: expense.isSplit || false,
-          paidByMemberId: (expense as Expense).paidByMemberId || (expense as TripExpense).paidByTripMemberId || "",
+          paidByMemberId: (expense as Expense).paidByMemberId || (expense as TripExpense).paidByTripMemberId || (allowPotPayer ? POT_PAYER_ID : ""),
           splitWithMemberIds: (expense as Expense).splitWithMemberIds || (expense as TripExpense).splitWithTripMemberIds || [],
         }
       : {
@@ -127,9 +129,9 @@ export function ExpenseForm({
           categoryId: "",
           notes: "",
           sharedBudgetId: NONE_SHARED_BUDGET_VALUE,
-          isSplit: true, 
-          paidByMemberId: "",
-          splitWithMemberIds: availableMembersForSplitting.map(m => m.id), // Default to all for new expense
+          isSplit: true,
+          paidByMemberId: allowPotPayer ? POT_PAYER_ID : (currentUserIdForDefaultPayer || ""),
+          splitWithMemberIds: availableMembersForSplitting.map(m => m.id),
         },
   });
 
@@ -142,13 +144,15 @@ export function ExpenseForm({
 
 
   useEffect(() => {
-    if (watchedIsSplit && !watchedPaidByMemberId && currentUserIdForDefaultPayer) {
+    if (watchedIsSplit && !watchedPaidByMemberId && !allowPotPayer && currentUserIdForDefaultPayer) {
         const isCurrentUserInList = availableMembersForSplitting.some(m => m.id === currentUserIdForDefaultPayer);
         if (isCurrentUserInList) {
             form.setValue("paidByMemberId", currentUserIdForDefaultPayer, { shouldValidate: true });
         }
+    } else if (watchedIsSplit && !watchedPaidByMemberId && allowPotPayer) {
+        form.setValue("paidByMemberId", POT_PAYER_ID, { shouldValidate: true });
     }
-  }, [watchedIsSplit, watchedPaidByMemberId, currentUserIdForDefaultPayer, form, availableMembersForSplitting]);
+  }, [watchedIsSplit, watchedPaidByMemberId, currentUserIdForDefaultPayer, allowPotPayer, form, availableMembersForSplitting]);
 
   useEffect(() => {
     if (!expense && watchedIsSplit && availableMembersForSplitting.length > 0 ) {
@@ -235,9 +239,9 @@ export function ExpenseForm({
             categoryId: "",
             notes: "",
             sharedBudgetId: NONE_SHARED_BUDGET_VALUE,
-            isSplit: true, 
-            paidByMemberId: currentUserIdForDefaultPayer && availableMembersForSplitting.some(m => m.id === currentUserIdForDefaultPayer) ? currentUserIdForDefaultPayer : "",
-            splitWithMemberIds: availableMembersForSplitting.map(m => m.id), 
+            isSplit: true,
+            paidByMemberId: allowPotPayer ? POT_PAYER_ID : (currentUserIdForDefaultPayer && availableMembersForSplitting.some(m => m.id === currentUserIdForDefaultPayer) ? currentUserIdForDefaultPayer : ""),
+            splitWithMemberIds: availableMembersForSplitting.map(m => m.id),
         });
         setAiCategorySuggestion(null);
         setAiNoteSuggestion(null);
@@ -485,13 +489,14 @@ export function ExpenseForm({
                           form.setValue("paidByMemberId", undefined);
                           form.setValue("splitWithMemberIds", []);
                         } else {
-                           if (currentUserIdForDefaultPayer && !form.getValues("paidByMemberId")) {
-                            const isCurrentUserInList = availableMembersForSplitting.some(m => m.id === currentUserIdForDefaultPayer);
-                            if (isCurrentUserInList) {
-                                form.setValue("paidByMemberId", currentUserIdForDefaultPayer, { shouldValidate: true });
-                            }
-                          }
-                          const currentSplitIds = form.getValues("splitWithMemberIds");
+                           if (!form.getValues("paidByMemberId")) {
+                                if (allowPotPayer) {
+                                    form.setValue("paidByMemberId", POT_PAYER_ID, {shouldValidate: true});
+                                } else if (currentUserIdForDefaultPayer && availableMembersForSplitting.some(m => m.id === currentUserIdForDefaultPayer)) {
+                                    form.setValue("paidByMemberId", currentUserIdForDefaultPayer, { shouldValidate: true });
+                                }
+                           }
+                           const currentSplitIds = form.getValues("splitWithMemberIds");
                            if ((!currentSplitIds || currentSplitIds.length === 0) && availableMembersForSplitting.length > 0) {
                                form.setValue("splitWithMemberIds", availableMembersForSplitting.map(m => m.id), { shouldValidate: true });
                            }
@@ -515,10 +520,17 @@ export function ExpenseForm({
                       <Select onValueChange={field.onChange} value={field.value || ""}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select member who paid" />
+                            <SelectValue placeholder="Select who paid or if from Pot" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
+                          {allowPotPayer && (
+                            <SelectItem value={POT_PAYER_ID}>
+                              <div className="flex items-center gap-2">
+                                <CircleDollarSign className="h-4 w-4 text-primary"/> Paid from Pot / Communal Fund
+                              </div>
+                            </SelectItem>
+                          )}
                           {availableMembersForSplitting.map((member) => (
                             <SelectItem key={member.id} value={member.id}>
                               {member.name}
@@ -539,7 +551,7 @@ export function ExpenseForm({
                       <div className="mb-2 flex items-center justify-between">
                         <div>
                             <FormLabel>Split With Whom?</FormLabel>
-                            <FormDescription>Select all members sharing this expense (including payer).</FormDescription>
+                            <FormDescription>Select all members sharing this expense (including payer if applicable).</FormDescription>
                         </div>
                         <Button
                             type="button"
@@ -657,5 +669,3 @@ export function ExpenseForm({
     </Form>
   );
 }
-
-    

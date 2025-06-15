@@ -22,11 +22,11 @@ export function MemberItem({
   onDelete,
   onAddContribution,
 }: MemberItemProps) {
-  const { getHouseholdMemberNetPotData, contributions, expenses, sharedBudgets } = useAppContext();
+  const { getHouseholdMemberNetPotData, contributions, expenses, sharedBudgets, members: allMembers } = useAppContext();
 
   const calculatedNetData: HouseholdMemberNetData = useMemo(() => {
     return getHouseholdMemberNetPotData(member.id);
-  }, [member.id, getHouseholdMemberNetPotData, contributions, expenses, sharedBudgets]);
+  }, [member.id, getHouseholdMemberNetPotData, contributions, expenses, sharedBudgets, allMembers]);
 
 
   return (
@@ -37,24 +37,23 @@ export function MemberItem({
           <div>
             <CardTitle className="text-lg">{member.name}</CardTitle>
             <CardDescription className="text-xs text-muted-foreground flex items-center gap-1">
-                <TrendingUp className="h-3 w-3 text-accent"/> Directly Contributed: {DEFAULT_CURRENCY}{calculatedNetData.directContributionToPot.toFixed(2)}
+                <TrendingUp className="h-3 w-3 text-accent"/> Directly Contributed to Pot: {DEFAULT_CURRENCY}{calculatedNetData.directContributionToPot.toFixed(2)}
             </CardDescription>
             <CardDescription className="text-xs text-muted-foreground flex items-center gap-1">
-                 <TrendingDown className="h-3 w-3 text-destructive"/> Share of Pot Expenses: {DEFAULT_CURRENCY}{calculatedNetData.shareOfPotExpenses.toFixed(2)}
+                 <TrendingDown className="h-3 w-3 text-destructive"/> Share of Pot-Paid Expenses: {DEFAULT_CURRENCY}{calculatedNetData.shareOfPotExpenses.toFixed(2)}
             </CardDescription>
           </div>
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
+            <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Member options">
               <MoreVertical className="h-4 w-4" />
-              <span className="sr-only">Member options</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => onAddContribution(member.id)}>
               <DollarSign className="mr-2 h-4 w-4" />
-              Add Contribution
+              Add Contribution to Pot
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onDelete(member.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
               <Trash2 className="mr-2 h-4 w-4" />
@@ -74,7 +73,7 @@ export function MemberItem({
           </div>
         </div>
         <p className="text-xs text-muted-foreground mt-1">
-          Their financial position relative to the household pot.
+          Their claim on the pot's cash based on direct contributions and share of pot-paid expenses.
         </p>
       </CardContent>
     </Card>
