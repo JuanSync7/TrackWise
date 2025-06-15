@@ -14,7 +14,7 @@ const EPSILON = 0.005; // For floating point comparisons
 interface TripSettlementListProps {
   settlements: TripSettlement[];
   tripId: string;
-  finalMemberFinancials: Record<string, CalculatedMemberFinancials> | undefined; // Changed from Map
+  finalMemberFinancials: Record<string, CalculatedMemberFinancials> | undefined;
   remainingCashInPot: number;
 }
 
@@ -30,7 +30,7 @@ export function TripSettlementList({ settlements, tripId, finalMemberFinancials,
     const payouts: { tripMemberId: string, memberName: string, amount: number }[] = [];
 
     // Get members who are net creditors to the system overall
-    const membersOwedBySystem = Object.values(finalMemberFinancials) // Changed from finalMemberFinancials.values()
+    const membersOwedBySystem = Object.values(finalMemberFinancials)
         .filter(fm => fm.finalNetShareForSettlement > EPSILON) // Members who are owed money by the system
         .sort((a,b) => b.finalNetShareForSettlement - a.finalNetShareForSettlement); // Prioritize larger creditors
 
@@ -56,7 +56,7 @@ export function TripSettlementList({ settlements, tripId, finalMemberFinancials,
                 amount: parseFloat(payoutAmount.toFixed(2)), 
             });
             undistributedPotCash -= payoutAmount;
-            undistributedPotCash = parseFloat(undistributedPotCash.toFixed(2)); 
+            undistributedPotCash = parseFloat(undistributedPotCash.toFixed(2)); // Ensure precision after subtraction
         }
       }
     }
