@@ -2,33 +2,47 @@
 "use client";
 
 import type { Member } from '@/lib/types';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'; // Added CardDescription, Header, Title
 import { Button } from '@/components/ui/button';
-import { User, Trash2, MoreVertical, DollarSign } from 'lucide-react';
+import { User, Trash2, MoreVertical, DollarSign, TrendingUp, TrendingDown, Scale } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAppContext } from '@/contexts/app-context';
 import { DEFAULT_CURRENCY } from '@/lib/constants';
+import { cn } from '@/lib/utils';
 
 interface MemberItemProps {
   member: Member;
   onDelete: (memberId: string) => void;
   onAddContribution: (memberId: string) => void;
+  totalHouseholdContributions: number;
+  remainingHouseholdPot: number;
 }
 
-export function MemberItem({ member, onDelete, onAddContribution }: MemberItemProps) {
+export function MemberItem({ 
+  member, 
+  onDelete, 
+  onAddContribution,
+  totalHouseholdContributions,
+  remainingHouseholdPot 
+}: MemberItemProps) {
   const { getMemberTotalContribution } = useAppContext();
-  const totalContribution = getMemberTotalContribution(member.id);
+  const directContribution = getMemberTotalContribution(member.id);
+
+  const memberShareOfPot = 
+    totalHouseholdContributions > 0 
+    ? (directContribution / totalHouseholdContributions) * remainingHouseholdPot 
+    : 0;
 
   return (
     <Card className="overflow-hidden transition-shadow hover:shadow-lg">
-      <CardContent className="p-4 flex items-center justify-between">
+      <CardHeader className="flex flex-row items-start justify-between p-4 pb-2">
         <div className="flex items-center gap-3">
-          <User className="h-8 w-8 text-primary p-1 bg-primary/10 rounded-full" />
+          <User className="h-10 w-10 text-primary p-1.5 bg-primary/10 rounded-full" />
           <div>
-            <span className="font-medium text-lg">{member.name}</span>
-            <p className="text-sm text-muted-foreground">
-              Contributed: {DEFAULT_CURRENCY}{totalContribution.toFixed(2)}
-            </p>
+            <CardTitle className="text-lg">{member.name}</CardTitle>
+            <CardDescription className="text-xs text-muted-foreground">
+              Directly Contributed: {DEFAULT_CURRENCY}{directContribution.toFixed(2)}
+            </CardDescription>
           </div>
         </div>
         <DropdownMenu>
@@ -49,7 +63,23 @@ export function MemberItem({ member, onDelete, onAddContribution }: MemberItemPr
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+      </CardHeader>
+      <CardContent className="p-4 pt-0">
+        <div className="flex items-center gap-2">
+          <Scale className={cn("h-5 w-5", memberShareOfPot >=0 ? "text-accent" : "text-destructive")} />
+          <div>
+            <p className="text-sm font-medium">Net Share in Pot:</p>
+            <p className={cn("text-xl font-bold", memberShareOfPot >=0 ? "text-accent" : "text-destructive")}>
+                {DEFAULT_CURRENCY}{memberShareOfPot.toFixed(2)}
+            </p>
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground mt-1">
+          This is their pro-rata share of the current household pot balance.
+        </p>
       </CardContent>
     </Card>
   );
 }
+
+    

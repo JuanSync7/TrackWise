@@ -109,17 +109,13 @@ export default function HouseholdPage() {
     setIsSubmittingExpense(true);
     let expenseData = { ...data, date: format(data.date, "yyyy-MM-dd") };
 
-    // If added via Household page's "Add Shared Expense"
-    // and no specific category or shared budget is chosen, default to "Household Expenses" category.
     if (!expenseData.categoryId && (!expenseData.sharedBudgetId || expenseData.sharedBudgetId === "__NONE__")) {
       expenseData.categoryId = HOUSEHOLD_EXPENSE_CATEGORY_ID;
     }
     
-    // Ensure sharedBudgetId is undefined if "None" was selected.
     if (expenseData.sharedBudgetId === "__NONE__") {
       expenseData.sharedBudgetId = undefined;
     }
-
 
     try {
       addExpense(expenseData);
@@ -199,7 +195,7 @@ export default function HouseholdPage() {
           <DialogHeader>
             <DialogTitle>Add New Shared Expense</DialogTitle>
             <DialogDescription>
-              Fill in the details for a new shared household expense. This will affect the Household Pot.
+              Fill in the details for a new shared household expense. If no specific category or shared budget is chosen, it will be categorized as 'Household Expenses' and affect the pot.
             </DialogDescription>
           </DialogHeader>
           <ExpenseForm
@@ -241,6 +237,8 @@ export default function HouseholdPage() {
                 members={members}
                 onDeleteMember={handleDeleteMember}
                 onAddContribution={handleAddContributionClick}
+                totalHouseholdContributions={totalHouseholdContributions}
+                remainingHouseholdPot={remainingInPot}
               />
             </CardContent>
           </Card>
@@ -343,3 +341,5 @@ export default function HouseholdPage() {
     </div>
   );
 }
+
+    

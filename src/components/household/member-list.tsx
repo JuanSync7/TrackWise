@@ -10,9 +10,17 @@ interface MemberListProps {
   members: Member[];
   onDeleteMember: (memberId: string) => void;
   onAddContribution: (memberId: string) => void;
+  totalHouseholdContributions: number;
+  remainingHouseholdPot: number;
 }
 
-export function MemberList({ members, onDeleteMember, onAddContribution }: MemberListProps) {
+export function MemberList({ 
+  members, 
+  onDeleteMember, 
+  onAddContribution,
+  totalHouseholdContributions,
+  remainingHouseholdPot 
+}: MemberListProps) {
   if (members.length === 0) {
     return (
       <div className="text-center py-10 border-2 border-dashed border-muted-foreground/30 rounded-lg mt-6">
@@ -39,6 +47,8 @@ export function MemberList({ members, onDeleteMember, onAddContribution }: Membe
               member={member}
               onDelete={onDeleteMember}
               onAddContribution={onAddContribution}
+              totalHouseholdContributions={totalHouseholdContributions}
+              remainingHouseholdPot={remainingHouseholdPot}
             />
           </motion.div>
         ))}
@@ -46,3 +56,5 @@ export function MemberList({ members, onDeleteMember, onAddContribution }: Membe
     </div>
   );
 }
+
+    
