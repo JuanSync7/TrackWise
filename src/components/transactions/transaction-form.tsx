@@ -133,10 +133,13 @@ const useFormInitialValues = (
     if (transaction) {
       const typedTransaction = transaction as (HouseholdTransaction | TripTransaction);
       const initialSplitType = typedTransaction.splitType || (typedTransaction.isSplit ? 'even' : undefined);
+      
+      // Ensure customSplitAmounts are initialized correctly with memberName if available
       const initialCustomSplits = typedTransaction.customSplitAmounts?.map(s => ({
         ...s,
         memberName: availableMembersForSplittingProp.find(m => m.id === s.memberId)?.name || 'Unknown'
       })) || [];
+
       return {
         transactionType: transaction.transactionType,
         description: transaction.description,
@@ -155,6 +158,7 @@ const useFormInitialValues = (
         customSplitAmounts: initialCustomSplits,
       };
     }
+    // Default values for a new form
     return {
       transactionType: 'expense' as TransactionType,
       description: "",
@@ -222,7 +226,7 @@ export function TransactionForm({
   const { fields: customSplitFields, replace: replaceCustomSplits } = useFieldArray({
     control: form.control,
     name: "customSplitAmounts",
-    keyName: "fieldId"
+    keyName: "fieldId" // Use a different key name to avoid conflicts if 'id' is used elsewhere
   });
 
   const watchedTransactionType = form.watch("transactionType");
@@ -230,31 +234,36 @@ export function TransactionForm({
   const watchedNotes = form.watch("notes");
   const watchedCategoryId = form.watch("categoryId");
   const watchedIsSplit = form.watch("isSplit");
-  const watchedSplitWithMemberIds = form.watch("splitWithMemberIds") || [];
+  const watchedSplitWithMemberIds = form.watch("splitWithMemberIds") || []; // Ensure it's an array
   const watchedIsRecurring = form.watch("isRecurring");
   const watchedSplitType = form.watch("splitType");
   const watchedAmount = form.watch("amount");
   const watchedCustomSplitAmounts = form.watch("customSplitAmounts");
 
+  // Effect to initialize/reset splitType and customSplitAmounts when isSplit changes or members change
   useEffect(() => {
     if (watchedIsSplit) {
         if (!form.getValues("splitType")) {
             form.setValue("splitType", "even");
         }
+        // Initialize paidByMemberId if not set
         if (!form.getValues("paidByMemberId")) {
             if (allowPotPayer) {
                 form.setValue("paidByMemberId", POT_PAYER_ID, {shouldValidate: true});
             } else if (currentUserIdForDefaultPayer && availableMembersForSplitting.some(m => m.id === currentUserIdForDefaultPayer)) {
                 form.setValue("paidByMemberId", currentUserIdForDefaultPayer, { shouldValidate: true });
             } else if (availableMembersForSplitting.length > 0) {
+                // Default to the first member if no other default payer is suitable
                 form.setValue("paidByMemberId", availableMembersForSplitting[0].id, { shouldValidate: true });
             }
         }
+        // Initialize splitWithMemberIds to all available members if empty
         const currentSplitIds = form.getValues("splitWithMemberIds");
         if ((!currentSplitIds || currentSplitIds.length === 0) && availableMembersForSplitting.length > 0) {
             form.setValue("splitWithMemberIds", availableMembersForSplitting.map(m => m.id), { shouldValidate: true });
         }
     } else {
+        // If not splitting, clear split-related fields
         form.setValue("splitType", undefined);
         form.setValue("customSplitAmounts", []);
         form.setValue("paidByMemberId", undefined);
@@ -263,17 +272,20 @@ export function TransactionForm({
   }, [watchedIsSplit, form, allowPotPayer, currentUserIdForDefaultPayer, availableMembersForSplitting]);
 
 
+  // Effect to update customSplitAmounts array when splitWithMemberIds changes
   useEffect(() => {
     if (watchedIsSplit && watchedSplitType === 'custom') {
       const newCustomSplits = watchedSplitWithMemberIds.map(memberId => {
+        // Try to find existing custom split amount for this member
         const existing = watchedCustomSplitAmounts?.find(s => s.memberId === memberId);
         const member = availableMembersForSplitting.find(m => m.id === memberId);
         return {
           memberId,
-          amount: existing?.amount ?? 0,
+          amount: existing?.amount ?? 0, // Keep existing amount or default to 0
           memberName: member?.name || 'Unknown Member'
         };
       });
+      // Only replace if the member list or their order has actually changed
       const currentCustomSplitMembers = form.getValues("customSplitAmounts")?.map(cs => cs.memberId).sort().join(',') || "";
       const newCustomSplitMembers = newCustomSplits.map(cs => cs.memberId).sort().join(',');
 
@@ -281,6 +293,7 @@ export function TransactionForm({
         replaceCustomSplits(newCustomSplits);
       }
     } else if (watchedIsSplit && watchedSplitType === 'even') {
+      // If switching to 'even' split, clear custom amounts
       if (form.getValues("customSplitAmounts")?.length > 0) {
         replaceCustomSplits([]);
       }
@@ -288,6 +301,7 @@ export function TransactionForm({
   }, [watchedSplitWithMemberIds, watchedSplitType, watchedIsSplit, replaceCustomSplits, form, availableMembersForSplitting, watchedCustomSplitAmounts]);
 
 
+  // Calculate sum of custom splits for display
   const sumOfCustomSplits = useMemo(() => {
     if (watchedSplitType === 'custom' && watchedCustomSplitAmounts) {
       return watchedCustomSplitAmounts.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
@@ -295,6 +309,7 @@ export function TransactionForm({
     return 0;
   }, [watchedCustomSplitAmounts, watchedSplitType]);
 
+  // Calculate difference for display
   const customSplitDifference = useMemo(() => {
     if (watchedSplitType === 'custom') {
       // Round to avoid floating point precision issues for display
@@ -303,21 +318,25 @@ export function TransactionForm({
     return 0;
   }, [watchedAmount, sumOfCustomSplits, watchedSplitType]);
 
+  // Filter categories based on transaction type
   const filteredCategories = useMemo(() => {
     return categories.filter(cat => cat.appliesTo === watchedTransactionType || cat.appliesTo === 'both');
   }, [categories, watchedTransactionType]);
 
+  // Reset category if it's not valid for the current transaction type
   useEffect(() => {
     const currentCategoryIdVal = form.getValues("categoryId");
     if (currentCategoryIdVal && !filteredCategories.some(cat => cat.id === currentCategoryIdVal)) {
-        form.setValue("categoryId", "");
+        form.setValue("categoryId", ""); // Reset if category not applicable
     }
-    setAiCategorySuggestion(null);
+    setAiCategorySuggestion(null); // Clear AI suggestion when type changes
   }, [watchedTransactionType, form, filteredCategories]);
 
+  // Disable splitting if transaction type is income
   useEffect(() => {
     if (watchedTransactionType === 'income') {
       form.setValue('isSplit', false);
+      // Other fields like splitType, paidByMemberId, splitWithMemberIds will be cleared by the isSplit effect
     }
   }, [watchedTransactionType, form]);
 
@@ -358,6 +377,7 @@ export function TransactionForm({
       ...data,
       recurrenceEndDate: data.recurrenceEndDate ? format(data.recurrenceEndDate, "yyyy-MM-dd") : undefined,
       sharedBudgetId: (data.sharedBudgetId === NONE_SHARED_BUDGET_VALUE) ? undefined : data.sharedBudgetId,
+      // Ensure split fields are only included if relevant
       isSplit: data.transactionType === 'expense' ? data.isSplit : false,
       splitType: data.transactionType === 'expense' && data.isSplit ? data.splitType : undefined,
       customSplitAmounts: data.transactionType === 'expense' && data.isSplit && data.splitType === 'custom' ? data.customSplitAmounts?.map(s => ({ memberId: s.memberId, amount: s.amount })) : [],
@@ -365,8 +385,8 @@ export function TransactionForm({
       splitWithMemberIds: data.transactionType === 'expense' && data.isSplit ? data.splitWithMemberIds : [],
     };
     onSave(dataToSave);
-    if (!transaction) {
-        form.reset(initialValues);
+    if (!transaction) { // Reset form only if it's a new item form
+        form.reset(initialValues); // Reset to potentially dynamic initial values
         setAiCategorySuggestion(null); setAiNoteSuggestion(null);
     }
   }
@@ -423,7 +443,7 @@ export function TransactionForm({
         {watchedTransactionType === 'expense' && aiCategorySuggestion && !form.getValues("categoryId") && <Alert variant="default" className="bg-primary/10 border-primary/30"><AiSparklesIcon className="h-5 w-5 text-primary" /><AlertTitle className="text-primary font-semibold">AI Category Suggestion</AlertTitle><AlertDescription className="text-primary/80">We think this might be <span className="font-semibold">{aiCategorySuggestion.category}</span>.<br /><span className="text-xs italic">Reasoning: {aiCategorySuggestion.reasoning}</span></AlertDescription><Button type="button" size="sm" variant="ghost" className="mt-2 text-primary hover:bg-primary/20" onClick={() => { const suggestedCat = filteredCategories.find(c => c.name.toLowerCase() === aiCategorySuggestion.category.toLowerCase()); if (suggestedCat) {form.setValue("categoryId", suggestedCat.id, { shouldValidate: true }); setAiCategorySuggestion(null);} else {toast({variant: "destructive", title: "Category not found"})}}}>Apply Suggestion</Button></Alert>}
         
         <FormField control={form.control} name="isRecurring" render={({ field }) => ( <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-3 shadow-sm bg-muted/30"> <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl> <div className="space-y-1 leading-none"> <FormLabel className="flex items-center gap-1.5 cursor-pointer"><Repeat className="h-4 w-4 text-primary" /> Is this a recurring transaction?</FormLabel> <FormDescription className="text-xs">Check if this transaction repeats.</FormDescription> </div> </FormItem> )} />
-        {watchedIsRecurring && <div className="space-y-4 p-4 border rounded-md bg-muted/50"> <FormField control={form.control} name="recurrencePeriod" render={({ field }) => ( <FormItem><FormLabel>Repeats</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select period" /></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem><SelectItem value="yearly">Yearly</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} /><FormField control={form.control} name="recurrenceEndDate" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Ends On (Optional)</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal bg-background",!field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : <span>Pick end date</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date < form.getValues("date") || date < new Date("1900-01-01")} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>)} /></div>}
+        {watchedIsRecurring && <div className="space-y-4 p-4 border rounded-md bg-muted/50"> <FormField control={form.control} name="recurrencePeriod" render={({ field }) => ( <FormItem><FormLabel>Repeats</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select period" /></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem><SelectItem value="yearly">Yearly</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} /><FormField control={form.control} name="recurrenceEndDate" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Ends On (Optional)</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal bg-background",!field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : <span>Pick end date</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value || undefined} onSelect={field.onChange} disabled={(date) => date < form.getValues("date") || date < new Date("1900-01-01")} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>)} /></div>}
         
         {showSharedBudgetLink && watchedTransactionType === 'expense' && householdSharedBudgets.length > 0 && <FormField control={form.control} name="sharedBudgetId" render={({ field }) => ( <FormItem> <FormLabel>Link to Household Shared Budget (Optional)</FormLabel> <Select onValueChange={(value) => field.onChange(value === NONE_SHARED_BUDGET_VALUE ? undefined : value)} value={field.value || NONE_SHARED_BUDGET_VALUE}> <FormControl><SelectTrigger><SelectValue placeholder="Select budget" /></SelectTrigger></FormControl> <SelectContent><SelectItem value={NONE_SHARED_BUDGET_VALUE}>None</SelectItem>{householdSharedBudgets.map((budget: SharedBudget) => ( <SelectItem key={budget.id} value={budget.id}>{budget.name}</SelectItem>))}</SelectContent> </Select> <FormDescription>Link to a shared household budget.</FormDescription> <FormMessage /> </FormItem> )} />}
         
@@ -486,4 +506,6 @@ export function TransactionForm({
     </Form>
   );
 }
+    
+
     
