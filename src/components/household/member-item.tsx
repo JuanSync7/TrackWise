@@ -1,6 +1,7 @@
 
 "use client";
 
+import React, { useMemo } from 'react'; // Added React
 import type { Member, HouseholdMemberNetData } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,7 +10,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useAppContext } from '@/contexts/app-context';
 import { DEFAULT_CURRENCY } from '@/lib/constants';
 import { cn } from '@/lib/utils';
-import { useMemo } from 'react';
 
 interface MemberItemProps {
   member: Member;
@@ -17,7 +17,7 @@ interface MemberItemProps {
   onAddContribution: (memberId: string) => void;
 }
 
-export function MemberItem({
+const MemberItem = React.memo(function MemberItem({
   member,
   onDelete,
   onAddContribution,
@@ -78,4 +78,7 @@ export function MemberItem({
       </CardContent>
     </Card>
   );
-}
+});
+
+export { MemberItem };
+

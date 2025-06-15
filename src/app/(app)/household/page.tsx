@@ -68,7 +68,7 @@ export default function HouseholdPage() {
     );
   }, [authUser, members]);
 
-  const handleSaveMember = async (data: Omit<Member, 'id'>) => {
+  const handleSaveMember = useCallback(async (data: Omit<Member, 'id'>) => {
     setIsSubmittingMember(true);
     try {
       addMember(data);
@@ -79,34 +79,34 @@ export default function HouseholdPage() {
     } finally {
       setIsSubmittingMember(false);
     }
-  };
+  }, [addMember, toast]);
 
-  const handleDeleteMember = (memberId: string) => {
+  const handleDeleteMemberRequest = useCallback((memberId: string) => {
     setMemberToDelete(memberId);
-  };
+  }, []);
 
-  const confirmDeleteMember = () => {
+  const confirmDeleteMember = useCallback(() => {
     if (memberToDelete) {
       const member = members.find(m => m.id === memberToDelete);
       contextDeleteMember(memberToDelete);
       toast({ title: "Member Deleted", description: `${member?.name || 'The member'} has been removed from the household.` });
       setMemberToDelete(null);
     }
-  };
+  }, [memberToDelete, members, contextDeleteMember, toast]);
 
-  const openMemberFormForNew = () => {
+  const openMemberFormForNew = useCallback(() => {
     setIsMemberFormOpen(true);
-  };
+  }, []);
 
-  const handleAddContributionClick = (memberId: string) => {
+  const handleAddContributionClick = useCallback((memberId: string) => {
     const member = members.find(m => m.id === memberId);
     if (member) {
       setSelectedMemberForContribution(member);
       setIsContributionFormOpen(true);
     }
-  };
+  }, [members]);
 
-  const handleSaveContribution = async (data: ContributionFormValues) => {
+  const handleSaveContribution = useCallback(async (data: ContributionFormValues) => {
     if (!selectedMemberForContribution) return;
     setIsSubmittingContribution(true);
     try {
@@ -124,21 +124,18 @@ export default function HouseholdPage() {
     } finally {
       setIsSubmittingContribution(false);
     }
-  };
+  }, [selectedMemberForContribution, addContribution, toast]);
 
-  const handleSaveExpense = async (data: ExpenseFormValuesType) => {
+  const handleSaveExpense = useCallback(async (data: ExpenseFormValuesType) => {
     setIsSubmittingExpense(true);
     let expenseData = { ...data, date: format(data.date, "yyyy-MM-dd") };
 
-    // Default to HOUSEHOLD_EXPENSE_CATEGORY_ID if no category and not linked to shared budget
     if (!expenseData.categoryId && (!expenseData.sharedBudgetId || expenseData.sharedBudgetId === "__NONE__")) {
       expenseData.categoryId = HOUSEHOLD_EXPENSE_CATEGORY_ID;
     }
-     // Ensure paidByMemberId is set if splitting and not already POT_PAYER_ID
     if (expenseData.isSplit && !expenseData.paidByMemberId) {
-        expenseData.paidByMemberId = POT_PAYER_ID; // Default to pot payer for shared household expenses
+        expenseData.paidByMemberId = POT_PAYER_ID; 
     }
-
 
     if (expenseData.sharedBudgetId === "__NONE__") {
       expenseData.sharedBudgetId = undefined;
@@ -153,20 +150,20 @@ export default function HouseholdPage() {
     } finally {
       setIsSubmittingExpense(false);
     }
-  };
+  }, [addExpense, toast]);
 
   const totalHouseholdContributions = useMemo(() => {
     return members.reduce((sum, member) => sum + getMemberTotalContribution(member.id), 0);
   }, [members, getMemberTotalContribution, contributions]);
 
   const totalPotSpending = useMemo(() => {
-    return getTotalHouseholdSpending(); // This now only counts POT_PAYER_ID expenses
+    return getTotalHouseholdSpending(); 
   }, [getTotalHouseholdSpending, expenses, sharedBudgets]);
 
   const remainingInPot = totalHouseholdContributions - totalPotSpending;
   const potUsagePercentage = totalHouseholdContributions > 0 ? Math.min((totalPotSpending / totalHouseholdContributions) * 100, 100) : 0;
 
-  const handleExportHouseholdData = () => {
+  const handleExportHouseholdData = useCallback(() => {
     const csvRows: (string | number | undefined)[][] = [];
     const currentDate = format(new Date(), 'yyyy-MM-dd');
     const filename = `trackwise_household_data_${currentDate}.csv`;
@@ -193,7 +190,7 @@ export default function HouseholdPage() {
         csvRows.push(["Household Pot Settlements (Who Owes Whom for Pot Balance)"]);
         csvRows.push(["Owed By", "Owes To", `Amount (${DEFAULT_CURRENCY})`]);
         householdSettlements.forEach(settlement => {
-            const owedByName = members.find(m => m.id === settlement.owedByTripMemberId)?.name || 'Unknown'; // Using TripMemberId for consistency
+            const owedByName = members.find(m => m.id === settlement.owedByTripMemberId)?.name || 'Unknown'; 
             const owedToName = members.find(m => m.id === settlement.owedToTripMemberId)?.name || 'Unknown';
             csvRows.push([owedByName, owedToName, settlement.amount.toFixed(2)]);
         });
@@ -231,7 +228,7 @@ export default function HouseholdPage() {
 
     exportToCsv(filename, csvRows);
     toast({ title: "Household Data Exported", description: `Data exported to ${filename}` });
-  };
+  }, [members, contributions, expenses, sharedBudgets, householdSettlements, totalHouseholdContributions, totalPotSpending, remainingInPot, getHouseholdMemberNetPotData, getCategoryById, toast]);
 
 
   return (
@@ -308,7 +305,7 @@ export default function HouseholdPage() {
             availableMembersForSplitting={members}
             currentUserIdForDefaultPayer={currentUserAsHouseholdMember?.id}
             hideSplittingFeature={false}
-            allowPotPayer={true} // Explicitly allow "Paid from Pot" for household
+            allowPotPayer={true} 
           />
         </DialogContent>
       </Dialog>
@@ -342,7 +339,7 @@ export default function HouseholdPage() {
             <CardContent>
               <MemberList
                 members={members}
-                onDeleteMember={handleDeleteMember}
+                onDeleteMember={handleDeleteMemberRequest}
                 onAddContribution={handleAddContributionClick}
               />
             </CardContent>

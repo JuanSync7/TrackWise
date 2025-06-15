@@ -39,7 +39,6 @@ export default function TripDetailPage() {
     tripExpenses: globalTripExpenses,
     getTripMembers,
     getTripSettlements, triggerTripSettlementCalculation,
-    getTripMemberNetData // Ensure this is used for card display
   } = useAppContext();
   const { user: authUser } = useAuth();
   const { toast } = useToast();
@@ -64,10 +63,9 @@ export default function TripDetailPage() {
       const foundTrip = getTripById(tripId);
       if (foundTrip) {
         setTrip(foundTrip);
-        // Initial fetch and subsequent updates for members, expenses, settlements
         setCurrentTripMembers(getTripMembers(tripId));
         setCurrentTripExpensesList(getTripExpenses(tripId));
-        triggerTripSettlementCalculation(tripId); // Calculate settlements on load
+        triggerTripSettlementCalculation(tripId);
         setSettlements(getTripSettlements(tripId));
       } else {
         toast({ variant: "destructive", title: "Trip Not Found", description: "The requested trip could not be found." });
@@ -80,7 +78,7 @@ export default function TripDetailPage() {
     if (tripId) {
         setCurrentTripMembers(getTripMembers(tripId));
         setCurrentTripExpensesList(getTripExpenses(tripId));
-        triggerTripSettlementCalculation(tripId); // Recalculate if global data changes
+        triggerTripSettlementCalculation(tripId); 
         setSettlements(getTripSettlements(tripId));
     }
   }, [tripId, globalTripMembers, globalTripContributions, globalTripExpenses, getTripMembers, getTripExpenses, getTripSettlements, triggerTripSettlementCalculation]);
@@ -95,7 +93,7 @@ export default function TripDetailPage() {
   }, [authUser, currentTripMembers]);
 
 
-  const handleSaveTripMember = async (data: TripMemberFormValues) => {
+  const handleSaveTripMember = useCallback(async (data: TripMemberFormValues) => {
     if (!tripId) return;
     setIsSubmittingMember(true);
     try {
@@ -107,30 +105,30 @@ export default function TripDetailPage() {
     } finally {
       setIsSubmittingMember(false);
     }
-  };
+  }, [tripId, addTripMember, toast]);
 
-  const handleDeleteTripMember = (memberId: string) => {
+  const handleDeleteTripMemberRequest = useCallback((memberId: string) => {
     setTripMemberToDelete(memberId);
-  };
+  }, []);
 
-  const confirmDeleteTripMember = () => {
+  const confirmDeleteTripMember = useCallback(() => {
     if (tripMemberToDelete && tripId) {
       const member = getTripMemberById(tripMemberToDelete);
       contextDeleteTripMember(tripMemberToDelete, tripId);
       toast({ title: "Trip Member Deleted", description: `${member?.name || 'The member'} has been removed from the trip.` });
       setTripMemberToDelete(null);
     }
-  };
+  }, [tripMemberToDelete, tripId, contextDeleteTripMember, getTripMemberById, toast]);
 
-  const handleAddTripContributionClick = (memberId: string) => {
+  const handleAddTripContributionClick = useCallback((memberId: string) => {
     const member = getTripMemberById(memberId);
     if (member) {
       setSelectedTripMemberForContribution(member);
       setIsContributionFormOpen(true);
     }
-  };
+  }, [getTripMemberById]);
 
-  const handleSaveTripContribution = async (data: TripContributionFormValues) => {
+  const handleSaveTripContribution = useCallback(async (data: TripContributionFormValues) => {
     if (!selectedTripMemberForContribution || !tripId) return;
     setIsSubmittingContribution(true);
     try {
@@ -143,9 +141,9 @@ export default function TripDetailPage() {
     } finally {
       setIsSubmittingContribution(false);
     }
-  };
+  }, [selectedTripMemberForContribution, tripId, addTripContribution, toast]);
 
-  const handleSaveTripExpense = async (formData: GenericExpenseFormValues) => {
+  const handleSaveTripExpense = useCallback(async (formData: GenericExpenseFormValues) => {
     if (!tripId) return;
     setIsSubmittingExpense(true);
     try {
@@ -157,7 +155,7 @@ export default function TripDetailPage() {
         categoryId: formData.categoryId,
         notes: formData.notes,
         isSplit: formData.isSplit,
-        paidByTripMemberId: formData.paidByMemberId, // This could be POT_PAYER_ID
+        paidByTripMemberId: formData.paidByMemberId, 
         splitWithTripMemberIds: formData.splitWithMemberIds,
       };
       addTripExpense(tripExpenseData);
@@ -168,13 +166,12 @@ export default function TripDetailPage() {
     } finally {
       setIsSubmittingExpense(false);
     }
-  };
+  }, [tripId, addTripExpense, toast]);
 
   const totalTripContributions = useMemo(() => {
     return currentTripMembers.reduce((sum, member) => sum + getTripMemberTotalDirectContribution(member.id, tripId), 0);
   }, [currentTripMembers, getTripMemberTotalDirectContribution, tripId, globalTripContributions]);
 
-  // Updated to only sum expenses paid from the pot
   const totalTripPotSpending = useMemo(() => {
     return currentTripExpensesList
       .filter(exp => exp.paidByTripMemberId === POT_PAYER_ID)
@@ -266,7 +263,7 @@ export default function TripDetailPage() {
             hideSplittingFeature={false}
             availableMembersForSplitting={currentTripMembers}
             currentUserIdForDefaultPayer={currentAuthUserAsTripMember?.id}
-            allowPotPayer={true} // Enable "Paid from Pot" option for trips
+            allowPotPayer={true} 
           />
         </DialogContent>
       </Dialog>
@@ -300,9 +297,9 @@ export default function TripDetailPage() {
             <CardContent>
               <TripMemberList
                 tripMembers={currentTripMembers}
-                onDeleteTripMember={handleDeleteTripMember}
+                onDeleteTripMember={handleDeleteTripMemberRequest}
                 onAddTripContribution={handleAddTripContributionClick}
-                numberOfTripMembers={currentTripMembers.length} // Pass this for calculations
+                numberOfTripMembers={currentTripMembers.length} 
               />
             </CardContent>
           </Card>
