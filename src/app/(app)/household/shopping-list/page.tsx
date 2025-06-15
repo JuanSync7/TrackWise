@@ -1,17 +1,16 @@
 
 "use client";
 
-import React, { useState, useEffect, useCallback, Suspense } from 'react'; // Added React, Suspense
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import { PageHeader } from '@/components/shared/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, CopyCheck, MilkIcon, EggIcon, SandwichIcon, Zap, Apple, Banana, Drumstick, Grape, Layers, Download, Loader2 } from 'lucide-react'; // Added Loader2
+import { PlusCircle, CopyCheck, MilkIcon, EggIcon, SandwichIcon, Zap, Apple, Banana, Drumstick, Grape, Layers, Download, Loader2, Trash2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useHousehold } from '@/contexts/household-context'; // Changed context
+import { useHousehold } from '@/contexts/household-context';
 import { useToast } from "@/hooks/use-toast";
 import type { ShoppingListItem } from '@/lib/types';
-// import { ShoppingListItemForm } from '@/components/household/shopping-list-item-form'; // Dynamic import
 import { ShoppingList } from '@/components/household/shopping-list';
 import { exportToCsv } from '@/lib/utils';
 import { format as formatDate, parseISO } from 'date-fns';
@@ -27,7 +26,7 @@ export default function ShoppingListPage() {
     deleteShoppingListItem: contextDeleteShoppingListItem,
     toggleShoppingListItemPurchased,
     copyLastWeeksPurchasedItems,
-  } = useHousehold(); // Changed context
+  } = useHousehold();
   const { toast } = useToast();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -62,7 +61,7 @@ export default function ShoppingListPage() {
         toast({ title: "Item Added", description: "New item added to the shopping list." });
       }
       setIsFormOpen(false);
-      setEditingItem(undefined);
+      // setEditingItem(undefined); // Already handled by onOpenChange
     } catch (error) {
       toast({ variant: "destructive", title: "Save Failed", description: "Could not save shopping list item. Please try again." });
     } finally {
@@ -215,7 +214,9 @@ export default function ShoppingListPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setItemToDelete(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeleteItem} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">Delete</AlertDialogAction>
+            <AlertDialogAction onClick={confirmDeleteItem} variant="destructive">
+              <Trash2 className="mr-2 h-4 w-4"/>Delete
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

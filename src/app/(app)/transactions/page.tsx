@@ -7,7 +7,7 @@ import type { Transaction } from '@/lib/types';
 import { usePersonalFinance } from '@/contexts/personal-finance-context';
 import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Download, Loader2, TrendingDown, TrendingUp, ArrowRightLeft, Repeat } from 'lucide-react';
+import { PlusCircle, Download, Loader2, TrendingDown, TrendingUp, ArrowRightLeft, Repeat, Trash2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useToast } from "@/hooks/use-toast";
 import { format as formatDate, parseISO, addDays, addWeeks, addMonths, addYears, isBefore, isEqual } from 'date-fns';
@@ -63,7 +63,7 @@ export default function TransactionsPage() {
         toast({ title: "Transaction Added", description: "Your new transaction has been successfully recorded." });
       }
       setIsFormOpen(false);
-      setEditingTransaction(undefined);
+      // setEditingTransaction(undefined); // Already handled by onOpenChange
     } catch (error) {
       toast({ variant: "destructive", title: "Save Failed", description: "Could not save transaction. Please try again." });
     } finally {
@@ -223,8 +223,8 @@ export default function TransactionsPage() {
               onSave={handleSaveTransaction}
               onCancel={() => { setIsFormOpen(false); setEditingTransaction(undefined);}}
               isSubmitting={isSubmitting}
-              hideSharedBudgetLink={true} // Not applicable for personal transactions page
-              hideSplittingFeature={true} // Not applicable for personal transactions page
+              hideSharedBudgetLink={true} 
+              hideSplittingFeature={true} 
             />
           </Suspense>
         </DialogContent>
@@ -240,7 +240,9 @@ export default function TransactionsPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setTransactionToDelete(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeleteTransaction} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">Delete</AlertDialogAction>
+            <AlertDialogAction onClick={confirmDeleteTransaction} variant="destructive">
+              <Trash2 className="mr-2 h-4 w-4"/>Delete
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

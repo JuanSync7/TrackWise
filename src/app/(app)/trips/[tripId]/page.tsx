@@ -5,7 +5,7 @@ import React, { useState, useEffect, useMemo, useCallback, Suspense } from 'reac
 import { useParams, useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/shared/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Users, Banknote, ListChecks, ArrowLeft, Shuffle, Wallet, Receipt, Loader2 } from 'lucide-react';
+import { PlusCircle, Users, Banknote, ListChecks, ArrowLeft, Shuffle, Wallet, Receipt, Loader2, Trash2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,7 +14,7 @@ import { useTrips } from '@/contexts/trip-context';
 import { usePersonalFinance } from '@/contexts/personal-finance-context';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from "@/hooks/use-toast";
-import type { Trip, TripMember, TripContribution, TripTransaction, TripSettlement, CalculatedMemberFinancials, MemberDisplayFinancials } from '@/lib/types'; // Renamed
+import type { Trip, TripMember, TripContribution, TripTransaction, TripSettlement, CalculatedMemberFinancials, MemberDisplayFinancials } from '@/lib/types';
 import { TripMemberList } from '@/components/trips/trip-member-list';
 import { TripSettlementList } from '@/components/trips/trip-settlement-list';
 import { DEFAULT_CURRENCY, POT_PAYER_ID } from '@/lib/constants';
@@ -26,8 +26,8 @@ const TripMemberForm = React.lazy(() => import('@/components/trips/trip-member-f
 type TripMemberFormValues = import('@/components/trips/trip-member-form').TripMemberFormValues;
 const TripContributionForm = React.lazy(() => import('@/components/trips/trip-contribution-form').then(module => ({ default: module.TripContributionForm })));
 type TripContributionFormValues = import('@/components/trips/trip-contribution-form').TripContributionFormValues;
-const TransactionForm = React.lazy(() => import('@/components/transactions/transaction-form').then(module => ({ default: module.TransactionForm }))); // Renamed
-type GenericTransactionFormValues = import('@/components/transactions/transaction-form').TransactionFormValues; // Renamed
+const TransactionForm = React.lazy(() => import('@/components/transactions/transaction-form').then(module => ({ default: module.TransactionForm })));
+type GenericTransactionFormValues = import('@/components/transactions/transaction-form').TransactionFormValues;
 
 
 export default function TripDetailPage() {
@@ -41,10 +41,10 @@ export default function TripDetailPage() {
     addTripContribution,
     tripMembers: globalTripMembers,
     tripContributions: globalTripContributions,
-    addTripTransaction, // Renamed
-    tripTransactions: globalTripTransactions, // Renamed
+    addTripTransaction,
+    tripTransactions: globalTripTransactions,
     getTripMembers,
-    getTripTransactions, // Renamed
+    getTripTransactions,
     getTripSettlements,
     triggerTripSettlementCalculation,
     tripFinancialSummaries,
@@ -57,11 +57,11 @@ export default function TripDetailPage() {
   const [trip, setTrip] = useState<Trip | undefined>(undefined);
   const [isMemberFormOpen, setIsMemberFormOpen] = useState(false);
   const [isContributionFormOpen, setIsContributionFormOpen] = useState(false);
-  const [isTransactionFormOpen, setIsTransactionFormOpen] = useState(false); // Renamed
+  const [isTransactionFormOpen, setIsTransactionFormOpen] = useState(false);
   const [selectedTripMemberForContribution, setSelectedTripMemberForContribution] = useState<TripMember | null>(null);
   const [isSubmittingMember, setIsSubmittingMember] = useState(false);
   const [isSubmittingContribution, setIsSubmittingContribution] = useState(false);
-  const [isSubmittingTransaction, setIsSubmittingTransaction] = useState(false); // Renamed
+  const [isSubmittingTransaction, setIsSubmittingTransaction] = useState(false);
   const [tripMemberToDelete, setTripMemberToDelete] = useState<string | null>(null);
 
   const memoizedTripMembers = useMemo(() => {
@@ -100,7 +100,7 @@ export default function TripDetailPage() {
     if (tripId) {
       triggerTripSettlementCalculation(tripId);
     }
-  }, [tripId, globalTripMembers, globalTripContributions, globalTripTransactions, triggerTripSettlementCalculation]); // Renamed
+  }, [tripId, globalTripMembers, globalTripContributions, globalTripTransactions, triggerTripSettlementCalculation]);
 
 
   const currentAuthUserAsTripMember = useMemo(() => {
@@ -162,31 +162,31 @@ export default function TripDetailPage() {
     }
   }, [selectedTripMemberForContribution, tripId, addTripContribution, toast]);
 
-  const handleSaveTripTransaction = useCallback(async (formData: GenericTransactionFormValues) => { // Renamed
+  const handleSaveTripTransaction = useCallback(async (formData: GenericTransactionFormValues) => {
     if (!tripId) return;
-    setIsSubmittingTransaction(true); // Renamed
+    setIsSubmittingTransaction(true);
     try {
-      const tripTransactionData: Omit<TripTransaction, 'id' | 'tripId'> & { tripId: string } = { // Renamed
+      const tripTransactionData: Omit<TripTransaction, 'id' | 'tripId'> & { tripId: string } = {
         tripId: tripId,
         description: formData.description,
         amount: formData.amount,
         date: formatDate(formData.date, "yyyy-MM-dd"),
         categoryId: formData.categoryId,
         notes: formData.notes,
-        transactionType: formData.transactionType, // Added
+        transactionType: formData.transactionType,
         isSplit: formData.transactionType === 'expense' ? formData.isSplit : false,
         paidByTripMemberId: formData.transactionType === 'expense' ? formData.paidByMemberId : undefined,
-        splitWithTripMemberIds: formData.transactionType === 'expense' ? formData.splitWithMemberIds : [],
+        splitWithTripMemberIds: formData.transactionType === 'expense' ? formData.splitWithTripMemberIds : [],
       };
-      addTripTransaction(tripTransactionData); // Renamed
-      toast({ title: "Trip Transaction Added", description: `Transaction "${formData.description}" recorded for the trip.` }); // Updated
-      setIsTransactionFormOpen(false); // Renamed
+      addTripTransaction(tripTransactionData);
+      toast({ title: "Trip Transaction Added", description: `Transaction "${formData.description}" recorded for the trip.` });
+      setIsTransactionFormOpen(false);
     } catch (error) {
       toast({ variant: "destructive", title: "Save Failed", description: "Could not save trip transaction." });
     } finally {
-      setIsSubmittingTransaction(false); // Renamed
+      setIsSubmittingTransaction(false);
     }
-  }, [tripId, addTripTransaction, toast]); // Renamed
+  }, [tripId, addTripTransaction, toast]);
 
  const tripFinancialSummary = useMemo(() => {
     let totalCashInPot = 0;
@@ -197,7 +197,7 @@ export default function TripDetailPage() {
       totalMemberPaidExpenses += financials.amountPersonallyPaidForGroup;
     });
 
-    const expenseTransactionsForThisTrip = globalTripTransactions.filter(trans => trans.tripId === tripId && trans.transactionType === 'expense'); // Renamed
+    const expenseTransactionsForThisTrip = globalTripTransactions.filter(trans => trans.tripId === tripId && trans.transactionType === 'expense');
     const totalPotPaidExpenses = expenseTransactionsForThisTrip
       .filter(exp => exp.paidByTripMemberId === POT_PAYER_ID)
       .reduce((sum, exp) => sum + exp.amount, 0);
@@ -212,7 +212,7 @@ export default function TripDetailPage() {
       remainingCashInPot,
       potUsagePercentage,
     };
-  }, [currentTripFinancials, globalTripTransactions, tripId]); // Renamed
+  }, [currentTripFinancials, globalTripTransactions, tripId]);
 
 
   if (!trip) {
@@ -230,8 +230,8 @@ export default function TripDetailPage() {
         description={trip.description || "Manage your trip's finances and members."}
         actions={
           <div className="flex gap-2 flex-wrap">
-            <Button variant="outline" onClick={() => setIsTransactionFormOpen(true)}> {/* Renamed */}
-              <ListChecks className="mr-2 h-4 w-4" /> Add Trip Transaction {/* Renamed */}
+            <Button variant="outline" onClick={() => setIsTransactionFormOpen(true)}>
+              <ListChecks className="mr-2 h-4 w-4" /> Add Trip Transaction
             </Button>
             <Button variant="outline" onClick={() => setIsMemberFormOpen(true)}>
               <PlusCircle className="mr-2 h-4 w-4" /> Add Trip Member
@@ -284,19 +284,19 @@ export default function TripDetailPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isTransactionFormOpen} onOpenChange={setIsTransactionFormOpen}> {/* Renamed */}
+      <Dialog open={isTransactionFormOpen} onOpenChange={setIsTransactionFormOpen}>
         <DialogContent className="sm:max-w-[425px] md:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Add New Trip Transaction</DialogTitle> {/* Renamed */}
+            <DialogTitle>Add New Trip Transaction</DialogTitle>
             <DialogDescription>
               Fill in details for a new trip transaction. Select "Paid from Pot" if communal funds were used for an expense.
             </DialogDescription>
           </DialogHeader>
           <Suspense fallback={<div className="flex justify-center items-center h-96"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
             <TransactionForm
-              onSave={handleSaveTripTransaction} // Renamed
-              onCancel={() => setIsTransactionFormOpen(false)} // Renamed
-              isSubmitting={isSubmittingTransaction} // Renamed
+              onSave={handleSaveTripTransaction}
+              onCancel={() => setIsTransactionFormOpen(false)}
+              isSubmitting={isSubmittingTransaction}
               showSharedBudgetLink={false}
               showSplittingFeature={true}
               availableMembersForSplitting={memoizedTripMembers}
@@ -318,7 +318,9 @@ export default function TripDetailPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setTripMemberToDelete(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeleteTripMember} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">Delete</AlertDialogAction>
+            <AlertDialogAction onClick={confirmDeleteTripMember} variant="destructive">
+              <Trash2 className="mr-2 h-4 w-4"/>Delete
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -401,5 +403,3 @@ export default function TripDetailPage() {
     </div>
   );
 }
-
-    

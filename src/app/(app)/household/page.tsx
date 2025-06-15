@@ -4,7 +4,7 @@
 import React, { useState, useMemo, useEffect, useCallback, Suspense } from 'react';
 import { PageHeader } from '@/components/shared/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Users, DollarSign, WalletCards, DivideSquare, ListChecks, Download, Shuffle, Wallet, Receipt, Loader2 } from 'lucide-react';
+import { PlusCircle, Users, DollarSign, WalletCards, DivideSquare, ListChecks, Download, Shuffle, Wallet, Receipt, Loader2, Trash2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -20,7 +20,7 @@ import { useHousehold } from '@/contexts/household-context';
 import { usePersonalFinance } from '@/contexts/personal-finance-context';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from "@/hooks/use-toast";
-import type { Member, Contribution, HouseholdTransaction, HouseholdSettlement, MemberDisplayFinancials, TransactionType } from '@/lib/types'; // Renamed HouseholdExpense
+import type { Member, Contribution, HouseholdTransaction, HouseholdSettlement, MemberDisplayFinancials, TransactionType } from '@/lib/types';
 import { MemberList } from '@/components/household/member-list';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -33,15 +33,15 @@ import { TripSettlementList } from '@/components/trips/trip-settlement-list';
 const MemberForm = React.lazy(() => import('@/components/household/member-form').then(module => ({ default: module.MemberForm })));
 const ContributionForm = React.lazy(() => import('@/components/household/contribution-form').then(module => ({ default: module.ContributionForm })));
 type ContributionFormValues = import('@/components/household/contribution-form').ContributionFormValues;
-const TransactionForm = React.lazy(() => import('@/components/transactions/transaction-form').then(module => ({ default: module.TransactionForm }))); // Renamed ExpenseForm
-type TransactionFormValuesType = import('@/components/transactions/transaction-form').TransactionFormValues; // Renamed
+const TransactionForm = React.lazy(() => import('@/components/transactions/transaction-form').then(module => ({ default: module.TransactionForm })));
+type TransactionFormValuesType = import('@/components/transactions/transaction-form').TransactionFormValues;
 
 
 export default function HouseholdPage() {
   const {
     members, addMember, deleteMember: contextDeleteMember, getMemberById,
     contributions, addContribution,
-    householdTransactions, addHouseholdTransaction, sharedBudgets, // Renamed
+    householdTransactions, addHouseholdTransaction, sharedBudgets,
     householdFinancialSummaries, householdOverallSettlements,
     getHouseholdMemberNetData, triggerHouseholdSettlementCalculation,
   } = useHousehold();
@@ -51,17 +51,17 @@ export default function HouseholdPage() {
 
   const [isMemberFormOpen, setIsMemberFormOpen] = useState(false);
   const [isContributionFormOpen, setIsContributionFormOpen] = useState(false);
-  const [isExpenseFormOpen, setIsExpenseFormOpen] = useState(false); // This form is now TransactionForm
+  const [isExpenseFormOpen, setIsExpenseFormOpen] = useState(false);
   const [selectedMemberForContribution, setSelectedMemberForContribution] = useState<Member | null>(null);
   const [isSubmittingMember, setIsSubmittingMember] = useState(false);
   const [isSubmittingContribution, setIsSubmittingContribution] = useState(false);
-  const [isSubmittingTransaction, setIsSubmittingTransaction] = useState(false); // Renamed
+  const [isSubmittingTransaction, setIsSubmittingTransaction] = useState(false);
   const [memberToDelete, setMemberToDelete] = useState<string | null>(null);
 
 
   useEffect(() => {
     triggerHouseholdSettlementCalculation();
-  }, [members, contributions, householdTransactions, triggerHouseholdSettlementCalculation]); // Renamed
+  }, [members, contributions, householdTransactions, triggerHouseholdSettlementCalculation]);
 
 
   const currentUserAsHouseholdMember = useMemo(() => {
@@ -130,51 +130,49 @@ export default function HouseholdPage() {
     }
   }, [selectedMemberForContribution, addContribution, toast]);
 
-  const handleSaveHouseholdTransaction = useCallback(async (data: TransactionFormValuesType) => { // Renamed
-    setIsSubmittingTransaction(true); // Renamed
-    let transactionData: Omit<HouseholdTransaction, 'id'> = { // Renamed
+  const handleSaveHouseholdTransaction = useCallback(async (data: TransactionFormValuesType) => {
+    setIsSubmittingTransaction(true);
+    let transactionData: Omit<HouseholdTransaction, 'id'> = {
       description: data.description,
       amount: data.amount,
       date: format(data.date, "yyyy-MM-dd"),
       categoryId: data.categoryId,
       notes: data.notes,
-      transactionType: data.transactionType, // Added
+      transactionType: data.transactionType,
       sharedBudgetId: data.sharedBudgetId === NONE_SHARED_BUDGET_VALUE ? undefined : data.sharedBudgetId,
       isSplit: data.transactionType === 'expense' ? data.isSplit : false,
       paidByMemberId: data.transactionType === 'expense' ? data.paidByMemberId : undefined,
       splitWithMemberIds: data.transactionType === 'expense' ? data.splitWithMemberIds : [],
     };
 
-    // Default category for household transactions if not linked to shared budget and no category selected
     if (transactionData.transactionType === 'expense' && !transactionData.categoryId && !transactionData.sharedBudgetId) {
       transactionData.categoryId = HOUSEHOLD_EXPENSE_CATEGORY_ID;
     }
-    // Default payer to POT if split and no payer selected (for expenses)
     if (transactionData.transactionType === 'expense' && transactionData.isSplit && !transactionData.paidByMemberId) {
         transactionData.paidByMemberId = POT_PAYER_ID;
     }
 
     try {
-      addHouseholdTransaction(transactionData); // Renamed
-      toast({ title: "Shared Transaction Added", description: "Your new shared transaction has been successfully recorded." }); // Updated
+      addHouseholdTransaction(transactionData);
+      toast({ title: "Shared Transaction Added", description: "Your new shared transaction has been successfully recorded." });
       setIsExpenseFormOpen(false);
     } catch (error) {
       toast({ variant: "destructive", title: "Save Failed", description: "Could not save shared transaction. Please try again." });
     } finally {
-      setIsSubmittingTransaction(false); // Renamed
+      setIsSubmittingTransaction(false);
     }
-  }, [addHouseholdTransaction, toast]); // Renamed
+  }, [addHouseholdTransaction, toast]);
 
 
   const householdFinancialSummary = useMemo(() => {
     let totalCashInPot = 0;
-    let totalMemberPaidExpenses = 0; // Only expenses
+    let totalMemberPaidExpenses = 0;
     Object.values(householdFinancialSummaries).forEach(financials => {
       totalCashInPot += financials.directCashContribution;
       totalMemberPaidExpenses += financials.amountPersonallyPaidForGroup;
     });
 
-    const totalPotPaidExpenses = householdTransactions // Renamed
+    const totalPotPaidExpenses = householdTransactions
       .filter(trans => trans.transactionType === 'expense' && trans.paidByMemberId === POT_PAYER_ID)
       .reduce((sum, trans) => sum + trans.amount, 0);
 
@@ -188,7 +186,7 @@ export default function HouseholdPage() {
       remainingCashInPot,
       potUsagePercentage,
     };
-  }, [householdFinancialSummaries, householdTransactions]); // Renamed
+  }, [householdFinancialSummaries, householdTransactions]);
 
 
   const handleExportHouseholdData = useCallback(() => {
@@ -240,9 +238,9 @@ export default function HouseholdPage() {
     });
     csvRows.push([]);
     csvRows.push(["Household Transactions (All Payers)"]);
-    csvRows.push(["Description", `Amount (${DEFAULT_CURRENCY})`, "Date", "Type", "Category/Linked Budget", "Paid By"]); // Added Type
-    householdTransactions.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()) // Renamed
-    .forEach(trans => { // Renamed
+    csvRows.push(["Description", `Amount (${DEFAULT_CURRENCY})`, "Date", "Type", "Category/Linked Budget", "Paid By"]);
+    householdTransactions.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .forEach(trans => {
       let source = "Unknown";
       if (trans.sharedBudgetId) {
         const budget = sharedBudgets.find(sb => sb.id === trans.sharedBudgetId);
@@ -252,12 +250,12 @@ export default function HouseholdPage() {
         source = category ? `Category: ${category.name}` : `Category: ID ${trans.categoryId}`;
       }
       const payerName = trans.paidByMemberId === POT_PAYER_ID ? "Household Pot" : (members.find(m=>m.id === trans.paidByMemberId)?.name || "Unknown Member");
-      csvRows.push([trans.description, trans.amount.toFixed(2), trans.date, trans.transactionType, source, payerName]); // Added type
+      csvRows.push([trans.description, trans.amount.toFixed(2), trans.date, trans.transactionType, source, payerName]);
     });
 
     exportToCsv(filename, csvRows);
     toast({ title: "Household Data Exported", description: `Data exported to ${filename}` });
-  }, [members, contributions, householdTransactions, sharedBudgets, householdOverallSettlements, householdFinancialSummary, getHouseholdMemberNetData, getCategoryById, toast]); // Renamed
+  }, [members, contributions, householdTransactions, sharedBudgets, householdOverallSettlements, householdFinancialSummary, getHouseholdMemberNetData, getCategoryById, toast]);
 
   const NONE_SHARED_BUDGET_VALUE = "__NONE__";
 
@@ -335,9 +333,9 @@ export default function HouseholdPage() {
           </DialogHeader>
           <Suspense fallback={<div className="flex justify-center items-center h-96"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
             <TransactionForm
-              onSave={handleSaveHouseholdTransaction} // Renamed
+              onSave={handleSaveHouseholdTransaction}
               onCancel={() => setIsExpenseFormOpen(false)}
-              isSubmitting={isSubmittingTransaction} // Renamed
+              isSubmitting={isSubmittingTransaction}
               showSharedBudgetLink={true}
               showSplittingFeature={true}
               availableMembersForSplitting={members}
@@ -359,7 +357,9 @@ export default function HouseholdPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setMemberToDelete(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeleteMember} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">Delete</AlertDialogAction>
+            <AlertDialogAction onClick={confirmDeleteMember} variant="destructive">
+                <Trash2 className="mr-2 h-4 w-4"/>Delete
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -515,5 +515,3 @@ export default function HouseholdPage() {
     </div>
   );
 }
-
-    

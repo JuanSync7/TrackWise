@@ -6,7 +6,7 @@ import { PageHeader } from '@/components/shared/page-header';
 import type { BudgetGoal } from '@/lib/types';
 import { usePersonalFinance } from '@/contexts/personal-finance-context';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Download, Loader2 } from 'lucide-react';
+import { PlusCircle, Download, Loader2, Trash2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -20,7 +20,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { BudgetGoalPieChart } from '@/components/dashboard/budget-goal-pie-chart';
-import { BudgetList } from '@/components/budgets/budget-list'; // BudgetList should still work as is
+import { BudgetList } from '@/components/budgets/budget-list';
 import { exportToCsv } from '@/lib/utils';
 import { format as formatDate } from 'date-fns';
 import { DEFAULT_CURRENCY } from '@/lib/constants';
@@ -55,7 +55,7 @@ export default function BudgetsPage() {
         toast({ title: "Budget Goal Set", description: `New budget goal for "${getCategoryById(data.categoryId)?.name || 'Category'}" has been successfully set.` });
       }
       setIsFormOpen(false);
-      setEditingBudget(undefined);
+      // setEditingBudget(undefined); // Already handled by useEffect and Dialog onOpenChange
     } catch (error) {
       toast({ variant: "destructive", title: "Save Failed", description: "Could not save budget goal. Please try again." });
     } finally {
@@ -98,7 +98,7 @@ export default function BudgetsPage() {
         categoryName,
         goal.amount,
         goal.period,
-        goal.currentSpending, // currentSpending in BudgetGoal refers to expenses
+        goal.currentSpending,
         DEFAULT_CURRENCY
       ];
     });
@@ -126,7 +126,10 @@ export default function BudgetsPage() {
         }
       />
 
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+      <Dialog open={isFormOpen} onOpenChange={(isOpen) => {
+        if (!isOpen) setEditingBudget(undefined); // Clear editing state when dialog closes
+        setIsFormOpen(isOpen);
+      }}>
         <DialogContent className="sm:max-w-[425px] md:max-w-md">
           <DialogHeader>
             <DialogTitle>{editingBudget ? 'Edit Budget Goal' : 'Set New Budget Goal'}</DialogTitle>
@@ -155,7 +158,9 @@ export default function BudgetsPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setBudgetToDelete(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeleteBudget}>Delete</AlertDialogAction>
+            <AlertDialogAction onClick={confirmDeleteBudget} variant="destructive">
+              <Trash2 className="mr-2 h-4 w-4"/>Delete
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -174,5 +179,3 @@ export default function BudgetsPage() {
     </div>
   );
 }
-
-    
