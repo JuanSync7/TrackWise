@@ -15,8 +15,6 @@ interface TripMemberItemProps {
   tripMember: TripMember;
   onDelete: (tripMemberId: string) => void;
   onAddContribution: (tripMemberId: string) => void;
-  // No longer need totalTripContributions, remainingTripPot, numberOfTripMembers
-  // as calculations will be more direct using getTripMemberNetData
 }
 
 export function TripMemberItem({
@@ -24,7 +22,7 @@ export function TripMemberItem({
   onDelete,
   onAddContribution,
 }: TripMemberItemProps) {
-  const { getTripMemberNetData, tripContributions, tripExpenses } = useAppContext(); // Add tripExpenses to dependencies
+  const { getTripMemberNetData, tripContributions, tripExpenses } = useAppContext();
   const [memberNetData, setMemberNetData] = useState<TripMemberNetData>({
     directContribution: 0,
     shareOfExpenses: 0,
@@ -32,10 +30,10 @@ export function TripMemberItem({
   });
 
   useEffect(() => {
-    if (tripMember && tripMember.tripId) {
+    if (tripMember && tripMember.tripId && tripMember.id) { // Ensure id and tripId are present
       setMemberNetData(getTripMemberNetData(tripMember.tripId, tripMember.id));
     }
-  }, [tripMember, getTripMemberNetData, tripContributions, tripExpenses]); // Add tripContributions and tripExpenses
+  }, [tripMember.id, tripMember.tripId, getTripMemberNetData, tripContributions, tripExpenses]); // Changed tripMember to tripMember.id and tripMember.tripId
 
   return (
     <Card className="overflow-hidden transition-shadow hover:shadow-lg">
