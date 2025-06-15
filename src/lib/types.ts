@@ -198,10 +198,14 @@ export interface PersonalFinanceContextType {
   updateTransaction: (transaction: Transaction) => void;
   deleteTransaction: (transactionId: string) => void;
 
+  addCategory: (categoryData: Omit<Category, 'id'>) => void;
+  updateCategory: (category: Category) => void;
+  deleteCategory: (categoryId: string) => void;
+  getCategoryById: (categoryId: string) => Category | undefined;
+
   addBudgetGoal: (goal: Omit<BudgetGoal, 'id' | 'currentSpending'>) => void;
   updateBudgetGoal: (goal: BudgetGoal) => void;
   deleteBudgetGoal: (goalId: string) => void;
-  getCategoryById: (categoryId: string) => Category | undefined;
 
   addFinancialGoal: (goal: Omit<FinancialGoal, 'id' | 'createdAt' | 'currentAmount'>) => void;
   updateFinancialGoal: (goal: FinancialGoal) => void;
@@ -299,3 +303,4 @@ export interface NavItem {
   external?: boolean;
   submenu?: NavItem[];
 }
+

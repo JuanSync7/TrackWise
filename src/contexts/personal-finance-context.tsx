@@ -21,6 +21,31 @@ export const PersonalFinanceProvider: React.FC<{ children: ReactNode }> = ({ chi
 
   const getCategoryById = useCallback((categoryId: string) => categories.find(cat => cat.id === categoryId), [categories]);
 
+  const addCategory = useCallback((categoryData: Omit<Category, 'id'>) => {
+    const newCategory = { ...categoryData, id: uuidv4() };
+    setCategories(prev => [...prev, newCategory]);
+  }, [setCategories]);
+
+  const updateCategory = useCallback((updatedCategory: Category) => {
+    setCategories(prev => prev.map(cat => cat.id === updatedCategory.id ? updatedCategory : cat));
+  }, [setCategories]);
+
+  const deleteCategory = useCallback((categoryId: string) => {
+    const otherCategory = categories.find(c => c.name.toLowerCase() === 'other');
+    
+    setTransactions(prevTransactions => 
+      prevTransactions.map(t => {
+        if (t.categoryId === categoryId) {
+          return { ...t, categoryId: otherCategory ? otherCategory.id : 'other' }; // Fallback to 'other' string if no "Other" category
+        }
+        return t;
+      })
+    );
+    setBudgetGoals(prevGoals => prevGoals.filter(goal => goal.categoryId !== categoryId));
+    setCategories(prev => prev.filter(cat => cat.id !== categoryId));
+  }, [categories, setCategories, setTransactions, setBudgetGoals]);
+
+
   const addTransaction = useCallback((newTransactionData: Omit<Transaction, 'id'>) => {
     let nextRecurrenceDate: string | undefined = undefined;
     if (newTransactionData.isRecurring && newTransactionData.recurrencePeriod && newTransactionData.date) {
@@ -166,7 +191,8 @@ export const PersonalFinanceProvider: React.FC<{ children: ReactNode }> = ({ chi
   const value: PersonalFinanceContextType = {
     transactions, categories, budgetGoals, financialGoals, personalDebts,
     addTransaction, updateTransaction, deleteTransaction,
-    addBudgetGoal, updateBudgetGoal, deleteBudgetGoal, getCategoryById,
+    addCategory, updateCategory, deleteCategory, getCategoryById,
+    addBudgetGoal, updateBudgetGoal, deleteBudgetGoal,
     addFinancialGoal, updateFinancialGoal, deleteFinancialGoal, contributeToFinancialGoal,
     addPersonalDebt, updatePersonalDebt, deletePersonalDebt, logPaymentToPersonalDebt,
   };
@@ -181,3 +207,4 @@ export const usePersonalFinance = (): PersonalFinanceContextType => {
   }
   return context;
 };
+
