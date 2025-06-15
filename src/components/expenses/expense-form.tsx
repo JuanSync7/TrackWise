@@ -80,11 +80,13 @@ interface ExpenseFormProps {
   onSave: (data: ExpenseFormValues) => void;
   onCancel?: () => void;
   isSubmitting?: boolean;
+  hideSharedBudgetLink?: boolean; // New prop
+  hideSplittingFeature?: boolean; // New prop
 }
 
 const NONE_SHARED_BUDGET_VALUE = "__NONE__";
 
-export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: ExpenseFormProps) {
+export function ExpenseForm({ expense, onSave, onCancel, isSubmitting, hideSharedBudgetLink = false, hideSplittingFeature = false }: ExpenseFormProps) {
   const { categories, getCategoryById, sharedBudgets, members } = useAppContext();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -98,20 +100,20 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
   const form = useForm<ExpenseFormValues>({
     resolver: zodResolver(expenseFormSchema),
     defaultValues: expense
-      ? { 
-          ...expense, 
-          date: new Date(expense.date), 
+      ? {
+          ...expense,
+          date: new Date(expense.date),
           sharedBudgetId: expense.sharedBudgetId || NONE_SHARED_BUDGET_VALUE,
           isSplit: expense.isSplit || false,
           paidByMemberId: expense.paidByMemberId || "",
           splitWithMemberIds: expense.splitWithMemberIds || [],
         }
-      : { 
-          description: "", 
-          amount: 0, 
-          date: new Date(), 
-          categoryId: "", 
-          notes: "", 
+      : {
+          description: "",
+          amount: 0,
+          date: new Date(),
+          categoryId: "",
+          notes: "",
           sharedBudgetId: NONE_SHARED_BUDGET_VALUE,
           isSplit: false,
           paidByMemberId: "",
@@ -128,17 +130,17 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
 
   const currentUserMember = useMemo(() => {
     if (!user || !members) return null;
-    return members.find(m => 
+    return members.find(m =>
       (user.displayName && m.name.toLowerCase().includes(user.displayName.toLowerCase())) ||
       (user.email && m.name.toLowerCase().includes(user.email.split('@')[0].toLowerCase()))
     );
   }, [user, members]);
 
   useEffect(() => {
-    if (watchedIsSplit && !watchedPaidByMemberId && currentUserMember && !expense) { // Only default for new expenses
+    if (watchedIsSplit && !watchedPaidByMemberId && currentUserMember && !expense && !hideSplittingFeature) { // Only default for new expenses in household context
       form.setValue("paidByMemberId", currentUserMember.id, { shouldValidate: true });
     }
-  }, [watchedIsSplit, watchedPaidByMemberId, currentUserMember, form, expense]);
+  }, [watchedIsSplit, watchedPaidByMemberId, currentUserMember, form, expense, hideSplittingFeature]);
 
 
   const handleSuggestCategory = useCallback(async () => {
@@ -164,10 +166,10 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
       setIsSuggestingCategory(false);
     }
   }, [watchedDescription, categories, toast, form, watchedCategoryId]);
-  
+
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (watchedDescription && watchedDescription.length >= 5 && !watchedCategoryId) { 
+      if (watchedDescription && watchedDescription.length >= 5 && !watchedCategoryId) {
         handleSuggestCategory();
       }
     }, 1000);
@@ -206,17 +208,18 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
   function onSubmit(data: ExpenseFormValues) {
     const dataToSave: ExpenseFormValues = {
       ...data,
-      sharedBudgetId: data.sharedBudgetId === NONE_SHARED_BUDGET_VALUE ? undefined : data.sharedBudgetId,
-      paidByMemberId: data.isSplit && data.paidByMemberId ? data.paidByMemberId : undefined,
-      splitWithMemberIds: data.isSplit && data.splitWithMemberIds ? data.splitWithMemberIds : [],
+      sharedBudgetId: (hideSharedBudgetLink || data.sharedBudgetId === NONE_SHARED_BUDGET_VALUE) ? undefined : data.sharedBudgetId,
+      isSplit: hideSplittingFeature ? false : data.isSplit,
+      paidByMemberId: (hideSplittingFeature || !data.isSplit || !data.paidByMemberId) ? undefined : data.paidByMemberId,
+      splitWithMemberIds: (hideSplittingFeature || !data.isSplit || !data.splitWithMemberIds) ? [] : data.splitWithMemberIds,
     };
     onSave(dataToSave);
     form.reset({
-      description: "", 
-      amount: 0, 
-      date: new Date(), 
-      categoryId: "", 
-      notes: "", 
+      description: "",
+      amount: 0,
+      date: new Date(),
+      categoryId: "",
+      notes: "",
       sharedBudgetId: NONE_SHARED_BUDGET_VALUE,
       isSplit: false,
       paidByMemberId: "",
@@ -225,7 +228,7 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
     setAiCategorySuggestion(null);
     setAiNoteSuggestion(null);
   }
-  
+
   const selectedCategory = getCategoryById(form.watch("categoryId"));
 
   const handleSelectAllSplitMembers = (checked: boolean) => {
@@ -311,7 +314,7 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
             )}
           />
         </div>
-        
+
         <FormField
           control={form.control}
           name="categoryId"
@@ -351,7 +354,7 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
                             key={category.id}
                             onSelect={() => {
                               form.setValue("categoryId", category.id);
-                              setAiCategorySuggestion(null); 
+                              setAiCategorySuggestion(null);
                               setCategoryPopoverOpen(false);
                             }}
                           >
@@ -395,16 +398,16 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
               <br />
               <span className="text-xs italic">Reasoning: {aiCategorySuggestion.reasoning}</span>
             </AlertDescription>
-            <Button 
-              type="button" 
-              size="sm" 
+            <Button
+              type="button"
+              size="sm"
               variant="ghost"
               className="mt-2 text-primary hover:bg-primary/20"
               onClick={() => {
                 const suggestedCat = categories.find(c => c.name.toLowerCase() === aiCategorySuggestion.category.toLowerCase());
                 if (suggestedCat) {
                   form.setValue("categoryId", suggestedCat.id, { shouldValidate: true });
-                  setAiCategorySuggestion(null); 
+                  setAiCategorySuggestion(null);
                 } else {
                   toast({variant: "destructive", title: "Category not found", description: `AI suggested "${aiCategorySuggestion.category}" which is not an available category.`})
                 }
@@ -415,17 +418,17 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
           </Alert>
         )}
 
-        {sharedBudgets.length > 0 && (
+        {!hideSharedBudgetLink && sharedBudgets.length > 0 && (
           <FormField
             control={form.control}
             name="sharedBudgetId"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Link to Shared Budget (Optional)</FormLabel>
-                <Select 
+                <Select
                   onValueChange={(value) => {
                     field.onChange(value === NONE_SHARED_BUDGET_VALUE ? "" : value);
-                  }} 
+                  }}
                   value={field.value || NONE_SHARED_BUDGET_VALUE}
                 >
                   <FormControl>
@@ -451,7 +454,7 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
           />
         )}
 
-        {members.length > 0 && (
+        {!hideSplittingFeature && members.length > 0 && (
           <div className="space-y-4 p-4 border rounded-md">
             <FormField
               control={form.control}
@@ -505,7 +508,7 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
                     </FormItem>
                   )}
                 />
-                
+
                 <Controller
                   control={form.control}
                   name="splitWithMemberIds"
@@ -516,10 +519,10 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
                             <FormLabel>Split With Whom?</FormLabel>
                             <FormDescription>Select all members sharing this expense (including payer).</FormDescription>
                         </div>
-                        <Button 
-                            type="button" 
-                            variant="outline" 
-                            size="sm" 
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
                             onClick={() => handleSelectAllSplitMembers(!areAllMembersSelected)}
                             disabled={members.length === 0}
                             className="ml-auto"
@@ -586,7 +589,7 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
             </FormItem>
           )}
         />
-        
+
         {isSuggestingNote && (
           <div className="flex items-center text-sm text-muted-foreground">
             <MessageSquarePlus className="mr-2 h-4 w-4 animate-pulse" />
@@ -602,9 +605,9 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
               "{aiNoteSuggestion.suggestedNote}"
               {aiNoteSuggestion.reasoning && <span className="text-xs italic block mt-1">Reasoning: {aiNoteSuggestion.reasoning}</span>}
             </AlertDescription>
-            <Button 
-              type="button" 
-              size="sm" 
+            <Button
+              type="button"
+              size="sm"
               variant="ghost"
               className="mt-2 text-accent-foreground/80 hover:bg-accent/30"
               onClick={() => {
@@ -632,3 +635,5 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
     </Form>
   );
 }
+
+    
