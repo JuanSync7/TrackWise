@@ -13,7 +13,7 @@ import { Progress } from '@/components/ui/progress';
 import { useAppContext } from '@/contexts/app-context';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from "@/hooks/use-toast";
-import type { Trip, TripMember, TripContribution, TripExpense, TripSettlement, MemberDisplayFinancials } from '@/lib/types';
+import type { Trip, TripMember, TripContribution, TripExpense, TripSettlement, MemberDisplayFinancials, CalculatedMemberFinancials } from '@/lib/types';
 import { TripMemberForm, type TripMemberFormValues } from '@/components/trips/trip-member-form';
 import { TripMemberList } from '@/components/trips/trip-member-list';
 import { TripContributionForm, type TripContributionFormValues } from '@/components/trips/trip-contribution-form';
@@ -33,15 +33,15 @@ export default function TripDetailPage() {
     getTripById,
     addTripMember, deleteTripMember: contextDeleteTripMember, getTripMemberById,
     addTripContribution, 
-    tripMembers: globalTripMembers, // For useEffect dependency
-    tripContributions: globalTripContributions, // For useEffect dependency
+    tripMembers: globalTripMembers, 
+    tripContributions: globalTripContributions, 
     addTripExpense,
-    tripExpenses: globalTripExpenses, // For useEffect dependency
+    tripExpenses: globalTripExpenses, 
     getTripMembers, 
     getTripExpenses, 
     getTripSettlements, 
     triggerTripSettlementCalculation,
-    getTripMemberNetData,
+    tripFinancialSummaries, // Use the map directly
   } = useAppContext();
   const { user: authUser } = useAuth();
   const { toast } = useToast();
@@ -56,12 +56,11 @@ export default function TripDetailPage() {
   const [isSubmittingExpense, setIsSubmittingExpense] = useState(false);
   const [tripMemberToDelete, setTripMemberToDelete] = useState<string | null>(null);
 
-
   const memoizedTripMembers = useMemo(() => {
     return tripId ? getTripMembers(tripId) : [];
   }, [tripId, getTripMembers]);
 
-  const memoizedTripExpensesList = useMemo(() => {
+  const memoizedTripExpensesList = useMemo(() => { // Not currently used in JSX, but available
     return tripId ? getTripExpenses(tripId) : [];
   }, [tripId, getTripExpenses]);
 
@@ -77,19 +76,22 @@ export default function TripDetailPage() {
     );
   }, [rawSettlements, memoizedTripMembers]);
 
+  const currentTripFinancials = useMemo(() => {
+    return tripFinancialSummaries[tripId] || new Map<string, CalculatedMemberFinancials>();
+  }, [tripFinancialSummaries, tripId]);
+
 
   useEffect(() => {
     if (tripId) {
       const foundTrip = getTripById(tripId);
       if (foundTrip) {
         setTrip(foundTrip);
-        triggerTripSettlementCalculation(tripId); // Initial calculation on load
       } else {
         toast({ variant: "destructive", title: "Trip Not Found", description: "The requested trip could not be found." });
         router.push('/trips');
       }
     }
-  }, [tripId, getTripById, router, toast, triggerTripSettlementCalculation]);
+  }, [tripId, getTripById, router, toast]);
 
   useEffect(() => {
     if (tripId) {
@@ -186,16 +188,20 @@ export default function TripDetailPage() {
  const tripFinancialSummary = useMemo(() => {
     let totalCashInPot = 0;
     let totalMemberPaidExpenses = 0;
+    let totalPotPaidExpenses = 0;
     
-    memoizedTripMembers.forEach(member => {
-      const memberData: MemberDisplayFinancials = getTripMemberNetData(tripId, member.id);
-      totalCashInPot += memberData.directCashContribution;
-      totalMemberPaidExpenses += memberData.amountPersonallyPaidForGroup;
+    // Use currentTripFinancials which is derived from the centralized map
+    currentTripFinancials.forEach(financials => {
+      totalCashInPot += financials.directCashContribution;
+      totalMemberPaidExpenses += financials.amountPersonallyPaidForGroup;
     });
 
-    const totalPotPaidExpenses = memoizedTripExpensesList
-      .filter(exp => exp.paidByTripMemberId === POT_PAYER_ID)
-      .reduce((sum, exp) => sum + exp.amount, 0);
+    // Pot paid expenses still need to be summed from raw expenses list
+    globalTripExpenses.forEach(exp => {
+      if (exp.tripId === tripId && exp.paidByTripMemberId === POT_PAYER_ID) {
+        totalPotPaidExpenses += exp.amount;
+      }
+    });
     
     const remainingCashInPot = totalCashInPot - totalPotPaidExpenses;
     const potUsagePercentage = totalCashInPot > 0 ? Math.min((totalPotPaidExpenses / totalCashInPot) * 100, 100) : 0;
@@ -207,7 +213,7 @@ export default function TripDetailPage() {
       remainingCashInPot,
       potUsagePercentage,
     };
-  }, [memoizedTripMembers, memoizedTripExpensesList, tripId, getTripMemberNetData]);
+  }, [currentTripFinancials, globalTripExpenses, tripId]);
 
 
   if (!trip) {
@@ -341,7 +347,12 @@ export default function TripDetailPage() {
               <CardDescription>Who owes whom to balance all trip finances (contributions, pot expenses, and member-paid shared expenses).</CardDescription>
             </CardHeader>
             <CardContent>
-                <TripSettlementList settlements={validSettlements} tripId={tripId} />
+                <TripSettlementList 
+                    settlements={validSettlements} 
+                    tripId={tripId}
+                    finalMemberFinancials={currentTripFinancials}
+                    remainingCashInPot={tripFinancialSummary.remainingCashInPot}
+                />
             </CardContent>
           </Card>
         </div>
@@ -361,6 +372,10 @@ export default function TripDetailPage() {
                     <span className="font-semibold text-accent">{DEFAULT_CURRENCY}{tripFinancialSummary.totalCashInPot.toFixed(2)}</span>
                 </div>
                 <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Total Member-Paid (Group):</span>
+                    <span className="font-semibold">{DEFAULT_CURRENCY}{tripFinancialSummary.totalMemberPaidExpenses.toFixed(2)}</span>
+                </div>
+                <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Total Spent from Pot:</span>
                     <span className="font-semibold text-destructive">{DEFAULT_CURRENCY}{tripFinancialSummary.totalPotPaidExpenses.toFixed(2)}</span>
                 </div>
@@ -377,21 +392,9 @@ export default function TripDetailPage() {
                 )}
             </CardContent>
            </Card>
-           <Card>
-             <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <Receipt className="h-6 w-6 text-primary" />
-                    Member-Paid Expenses
-                </CardTitle>
-                <CardDescription>Total expenses paid personally by members for the group.</CardDescription>
-             </CardHeader>
-             <CardContent>
-                <p className="text-2xl font-bold">{DEFAULT_CURRENCY}{tripFinancialSummary.totalMemberPaidExpenses.toFixed(2)}</p>
-                <p className="text-xs text-muted-foreground">This amount is factored into the overall settlement.</p>
-             </CardContent>
-           </Card>
         </div>
       </div>
     </div>
   );
 }
+
