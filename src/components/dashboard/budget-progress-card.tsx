@@ -4,12 +4,12 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import type { BudgetGoal } from '@/lib/types';
-import { useAppContext } from '@/contexts/app-context';
+import { usePersonalFinance } from '@/contexts/personal-finance-context'; // Changed to usePersonalFinance
 import { DEFAULT_CURRENCY } from '@/lib/constants';
 import { CategoryIcon } from '@/components/shared/category-icon';
 
 export function BudgetProgressCard() {
-  const { budgetGoals, getCategoryById } = useAppContext();
+  const { budgetGoals, getCategoryById } = usePersonalFinance(); // Changed to usePersonalFinance
 
   if (budgetGoals.length === 0) {
     return (
@@ -48,9 +48,9 @@ export function BudgetProgressCard() {
                   {DEFAULT_CURRENCY}{goal.currentSpending.toFixed(2)} / {DEFAULT_CURRENCY}{goal.amount.toFixed(2)}
                 </span>
               </div>
-              <Progress 
-                value={progressPercentage} 
-                className={isOverBudget ? '[&>div]:bg-destructive' : '[&>div]:bg-accent'} 
+              <Progress
+                value={progressPercentage}
+                className={isOverBudget ? '[&>div]:bg-destructive' : '[&>div]:bg-accent'}
                 aria-label={`${category?.name || 'Budget'} progress ${progressPercentage.toFixed(0)}%`}
               />
               {isOverBudget && <p className="text-xs text-destructive mt-1">You've exceeded your budget for {category?.name || 'this category'}.</p>}

@@ -6,20 +6,19 @@ import { SummaryCard } from '@/components/dashboard/summary-card';
 import { SpendingChart } from '@/components/dashboard/spending-chart';
 import { BudgetGoalPieChart } from '@/components/dashboard/budget-goal-pie-chart';
 import { DollarSign, TrendingUp, TrendingDown, ListChecks, Wallet } from 'lucide-react';
-import { useAppContext } from '@/contexts/app-context';
+import { usePersonalFinance } from '@/contexts/personal-finance-context'; // Changed context
 import { DEFAULT_CURRENCY } from '@/lib/constants';
 import { useMemo, useState, useEffect } from 'react';
-import type { Expense } from '@/lib/types';
+import type { Expense } from '@/lib/types'; // Still use personal Expense type for this dashboard overview
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
 export default function DashboardPage() {
-  const { expenses, budgetGoals } = useAppContext();
+  const { expenses, budgetGoals } = usePersonalFinance(); // Changed context
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate data loading
     const timer = setTimeout(() => setIsLoading(false), 500);
     return () => clearTimeout(timer);
   }, []);
@@ -32,18 +31,17 @@ export default function DashboardPage() {
     return budgetGoals.reduce((sum, goal) => sum + goal.amount, 0);
   }, [budgetGoals]);
 
-  const remainingBudget = totalBudget - totalExpenses; 
+  const remainingBudget = totalBudget - totalExpenses;
 
   const averageExpense = useMemo(() => {
     return expenses.length > 0 ? totalExpenses / expenses.length : 0;
   }, [expenses, totalExpenses]);
 
-  
+
   const [expenseTrend, setExpenseTrend] = useState<{ value: string; icon: any; color: string } | null>(null);
 
   useEffect(() => {
     if (expenses.length > 1) {
-      // Sort expenses by date to ensure correct comparison, newest first
       const sortedExpenses = [...expenses].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       const lastExpense = sortedExpenses[0];
       const secondLastExpense = sortedExpenses[1];
@@ -54,7 +52,7 @@ export default function DashboardPage() {
         } else if (lastExpense.amount < secondLastExpense.amount) {
           setExpenseTrend({ value: "Spending down", icon: TrendingDown, color: "text-accent" });
         } else {
-          setExpenseTrend(null); // No change or not enough data
+          setExpenseTrend(null);
         }
       } else {
         setExpenseTrend(null);
@@ -67,8 +65,8 @@ export default function DashboardPage() {
 
   return (
     <div className="container mx-auto py-2">
-      <PageHeader 
-        title="Welcome to Trackwise!" 
+      <PageHeader
+        title="Welcome to Trackwise!"
         description="Here's your financial overview."
         actions={
           <Link href="/expenses" passHref>
@@ -78,31 +76,31 @@ export default function DashboardPage() {
           </Link>
         }
       />
-      
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
-        <SummaryCard 
-          title="Total Expenses" 
-          value={`${DEFAULT_CURRENCY}${totalExpenses.toFixed(2)}`} 
+        <SummaryCard
+          title="Total Expenses"
+          value={`${DEFAULT_CURRENCY}${totalExpenses.toFixed(2)}`}
           icon={DollarSign}
           isLoading={isLoading}
           trend={expenseTrend?.value}
           trendColor={expenseTrend?.color as any}
         />
-        <SummaryCard 
-          title="Total Personal Budget" 
+        <SummaryCard
+          title="Total Personal Budget"
           value={`${DEFAULT_CURRENCY}${totalBudget.toFixed(2)}`}
           icon={Wallet}
           isLoading={isLoading}
         />
-         <SummaryCard 
-          title="Remaining Personal Budget" 
+         <SummaryCard
+          title="Remaining Personal Budget"
           value={`${DEFAULT_CURRENCY}${remainingBudget.toFixed(2)}`}
-          icon={Wallet} 
+          icon={Wallet}
           isLoading={isLoading}
           trendColor={remainingBudget >=0 ? "text-accent" : "text-destructive"}
         />
-        <SummaryCard 
-          title="Average Transaction" 
+        <SummaryCard
+          title="Average Transaction"
           value={`${DEFAULT_CURRENCY}${averageExpense.toFixed(2)}`}
           icon={ListChecks}
           isLoading={isLoading}

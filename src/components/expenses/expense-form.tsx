@@ -17,14 +17,15 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Check, ChevronsUpDown, Sparkles as AiSparklesIcon, Users, Landmark, CheckSquare, Square, MessageSquarePlus, Edit, CircleDollarSign } from "lucide-react"; // Added CircleDollarSign
+import { CalendarIcon, Check, ChevronsUpDown, Sparkles as AiSparklesIcon, Users, Landmark, CheckSquare, Square, MessageSquarePlus, Edit, CircleDollarSign } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import type { Expense, SharedBudget, Member, TripMember } from "@/lib/types";
-import { useAppContext } from "@/contexts/app-context";
+import type { Expense, SharedBudget, Member, TripMember, HouseholdExpense, TripExpense } from '@/lib/types'; // Added HouseholdExpense, TripExpense
+import { usePersonalFinance } from '@/contexts/personal-finance-context'; // For categories
+import { useHousehold } from '@/contexts/household-context'; // For household shared budgets
 import { format } from "date-fns";
 import { useEffect, useState, useCallback, useMemo }  from "react";
 import { suggestExpenseCategory, type SuggestExpenseCategoryInput, type SuggestExpenseCategoryOutput } from "@/ai/flows/suggest-expense-category";
@@ -33,20 +34,23 @@ import { useToast } from "@/hooks/use-toast";
 import { CategoryIcon } from '@/components/shared/category-icon';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { POT_PAYER_ID } from "@/lib/constants"; // Import POT_PAYER_ID
+import { POT_PAYER_ID } from "@/lib/constants";
 
+// This base schema is for the form fields themselves
 const expenseFormSchemaBase = z.object({
   description: z.string().min(2, { message: "Description must be at least 2 characters." }).max(100),
   amount: z.coerce.number().positive({ message: "Amount must be positive." }),
   date: z.date({ required_error: "A date is required." }),
   categoryId: z.string({ required_error: "Please select a category." }),
   notes: z.string().max(200).optional(),
-  sharedBudgetId: z.string().optional(),
+  // Fields for household/trip expenses (optional at base level)
+  sharedBudgetId: z.string().optional(), // For household shared budgets
   isSplit: z.boolean().optional().default(false),
-  paidByMemberId: z.string().optional(),
-  splitWithMemberIds: z.array(z.string()).optional().default([]),
+  paidByMemberId: z.string().optional(), // Can be household member ID or trip member ID or POT_PAYER_ID
+  splitWithMemberIds: z.array(z.string()).optional().default([]), // Household or Trip member IDs
 });
 
+// Refinement for splitting logic
 const expenseFormSchema = expenseFormSchemaBase.superRefine((data, ctx) => {
   if (data.isSplit) {
     if (!data.paidByMemberId) {
@@ -72,21 +76,23 @@ const expenseFormSchema = expenseFormSchemaBase.superRefine((data, ctx) => {
   }
 });
 
-
 export type ExpenseFormValues = z.infer<typeof expenseFormSchema>;
 
-type MemberLike = { id: string; name: string };
+type MemberLike = { id: string; name: string }; // Can be Member or TripMember
 
 interface ExpenseFormProps {
-  expense?: Expense | TripExpense;
-  onSave: (data: ExpenseFormValues) => void;
+  expense?: Expense | HouseholdExpense | TripExpense; // Can be any expense type for editing
+  onSave: (data: ExpenseFormValues) => void; // Form always outputs ExpenseFormValues
   onCancel?: () => void;
   isSubmitting?: boolean;
-  hideSharedBudgetLink?: boolean;
-  hideSplittingFeature?: boolean;
-  availableMembersForSplitting?: MemberLike[];
-  currentUserIdForDefaultPayer?: string;
-  allowPotPayer?: boolean; // New prop to enable "Paid from Pot"
+  
+  // Control features based on context (personal, household, trip)
+  showSharedBudgetLink?: boolean; // Default false, true for household expenses
+  showSplittingFeature?: boolean; // Default false, true for household/trip expenses
+
+  availableMembersForSplitting?: MemberLike[]; // Pass household or trip members
+  currentUserIdForDefaultPayer?: string; // User's ID if they are a member of the group
+  allowPotPayer?: boolean; // True for household/trip shared expenses
 }
 
 const NONE_SHARED_BUDGET_VALUE = "__NONE__";
@@ -96,43 +102,47 @@ export function ExpenseForm({
     onSave,
     onCancel,
     isSubmitting,
-    hideSharedBudgetLink = false,
-    hideSplittingFeature = false,
+    showSharedBudgetLink = false, // Show for household expenses
+    showSplittingFeature = false, // Show for household/trip expenses
     availableMembersForSplitting = [],
     currentUserIdForDefaultPayer,
-    allowPotPayer = false, // Default to false for general expenses, true for household/trip
+    allowPotPayer = false,
 }: ExpenseFormProps) {
-  const { categories, getCategoryById, sharedBudgets: householdSharedBudgets } = useAppContext();
+  const { categories, getCategoryById } = usePersonalFinance();
+  const { sharedBudgets: householdSharedBudgets } = useHousehold(); // Get household shared budgets
   const { toast } = useToast();
+
   const [aiCategorySuggestion, setAiCategorySuggestion] = useState<SuggestExpenseCategoryOutput | null>(null);
   const [isSuggestingCategory, setIsSuggestingCategory] = useState(false);
   const [aiNoteSuggestion, setAiNoteSuggestion] = useState<SuggestExpenseNotesOutput | null>(null);
   const [isSuggestingNote, setIsSuggestingNote] = useState(false);
   const [categoryPopoverOpen, setCategoryPopoverOpen] = useState(false);
 
-
   const form = useForm<ExpenseFormValues>({
     resolver: zodResolver(expenseFormSchema),
-    defaultValues: expense
-      ? {
+    defaultValues: useMemo(() => {
+      if (expense) {
+        return {
           ...expense,
           date: new Date(expense.date),
-          sharedBudgetId: (expense as Expense).sharedBudgetId || NONE_SHARED_BUDGET_VALUE,
-          isSplit: expense.isSplit || false,
-          paidByMemberId: (expense as Expense).paidByMemberId || (expense as TripExpense).paidByTripMemberId || (allowPotPayer ? POT_PAYER_ID : ""),
-          splitWithMemberIds: (expense as Expense).splitWithMemberIds || (expense as TripExpense).splitWithTripMemberIds || [],
-        }
-      : {
-          description: "",
-          amount: 0,
-          date: new Date(),
-          categoryId: "",
-          notes: "",
-          sharedBudgetId: NONE_SHARED_BUDGET_VALUE,
-          isSplit: true,
-          paidByMemberId: allowPotPayer ? POT_PAYER_ID : (currentUserIdForDefaultPayer || ""),
-          splitWithMemberIds: availableMembersForSplitting.map(m => m.id),
-        },
+          sharedBudgetId: (expense as HouseholdExpense).sharedBudgetId || NONE_SHARED_BUDGET_VALUE, // Specific to HouseholdExpense
+          isSplit: (expense as HouseholdExpense | TripExpense).isSplit || false, // Specific to Household/Trip
+          paidByMemberId: (expense as HouseholdExpense).paidByMemberId || (expense as TripExpense).paidByTripMemberId || (allowPotPayer ? POT_PAYER_ID : ""),
+          splitWithMemberIds: (expense as HouseholdExpense).splitWithMemberIds || (expense as TripExpense).splitWithTripMemberIds || [],
+        };
+      }
+      return {
+        description: "",
+        amount: 0,
+        date: new Date(),
+        categoryId: "",
+        notes: "",
+        sharedBudgetId: NONE_SHARED_BUDGET_VALUE,
+        isSplit: showSplittingFeature, // Default to true if feature is shown
+        paidByMemberId: allowPotPayer ? POT_PAYER_ID : (currentUserIdForDefaultPayer || ""),
+        splitWithMemberIds: showSplittingFeature ? availableMembersForSplitting.map(m => m.id) : [],
+      };
+    }, [expense, showSplittingFeature, allowPotPayer, currentUserIdForDefaultPayer, availableMembersForSplitting]),
   });
 
   const watchedDescription = form.watch("description");
@@ -144,24 +154,24 @@ export function ExpenseForm({
 
 
   useEffect(() => {
-    if (watchedIsSplit && !watchedPaidByMemberId && !allowPotPayer && currentUserIdForDefaultPayer) {
+    if (showSplittingFeature && watchedIsSplit && !watchedPaidByMemberId && !allowPotPayer && currentUserIdForDefaultPayer) {
         const isCurrentUserInList = availableMembersForSplitting.some(m => m.id === currentUserIdForDefaultPayer);
         if (isCurrentUserInList) {
             form.setValue("paidByMemberId", currentUserIdForDefaultPayer, { shouldValidate: true });
         }
-    } else if (watchedIsSplit && !watchedPaidByMemberId && allowPotPayer) {
+    } else if (showSplittingFeature && watchedIsSplit && !watchedPaidByMemberId && allowPotPayer) {
         form.setValue("paidByMemberId", POT_PAYER_ID, { shouldValidate: true });
     }
-  }, [watchedIsSplit, watchedPaidByMemberId, currentUserIdForDefaultPayer, allowPotPayer, form, availableMembersForSplitting]);
+  }, [showSplittingFeature, watchedIsSplit, watchedPaidByMemberId, currentUserIdForDefaultPayer, allowPotPayer, form, availableMembersForSplitting]);
 
   useEffect(() => {
-    if (!expense && watchedIsSplit && availableMembersForSplitting.length > 0 ) {
+    if (!expense && showSplittingFeature && watchedIsSplit && availableMembersForSplitting.length > 0 ) {
         const currentSplitIds = form.getValues("splitWithMemberIds");
         if (!currentSplitIds || currentSplitIds.length === 0) {
              form.setValue("splitWithMemberIds", availableMembersForSplitting.map(m => m.id), { shouldValidate: true });
         }
     }
-  }, [expense, watchedIsSplit, availableMembersForSplitting, form]);
+  }, [expense, showSplittingFeature, watchedIsSplit, availableMembersForSplitting, form]);
 
 
   const handleSuggestCategory = useCallback(async () => {
@@ -228,20 +238,16 @@ export function ExpenseForm({
   function onSubmit(data: ExpenseFormValues) {
     const dataToSave: ExpenseFormValues = {
       ...data,
-      sharedBudgetId: (hideSharedBudgetLink || data.sharedBudgetId === NONE_SHARED_BUDGET_VALUE) ? undefined : data.sharedBudgetId,
+      sharedBudgetId: (data.sharedBudgetId === NONE_SHARED_BUDGET_VALUE) ? undefined : data.sharedBudgetId,
     };
     onSave(dataToSave);
-    if (!expense) {
+    if (!expense) { // Reset form only if it's a new item form
         form.reset({
-            description: "",
-            amount: 0,
-            date: new Date(),
-            categoryId: "",
-            notes: "",
+            description: "", amount: 0, date: new Date(), categoryId: "", notes: "",
             sharedBudgetId: NONE_SHARED_BUDGET_VALUE,
-            isSplit: true,
-            paidByMemberId: allowPotPayer ? POT_PAYER_ID : (currentUserIdForDefaultPayer && availableMembersForSplitting.some(m => m.id === currentUserIdForDefaultPayer) ? currentUserIdForDefaultPayer : ""),
-            splitWithMemberIds: availableMembersForSplitting.map(m => m.id),
+            isSplit: showSplittingFeature,
+            paidByMemberId: allowPotPayer ? POT_PAYER_ID : (currentUserIdForDefaultPayer || ""),
+            splitWithMemberIds: showSplittingFeature ? availableMembersForSplitting.map(m => m.id) : [],
         });
         setAiCategorySuggestion(null);
         setAiNoteSuggestion(null);
@@ -257,9 +263,7 @@ export function ExpenseForm({
       form.setValue("splitWithMemberIds", [], { shouldValidate: true });
     }
   };
-
   const areAllMembersSelected = availableMembersForSplitting.length > 0 && watchedSplitWithMemberIds?.length === availableMembersForSplitting.length;
-
 
   return (
     <Form {...form}>
@@ -346,6 +350,7 @@ export function ExpenseForm({
                     <Button
                       variant="outline"
                       role="combobox"
+                      aria-expanded={categoryPopoverOpen}
                       className={cn(
                         "w-full justify-between",
                         !field.value && "text-muted-foreground"
@@ -437,7 +442,7 @@ export function ExpenseForm({
           </Alert>
         )}
 
-        {!hideSharedBudgetLink && householdSharedBudgets.length > 0 && (
+        {showSharedBudgetLink && householdSharedBudgets.length > 0 && (
           <FormField
             control={form.control}
             name="sharedBudgetId"
@@ -473,7 +478,7 @@ export function ExpenseForm({
           />
         )}
 
-        {!hideSplittingFeature && availableMembersForSplitting.length > 0 && (
+        {showSplittingFeature && availableMembersForSplitting.length > 0 && (
           <div className="space-y-4 p-4 border rounded-md">
             <FormField
               control={form.control}

@@ -7,9 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Progress } from '@/components/ui/progress';
-import { MoreHorizontal, Trash2, WalletCards, Edit2, Eye } from 'lucide-react';
+import { MoreHorizontal, Trash2, WalletCards, Edit2 } from 'lucide-react'; // Removed Eye
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+// No context needed here as all data is passed via props
 
 interface SharedBudgetItemProps {
   sharedBudget: SharedBudget;
@@ -59,19 +60,19 @@ export function SharedBudgetItem({ sharedBudget, onDelete, onEdit }: SharedBudge
         {sharedBudget.description && (
           <p className="text-sm text-muted-foreground italic mb-3">{sharedBudget.description}</p>
         )}
-        
+
         <div className="mb-2">
           <div className="flex justify-between text-sm mb-1">
             <span className="text-muted-foreground">Spent: {DEFAULT_CURRENCY}{sharedBudget.currentSpending.toFixed(2)}</span>
             <span className={cn("font-medium", isOverBudget ? "text-destructive" : "text-accent")}>
-              {isOverBudget 
+              {isOverBudget
                 ? `Over by ${DEFAULT_CURRENCY}${Math.abs(remainingAmount).toFixed(2)}`
                 : `Remaining: ${DEFAULT_CURRENCY}${remainingAmount.toFixed(2)}`}
             </span>
           </div>
-          <Progress 
-            value={progressPercentage} 
-            className={cn("h-3", isOverBudget ? '[&>div]:bg-destructive' : '[&>div]:bg-primary')} 
+          <Progress
+            value={progressPercentage}
+            className={cn("h-3", isOverBudget ? '[&>div]:bg-destructive' : '[&>div]:bg-primary')}
             aria-label={`${sharedBudget.name} progress ${progressPercentage.toFixed(0)}%`}
           />
         </div>

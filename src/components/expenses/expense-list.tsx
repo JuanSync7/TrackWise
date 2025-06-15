@@ -1,20 +1,22 @@
+
 "use client";
 
-import type { Expense } from '@/lib/types';
+import type { Expense, HouseholdExpense, TripExpense } from '@/lib/types'; // Use union type
 import { ExpenseItem } from './expense-item';
-import { AnimatePresence, motion } from 'framer-motion'; // For animations
+import { AnimatePresence, motion } from 'framer-motion';
 
 interface ExpenseListProps {
-  expenses: Expense[];
-  onEditExpense: (expense: Expense) => void;
+  expenses: (Expense | HouseholdExpense | TripExpense)[]; // Can be an array of any expense type
+  onEditExpense: (expense: Expense | HouseholdExpense | TripExpense) => void;
   onDeleteExpense: (expenseId: string) => void;
+  expenseContext?: 'personal' | 'household' | 'trip'; // Pass context for correct member name resolution in ExpenseItem
 }
 
-export function ExpenseList({ expenses, onEditExpense, onDeleteExpense }: ExpenseListProps) {
+export function ExpenseList({ expenses, onEditExpense, onDeleteExpense, expenseContext = 'personal' }: ExpenseListProps) {
   if (expenses.length === 0) {
     return (
       <div className="text-center py-10">
-        <img src="https://placehold.co/300x200.png" alt="Empty state" data-ai-hint="empty illustration" className="mx-auto mb-4 rounded-lg" />
+        <img src="https://placehold.co/300x200.png" data-ai-hint="empty receipt list" alt="Empty state" className="mx-auto mb-4 rounded-lg" />
         <h3 className="text-xl font-semibold mb-2">No Expenses Yet</h3>
         <p className="text-muted-foreground">Start adding your expenses to see them here.</p>
       </div>
@@ -39,6 +41,7 @@ export function ExpenseList({ expenses, onEditExpense, onDeleteExpense }: Expens
               expense={expense}
               onEdit={onEditExpense}
               onDelete={onDeleteExpense}
+              expenseContext={expenseContext} // Pass context to ExpenseItem
             />
           </motion.div>
         ))}

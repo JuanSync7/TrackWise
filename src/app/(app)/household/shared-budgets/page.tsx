@@ -1,10 +1,10 @@
 
 "use client";
 
-import { useState } from 'react';
+import React, { useState, Suspense } from 'react'; // Added React, Suspense
 import { PageHeader } from '@/components/shared/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Trash2 } from 'lucide-react';
+import { PlusCircle, Trash2, Loader2 } from 'lucide-react'; // Added Loader2
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -16,16 +16,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useAppContext } from '@/contexts/app-context';
+import { useHousehold } from '@/contexts/household-context'; // Changed context
 import { useToast } from "@/hooks/use-toast";
 import type { SharedBudget } from '@/lib/types';
-import { SharedBudgetForm } from '@/components/household/shared-budget-form';
+// import { SharedBudgetForm } from '@/components/household/shared-budget-form'; // Dynamic import
 import { SharedBudgetList } from '@/components/household/shared-budget-list';
 
+const SharedBudgetForm = React.lazy(() => import('@/components/household/shared-budget-form').then(module => ({ default: module.SharedBudgetForm })));
 type SharedBudgetFormValues = Omit<SharedBudget, 'id' | 'createdAt' | 'currentSpending'>;
 
 export default function SharedBudgetsPage() {
-  const { sharedBudgets, addSharedBudget, updateSharedBudget, deleteSharedBudget: contextDeleteSharedBudget } = useAppContext();
+  const { sharedBudgets, addSharedBudget, updateSharedBudget, deleteSharedBudget: contextDeleteSharedBudget } = useHousehold(); // Changed context
   const { toast } = useToast();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -37,15 +38,14 @@ export default function SharedBudgetsPage() {
     setIsSubmitting(true);
     try {
       if (editingBudget) {
-        // Ensure currentSpending and createdAt are preserved for updates
         const budgetToUpdate: SharedBudget = {
-            ...editingBudget, // This includes id, createdAt, and importantly currentSpending
+            ...editingBudget,
             name: data.name,
             amount: data.amount,
             period: data.period,
             description: data.description,
         };
-        updateSharedBudget(budgetToUpdate); 
+        updateSharedBudget(budgetToUpdate);
         toast({ title: "Shared Budget Updated", description: `The shared budget "${budgetToUpdate.name}" has been successfully updated.` });
       } else {
         addSharedBudget(data);
@@ -106,12 +106,14 @@ export default function SharedBudgetsPage() {
               {editingBudget ? 'Update the details of the shared budget.' : 'Fill in the details for the new shared household budget.'}
             </DialogDescription>
           </DialogHeader>
-          <SharedBudgetForm
-            sharedBudget={editingBudget}
-            onSave={handleSaveBudget}
-            onCancel={() => { setIsFormOpen(false); setEditingBudget(undefined); }}
-            isSubmitting={isSubmitting}
-          />
+          <Suspense fallback={<div className="flex justify-center items-center h-60"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+            <SharedBudgetForm
+              sharedBudget={editingBudget}
+              onSave={handleSaveBudget}
+              onCancel={() => { setIsFormOpen(false); setEditingBudget(undefined); }}
+              isSubmitting={isSubmitting}
+            />
+          </Suspense>
         </DialogContent>
       </Dialog>
 

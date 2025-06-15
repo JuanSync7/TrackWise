@@ -2,22 +2,24 @@
 "use client";
 
 import { useMemo, useState } from 'react';
-import { Bar, BarChart, Line, LineChart as RechartsLineChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts';
+import { Line, LineChart as RechartsLineChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts'; // Renamed to avoid conflict
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useAppContext } from '@/contexts/app-context';
+import { usePersonalFinance } from '@/contexts/personal-finance-context'; // Changed context
 import { DEFAULT_CURRENCY } from '@/lib/constants';
 import { format, subMonths, startOfMonth, endOfMonth, eachMonthOfInterval, isWithinInterval, parseISO } from 'date-fns';
+import type { Expense } from '@/lib/types'; // Use personal Expense type
 
 type PeriodOption = "last_6_months" | "last_12_months" | "this_year";
 
 interface MonthlyData {
-  month: string; // e.g., "Jan 2023"
+  month: string;
   totalSpending: number;
 }
 
 export function MonthlySpendingTrendChart() {
-  const { expenses } = useAppContext();
+  const { expenses } = usePersonalFinance(); // Changed context
+
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodOption>("last_6_months");
 
   const chartData = useMemo(() => {
@@ -37,14 +39,14 @@ export function MonthlySpendingTrendChart() {
         startDate = startOfMonth(subMonths(now, 5));
         break;
     }
-    
+
     const monthsInPeriod = eachMonthOfInterval({ start: startDate, end: endDate });
 
     const monthlyTotals = monthsInPeriod.map(monthDate => {
       const monthStart = startOfMonth(monthDate);
       const monthEnd = endOfMonth(monthDate);
-      
-      const spendingThisMonth = expenses
+
+      const spendingThisMonth = expenses // Personal expenses
         .filter(expense => {
             try {
                 const expenseDate = parseISO(expense.date);
@@ -52,7 +54,7 @@ export function MonthlySpendingTrendChart() {
             } catch (e) { return false; }
         })
         .reduce((sum, expense) => sum + expense.amount, 0);
-      
+
       return {
         month: format(monthDate, 'MMM yyyy'),
         totalSpending: spendingThisMonth,
@@ -101,17 +103,17 @@ export function MonthlySpendingTrendChart() {
         <ResponsiveContainer width="100%" height={350}>
           <RechartsLineChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-            <XAxis 
-              dataKey="month" 
-              stroke="hsl(var(--muted-foreground))" 
-              fontSize={12} 
-              tickLine={false} 
+            <XAxis
+              dataKey="month"
+              stroke="hsl(var(--muted-foreground))"
+              fontSize={12}
+              tickLine={false}
               axisLine={false}
             />
-            <YAxis 
-              stroke="hsl(var(--muted-foreground))" 
-              fontSize={12} 
-              tickLine={false} 
+            <YAxis
+              stroke="hsl(var(--muted-foreground))"
+              fontSize={12}
+              tickLine={false}
               axisLine={false}
               tickFormatter={(value) => `${DEFAULT_CURRENCY}${value}`}
             />
@@ -128,4 +130,3 @@ export function MonthlySpendingTrendChart() {
     </Card>
   );
 }
-

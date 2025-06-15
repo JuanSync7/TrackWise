@@ -1,15 +1,16 @@
 
 "use client";
 
-import { useState, useMemo } from 'react'; // Added useMemo
+import React, { useState, useMemo, Suspense } from 'react'; // Added React, Suspense
 import { PageHeader } from '@/components/shared/page-header';
-import { ExpenseForm } from '@/components/expenses/expense-form';
+// import { ExpenseForm } from '@/components/expenses/expense-form'; // Dynamic import
 import { ExpenseList } from '@/components/expenses/expense-list';
-import type { Expense } from '@/lib/types';
-import { useAppContext } from '@/contexts/app-context';
-import { useAuth } from '@/contexts/auth-context'; // Import useAuth
+import type { Expense, HouseholdExpense } from '@/lib/types'; // Use personal Expense type
+import { usePersonalFinance } from '@/contexts/personal-finance-context'; // Changed context
+import { useHousehold } from '@/contexts/household-context'; // For household members if splitting
+import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, X, Download } from 'lucide-react';
+import { PlusCircle, X, Download, Loader2 } from 'lucide-react'; // Added Loader2
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useToast } from "@/hooks/use-toast";
 import { format as formatDate } from 'date-fns';
@@ -26,9 +27,14 @@ import {
 import { exportToCsv } from '@/lib/utils';
 import { DEFAULT_CURRENCY } from '@/lib/constants';
 
+const ExpenseForm = React.lazy(() => import('@/components/expenses/expense-form').then(module => ({ default: module.ExpenseForm })));
+
 export default function ExpensesPage() {
-  const { expenses, addExpense, updateExpense, deleteExpense: contextDeleteExpense, categories, sharedBudgets, members, getCategoryById, getMemberById } = useAppContext();
-  const { user: authUser } = useAuth(); // Get authenticated user
+  // Personal expenses managed by PersonalFinanceContext
+  const { expenses, addExpense, updateExpense, deleteExpense: contextDeleteExpense, categories, getCategoryById } = usePersonalFinance();
+  // Household members for potential future splitting of personal expenses (though not fully implemented for personal context yet)
+  const { members: householdMembers, sharedBudgets: householdSharedBudgets } = useHousehold();
+  const { user: authUser } = useAuth();
   const { toast } = useToast();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -36,25 +42,35 @@ export default function ExpensesPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null);
 
+  // This page primarily deals with *personal* expenses.
+  // The ExpenseForm is generic, so we'll pass relevant props for a personal context.
   const currentUserAsHouseholdMember = useMemo(() => {
-    if (!authUser || !members || members.length === 0) return undefined;
-    return members.find(m => 
+    if (!authUser || !householdMembers || householdMembers.length === 0) return undefined;
+    return householdMembers.find(m =>
         (authUser.displayName && m.name.toLowerCase() === authUser.displayName.toLowerCase()) ||
         (authUser.email && m.name.toLowerCase() === authUser.email.split('@')[0].toLowerCase())
     );
-  }, [authUser, members]);
+  }, [authUser, householdMembers]);
 
 
-  const handleSaveExpense = async (data: any) => {
+  const handleSaveExpense = async (data: any) => { // data will be ExpenseFormValues
     setIsSubmitting(true);
-    const expenseData = { ...data, date: formatDate(data.date, "yyyy-MM-dd") };
+    // Ensure it's treated as a personal expense (no household-specific fields like sharedBudgetId)
+    const expenseData: Omit<Expense, 'id'> = {
+      description: data.description,
+      amount: data.amount,
+      date: formatDate(data.date, "yyyy-MM-dd"),
+      categoryId: data.categoryId,
+      notes: data.notes,
+      // isSplit, paidByMemberId, splitWithMemberIds are not part of personal Expense type here
+    };
     try {
       if (editingExpense) {
         updateExpense({ ...editingExpense, ...expenseData });
-        toast({ title: "Expense Updated", description: "Your expense has been successfully updated." });
+        toast({ title: "Personal Expense Updated", description: "Your expense has been successfully updated." });
       } else {
         addExpense(expenseData);
-        toast({ title: "Expense Added", description: "Your new expense has been successfully recorded." });
+        toast({ title: "Personal Expense Added", description: "Your new expense has been successfully recorded." });
       }
       setIsFormOpen(false);
       setEditingExpense(undefined);
@@ -82,7 +98,6 @@ export default function ExpensesPage() {
     }
   };
 
-
   const openFormForNew = () => {
     setEditingExpense(undefined);
     setIsFormOpen(true);
@@ -90,19 +105,13 @@ export default function ExpensesPage() {
 
   const handleExportExpenses = () => {
     const headerRow = [
-      "ID", "Description", "Amount", "Currency", "Date", 
-      "Category Name", "Notes", "Shared Budget Name", "Is Split", 
-      "Paid By Member Name", "Split With Member Names"
+      "ID", "Description", "Amount", "Currency", "Date",
+      "Category Name", "Notes"
+      // Removed household/split specific fields for personal expense export
     ];
 
     const dataRows = expenses.map(exp => {
       const categoryName = getCategoryById(exp.categoryId)?.name || 'N/A';
-      const sharedBudgetName = exp.sharedBudgetId ? sharedBudgets.find(sb => sb.id === exp.sharedBudgetId)?.name || 'N/A' : '';
-      const paidByMemberName = exp.paidByMemberId ? getMemberById(exp.paidByMemberId)?.name || 'N/A' : '';
-      const splitWithMemberNames = exp.splitWithMemberIds && exp.splitWithMemberIds.length > 0
-        ? exp.splitWithMemberIds.map(id => getMemberById(id)?.name || 'Unknown Member').join('; ')
-        : '';
-
       return [
         exp.id,
         exp.description,
@@ -111,27 +120,23 @@ export default function ExpensesPage() {
         exp.date,
         categoryName,
         exp.notes || '',
-        sharedBudgetName,
-        exp.isSplit ? 'Yes' : 'No',
-        paidByMemberName,
-        splitWithMemberNames
       ];
     });
 
-    const filename = `trackwise_expenses_${formatDate(new Date(), 'yyyy-MM-dd')}.csv`;
+    const filename = `trackwise_personal_expenses_${formatDate(new Date(), 'yyyy-MM-dd')}.csv`;
     exportToCsv(filename, [headerRow, ...dataRows]);
-    toast({ title: "Expenses Exported", description: `Expenses have been exported to ${filename}` });
+    toast({ title: "Personal Expenses Exported", description: `Expenses have been exported to ${filename}` });
   };
 
   return (
     <div className="container mx-auto">
-      <PageHeader 
-        title="Manage Your Expenses"
-        description="Keep track of your spending and categorize transactions."
+      <PageHeader
+        title="Manage Your Personal Expenses"
+        description="Keep track of your individual spending and categorize transactions."
         actions={
           <div className="flex gap-2 flex-wrap">
             <Button onClick={handleExportExpenses} variant="outline" disabled={expenses.length === 0}>
-              <Download className="mr-2 h-4 w-4" /> Export Expenses
+              <Download className="mr-2 h-4 w-4" /> Export Personal Expenses
             </Button>
             <Button onClick={openFormForNew}>
               <PlusCircle className="mr-2 h-4 w-4" /> Add New Expense
@@ -148,24 +153,27 @@ export default function ExpensesPage() {
       }}>
         <DialogContent className="sm:max-w-[425px] md:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingExpense ? 'Edit Expense' : 'Add New Expense'}</DialogTitle>
+            <DialogTitle>{editingExpense ? 'Edit Personal Expense' : 'Add New Personal Expense'}</DialogTitle>
             <DialogDescription>
-              {editingExpense ? 'Update the details of your expense.' : 'Fill in the details to add a new expense.'}
+              {editingExpense ? 'Update the details of your personal expense.' : 'Fill in the details to add a new personal expense.'}
             </DialogDescription>
           </DialogHeader>
-          <ExpenseForm
-            expense={editingExpense}
-            onSave={handleSaveExpense}
-            onCancel={() => { setIsFormOpen(false); setEditingExpense(undefined);}}
-            isSubmitting={isSubmitting}
-            availableMembersForSplitting={members} // Pass household members
-            currentUserIdForDefaultPayer={currentUserAsHouseholdMember?.id} // Pass current user's household member ID
-            // hideSharedBudgetLink can default to false or be explicitly false
-            // hideSplittingFeature can default to false or be explicitly false
-          />
+          <Suspense fallback={<div className="flex justify-center items-center h-60"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+            <ExpenseForm
+              expense={editingExpense} // ExpenseForm can handle base Expense type for its fields
+              onSave={handleSaveExpense}
+              onCancel={() => { setIsFormOpen(false); setEditingExpense(undefined);}}
+              isSubmitting={isSubmitting}
+              // For personal expenses, these splitting/household features are generally hidden or disabled
+              hideSharedBudgetLink={true}
+              hideSplittingFeature={true} // Hide splitting for personal expenses
+              // availableMembersForSplitting={householdMembers} // Not strictly needed if splitting is hidden
+              // currentUserIdForDefaultPayer={currentUserAsHouseholdMember?.id} // Not strictly needed
+            />
+          </Suspense>
         </DialogContent>
       </Dialog>
-      
+
       <AlertDialog open={!!expenseToDelete} onOpenChange={() => setExpenseToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -181,9 +189,8 @@ export default function ExpensesPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-
-      <ExpenseList 
-        expenses={expenses} 
+      <ExpenseList
+        expenses={expenses} // Pass personal expenses
         onEditExpense={handleEditExpense}
         onDeleteExpense={handleDeleteExpense}
       />

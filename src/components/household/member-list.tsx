@@ -10,6 +10,7 @@ interface MemberListProps {
   members: Member[];
   onDeleteMember: (memberId: string) => void;
   onAddContribution: (memberId: string) => void;
+  // numberOfHouseholdMembers prop removed as calculations are centralized
 }
 
 export function MemberList({
@@ -43,7 +44,6 @@ export function MemberList({
               member={member}
               onDelete={onDeleteMember}
               onAddContribution={onAddContribution}
-              // numberOfHouseholdMembers={members.length} // No longer needed here directly
             />
           </motion.div>
         ))}

@@ -9,17 +9,17 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { MoreHorizontal, Edit3, Trash2, ShoppingBag, MinusCircle, PlusCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNowStrict } from 'date-fns';
-import { useAppContext } from '@/contexts/app-context'; // Added for direct context access
+import { useHousehold } from '@/contexts/household-context'; // Changed context
 
 interface ShoppingListItemProps {
   item: ShoppingListItemType;
-  onEdit: (item: ShoppingListItemType) => void; // For opening edit form
+  onEdit: (item: ShoppingListItemType) => void;
   onDelete: (itemId: string) => void;
   onTogglePurchased: (itemId: string) => void;
 }
 
 export function ShoppingListItem({ item, onEdit, onDelete, onTogglePurchased }: ShoppingListItemProps) {
-  const { editShoppingListItem } = useAppContext(); // Get context function
+  const { editShoppingListItem } = useHousehold(); // Changed context
   const timeAgo = formatDistanceToNowStrict(new Date(item.addedAt), { addSuffix: true });
 
   const isNumericQuantity = /^\d+$/.test(item.quantity);
@@ -27,10 +27,9 @@ export function ShoppingListItem({ item, onEdit, onDelete, onTogglePurchased }: 
   const handleQuantityChange = (increment: boolean) => {
     if (!isNumericQuantity) return;
     const currentVal = parseInt(item.quantity, 10);
-    const newVal = increment ? currentVal + 1 : Math.max(1, currentVal - 1); // Ensure quantity doesn't go below 1
-    
-    // Directly call context function to update item quantity
-    editShoppingListItem({
+    const newVal = increment ? currentVal + 1 : Math.max(1, currentVal - 1);
+
+    editShoppingListItem({ // Context function for updating
       id: item.id,
       itemName: item.itemName,
       quantity: String(newVal),
@@ -41,7 +40,6 @@ export function ShoppingListItem({ item, onEdit, onDelete, onTogglePurchased }: 
   return (
     <Card className={cn("overflow-hidden transition-shadow hover:shadow-md", item.isPurchased && "bg-muted/50 opacity-70")}>
       <CardContent className="p-4 flex items-center justify-between gap-2">
-        {/* Checkbox and Item Name/Notes/Timestamp */}
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <Checkbox
             id={`item-${item.id}`}
@@ -50,8 +48,8 @@ export function ShoppingListItem({ item, onEdit, onDelete, onTogglePurchased }: 
             aria-label={`Mark ${item.itemName} as ${item.isPurchased ? 'not purchased' : 'purchased'}`}
           />
           <div className="flex-1 min-w-0">
-            <label 
-              htmlFor={`item-${item.id}`} 
+            <label
+              htmlFor={`item-${item.id}`}
               className={cn(
                 "font-medium cursor-pointer",
                 item.isPurchased && "line-through text-muted-foreground"
@@ -64,9 +62,7 @@ export function ShoppingListItem({ item, onEdit, onDelete, onTogglePurchased }: 
           </div>
         </div>
 
-        {/* Quantity Controls OR Static Quantity Display - positioned before ShoppingBag/Menu */}
-        <div className="flex items-center"> {/* Wrapper for quantity and action icons */}
-            {/* Quantity Controls */}
+        <div className="flex items-center">
             {!item.isPurchased && isNumericQuantity && (
                 <div className="flex items-center gap-1">
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleQuantityChange(false)} disabled={parseInt(item.quantity, 10) <= 1}>
@@ -78,14 +74,12 @@ export function ShoppingListItem({ item, onEdit, onDelete, onTogglePurchased }: 
                     </Button>
                 </div>
             )}
-            {/* Static Quantity Display (if not numeric or purchased) */}
             {((!isNumericQuantity && item.quantity) || (item.isPurchased && item.quantity)) && (
                  <div className="px-2">
                     <span className={cn("text-sm", item.isPurchased ? "text-muted-foreground" : "text-foreground")}>Qty: {item.quantity}</span>
                 </div>
             )}
 
-            {/* Shopping Bag and Options Menu */}
             <ShoppingBag className={cn("h-5 w-5 ml-2", item.isPurchased ? "text-green-500" : "text-primary/70")} />
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>

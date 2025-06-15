@@ -1,32 +1,33 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Suspense } from 'react'; // Added React, Suspense
 import { PageHeader } from '@/components/shared/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, CopyCheck, MilkIcon, EggIcon, SandwichIcon, Zap, Apple, Banana, Drumstick, Grape, Layers, Download } from 'lucide-react'; // Added new icons
+import { PlusCircle, CopyCheck, MilkIcon, EggIcon, SandwichIcon, Zap, Apple, Banana, Drumstick, Grape, Layers, Download, Loader2 } from 'lucide-react'; // Added Loader2
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useAppContext } from '@/contexts/app-context';
+import { useHousehold } from '@/contexts/household-context'; // Changed context
 import { useToast } from "@/hooks/use-toast";
-import type { ShoppingListItem, Expense } from '@/lib/types';
-import { ShoppingListItemForm } from '@/components/household/shopping-list-item-form';
+import type { ShoppingListItem } from '@/lib/types';
+// import { ShoppingListItemForm } from '@/components/household/shopping-list-item-form'; // Dynamic import
 import { ShoppingList } from '@/components/household/shopping-list';
-import type { ExpenseFormValues } from '@/components/expenses/expense-form';
 import { exportToCsv } from '@/lib/utils';
 import { format as formatDate, parseISO } from 'date-fns';
 
+const ShoppingListItemForm = React.lazy(() => import('@/components/household/shopping-list-item-form').then(module => ({ default: module.ShoppingListItemForm })));
+
+
 export default function ShoppingListPage() {
-  const { 
-    shoppingListItems, 
-    addShoppingListItem, 
-    editShoppingListItem, 
-    deleteShoppingListItem: contextDeleteShoppingListItem, 
-    toggleShoppingListItemPurchased, 
+  const {
+    shoppingListItems,
+    addShoppingListItem,
+    editShoppingListItem,
+    deleteShoppingListItem: contextDeleteShoppingListItem,
+    toggleShoppingListItemPurchased,
     copyLastWeeksPurchasedItems,
-    // setExpensePrefillData // Removed as it's not in context
-  } = useAppContext();
+  } = useHousehold(); // Changed context
   const { toast } = useToast();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -41,8 +42,8 @@ export default function ShoppingListPage() {
     { name: "Apples", icon: Apple, defaultQuantity: "5", notes: "e.g., Fuji, Gala" },
     { name: "Bananas", icon: Banana, defaultQuantity: "1 bunch", notes: "e.g., ~5-7 count" },
     { name: "Chicken", icon: Drumstick, defaultQuantity: "1 lb", notes: "e.g., Breasts, Thighs" },
-    { name: "Rice", icon: Grape, defaultQuantity: "1 bag", notes: "e.g., Basmati, Jasmine (Using Grape as produce proxy)" }, // Using Grape as a placeholder visual for a bag of produce/grains
-    { name: "Toilet Paper", icon: Layers, defaultQuantity: "1 pack", notes: "e.g., 6 rolls, 12 rolls (Using Layers as placeholder)" }, // Using Layers as a placeholder
+    { name: "Rice", icon: Grape, defaultQuantity: "1 bag", notes: "e.g., Basmati, Jasmine (Using Grape as produce proxy)" },
+    { name: "Toilet Paper", icon: Layers, defaultQuantity: "1 pack", notes: "e.g., 6 rolls, 12 rolls (Using Layers as placeholder)" },
   ];
 
   const handleAddCommonItem = (itemName: string, quantity: string, itemNotes?: string) => {
@@ -99,12 +100,6 @@ export default function ShoppingListPage() {
     setIsFormOpen(true);
   }, []);
 
-  // Removed useEffect that called non-existent setExpensePrefillData
-  // useEffect(() => {
-  //   setExpensePrefillData(null); 
-  // }, [setExpensePrefillData]);
-
-
   const handleCopyItems = () => {
     const count = copyLastWeeksPurchasedItems();
     if (count > 0) {
@@ -135,7 +130,7 @@ export default function ShoppingListPage() {
 
   return (
     <div className="container mx-auto flex flex-col h-full">
-      <div className="sticky top-0 z-10 bg-background py-4 mb-0"> 
+      <div className="sticky top-0 z-10 bg-background py-4 mb-0">
         <PageHeader
           title="Household Shopping List"
           description="Manage items your household needs to buy together."
@@ -166,9 +161,9 @@ export default function ShoppingListPage() {
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
               {commonItems.map(commonItem => (
-                  <Button 
-                      key={commonItem.name} 
-                      variant="outline" 
+                  <Button
+                      key={commonItem.name}
+                      variant="outline"
                       onClick={() => handleAddCommonItem(commonItem.name, commonItem.defaultQuantity, commonItem.notes)}
                       className="flex items-center gap-2 py-2 px-3 h-auto"
                   >
@@ -199,12 +194,14 @@ export default function ShoppingListPage() {
               {editingItem ? 'Update the details of the shopping list item.' : 'Fill in the details for the new item.'}
             </DialogDescription>
           </DialogHeader>
-          <ShoppingListItemForm
-            item={editingItem}
-            onSave={handleSaveItem}
-            onCancel={() => { setIsFormOpen(false); setEditingItem(undefined); }}
-            isSubmitting={isSubmitting}
-          />
+          <Suspense fallback={<div className="flex justify-center items-center h-40"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+            <ShoppingListItemForm
+              item={editingItem}
+              onSave={handleSaveItem}
+              onCancel={() => { setIsFormOpen(false); setEditingItem(undefined); }}
+              isSubmitting={isSubmitting}
+            />
+          </Suspense>
         </DialogContent>
       </Dialog>
 
@@ -225,4 +222,3 @@ export default function ShoppingListPage() {
     </div>
   );
 }
-

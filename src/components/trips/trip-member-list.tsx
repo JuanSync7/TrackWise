@@ -10,14 +10,13 @@ interface TripMemberListProps {
   tripMembers: TripMember[];
   onDeleteTripMember: (tripMemberId: string) => void;
   onAddTripContribution: (tripMemberId: string) => void;
-  numberOfTripMembers: number; // Added to help with calculations if pot is negative with 0 contributions
+  // numberOfTripMembers prop can be removed if not used, financial calculations are centralized
 }
 
 export function TripMemberList({
   tripMembers,
   onDeleteTripMember,
   onAddTripContribution,
-  numberOfTripMembers,
 }: TripMemberListProps) {
   if (tripMembers.length === 0) {
     return (
@@ -45,7 +44,6 @@ export function TripMemberList({
               tripMember={member}
               onDelete={onDeleteTripMember}
               onAddContribution={onAddTripContribution}
-              numberOfTripMembers={numberOfTripMembers}
             />
           </motion.div>
         ))}

@@ -3,54 +3,52 @@
 
 import { useState, useMemo } from 'react';
 import { PageHeader } from '@/components/shared/page-header';
-import { useAppContext } from '@/contexts/app-context';
+import { useHousehold } from '@/contexts/household-context'; // Changed context
 import { DebtList } from '@/components/household/debt-list';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Debt, Member } from '@/lib/types';
 import { useAuth } from '@/contexts/auth-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DEFAULT_CURRENCY } from '@/lib/constants';
-import { ArrowDownCircle, ArrowUpCircle, Users, DivideSquare, Scale } from 'lucide-react'; // Added Scale for Net Balance
+import { ArrowDownCircle, ArrowUpCircle, Users, DivideSquare, Scale } from 'lucide-react';
 
 export default function ExpenseSplittingPage() {
-  const { getAllDebts, getMemberById, members, getDebtsOwedByMember, getDebtsOwedToMember } = useAppContext();
-  const { user } = useAuth(); 
+  const { getAllDebts, getMemberById, members, getDebtsOwedByMember, getDebtsOwedToMember } = useHousehold(); // Changed context
+  const { user } = useAuth();
 
   const currentUserMember = useMemo(() => {
     if (!user || !members || members.length === 0) return null;
-    return members.find(m => 
+    return members.find(m =>
       (user.displayName && m.name.toLowerCase().includes(user.displayName.toLowerCase())) ||
       (user.email && m.name.toLowerCase().includes(user.email.split('@')[0].toLowerCase()))
     );
   }, [user, members]);
 
 
-  const allDebtsForDisplay = getAllDebts(true); // Get all debts (settled and unsettled) for list display
-  
-  // For summary cards, we only care about unsettled debts
+  const allDebtsForDisplay = getAllDebts(true);
+
   const unsettledDebtsOwedByCurrentUser = useMemo(() => {
     if (!currentUserMember) return [];
-    return getDebtsOwedByMember(currentUserMember.id, false); // false for includeSettled
+    return getDebtsOwedByMember(currentUserMember.id, false);
   }, [currentUserMember, getDebtsOwedByMember]);
 
   const unsettledDebtsOwedToCurrentUser = useMemo(() => {
     if (!currentUserMember) return [];
-    return getDebtsOwedToMember(currentUserMember.id, false); // false for includeSettled
+    return getDebtsOwedToMember(currentUserMember.id, false);
   }, [currentUserMember, getDebtsOwedToMember]);
 
   const totalOwedByCurrentUser = unsettledDebtsOwedByCurrentUser.reduce((sum, debt) => sum + debt.amount, 0);
   const totalOwedToCurrentUser = unsettledDebtsOwedToCurrentUser.reduce((sum, debt) => sum + debt.amount, 0);
   const netBalance = totalOwedToCurrentUser - totalOwedByCurrentUser;
 
-  // For tab content, get all debts (settled and unsettled)
   const debtsOwedByCurrentUserForList = useMemo(() => {
     if (!currentUserMember) return [];
-    return getDebtsOwedByMember(currentUserMember.id, true); // true for includeSettled
+    return getDebtsOwedByMember(currentUserMember.id, true);
   }, [currentUserMember, getDebtsOwedByMember]);
 
   const debtsOwedToCurrentUserForList = useMemo(() => {
     if (!currentUserMember) return [];
-    return getDebtsOwedToMember(currentUserMember.id, true); // true for includeSettled
+    return getDebtsOwedToMember(currentUserMember.id, true);
   }, [currentUserMember, getDebtsOwedToMember]);
 
 

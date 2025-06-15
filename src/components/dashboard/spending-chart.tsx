@@ -1,24 +1,25 @@
+
 "use client";
 
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import type { Expense, Category } from '@/lib/types';
-import { useAppContext } from '@/contexts/app-context';
+import { usePersonalFinance } from '@/contexts/personal-finance-context'; // Changed context
 import { DEFAULT_CURRENCY } from '@/lib/constants';
 import { useMemo } from 'react';
 
 interface SpendingChartProps {
-  expenses: Expense[];
-  categories: Category[];
+  // Props are no longer needed as context is used directly
 }
 
 interface ChartData {
   name: string;
-  [key: string]: string | number; // Category name as key, amount as value
+  total: number; // Keep 'total' for the Bar dataKey
+  fill: string;
 }
 
 export function SpendingChart() {
-  const { expenses, categories } = useAppContext();
+  const { expenses, categories } = usePersonalFinance(); // Changed context
 
   const chartData = useMemo(() => {
     const dataMap = new Map<string, number>();
@@ -28,11 +29,11 @@ export function SpendingChart() {
         dataMap.set(category.name, (dataMap.get(category.name) || 0) + expense.amount);
       }
     });
-    
+
     return Array.from(dataMap.entries()).map(([name, total]) => ({
       name,
       total,
-      fill: categories.find(c => c.name === name)?.color || '#8884d8', // Fallback color
+      fill: categories.find(c => c.name === name)?.color || '#8884d8',
     }));
   }, [expenses, categories]);
 
@@ -62,12 +63,12 @@ export function SpendingChart() {
           <BarChart data={chartData} layout="vertical" margin={{ left: 20, right: 20 }}>
             <CartesianGrid strokeDasharray="3 3" horizontal={false} />
             <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={(value) => `${DEFAULT_CURRENCY}${value}`} />
-            <YAxis 
-              dataKey="name" 
-              type="category" 
-              stroke="hsl(var(--muted-foreground))" 
-              fontSize={12} 
-              width={100} 
+            <YAxis
+              dataKey="name"
+              type="category"
+              stroke="hsl(var(--muted-foreground))"
+              fontSize={12}
+              width={100}
               tick={{ dy: 2 }}
               interval={0}
             />

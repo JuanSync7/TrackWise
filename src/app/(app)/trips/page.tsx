@@ -1,26 +1,30 @@
 
 "use client";
 
-import { useState } from 'react';
+import React, { useState, Suspense } from 'react'; // Added React, Suspense
 import { PageHeader } from '@/components/shared/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, PlaneTakeoff, Edit3, Trash2 } from 'lucide-react';
+import { PlusCircle, PlaneTakeoff, Loader2 } from 'lucide-react'; // Added Loader2
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { useAppContext } from '@/contexts/app-context';
+import { useTrips } from '@/contexts/trip-context'; // Changed to useTrips
 import { useToast } from "@/hooks/use-toast";
 import type { Trip } from '@/lib/types';
-import { TripForm, type TripFormValues } from '@/components/trips/trip-form';
+// import { TripForm, type TripFormValues } from '@/components/trips/trip-form'; // Dynamic import
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { AnimatePresence, motion } from 'framer-motion';
 
+const TripForm = React.lazy(() => import('@/components/trips/trip-form').then(module => ({ default: module.TripForm })));
+type TripFormValues = Omit<Trip, 'id' | 'createdAt'>;
+
+
 export default function TripsPage() {
-  const { trips, addTrip, getTrips } = useAppContext(); // Assuming getTrips() is added to context
+  const { addTrip, getTrips } = useTrips(); // Changed context
   const { toast } = useToast();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingTrip, setEditingTrip] = useState<Trip | undefined>(undefined); // For future editing
+  const [editingTrip, setEditingTrip] = useState<Trip | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const allTrips = getTrips().sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -28,7 +32,6 @@ export default function TripsPage() {
   const handleSaveTrip = async (data: TripFormValues) => {
     setIsSubmitting(true);
     try {
-      // For now, only adding new trips. Editing will be a future enhancement.
       addTrip(data);
       toast({ title: "Trip Created", description: `"${data.name}" has been successfully created.` });
       setIsFormOpen(false);
@@ -68,12 +71,14 @@ export default function TripsPage() {
               {editingTrip ? 'Update the details of your trip.' : 'Fill in the details for your new trip.'}
             </DialogDescription>
           </DialogHeader>
-          <TripForm
-            trip={editingTrip}
-            onSave={handleSaveTrip}
-            onCancel={() => { setIsFormOpen(false); setEditingTrip(undefined); }}
-            isSubmitting={isSubmitting}
-          />
+          <Suspense fallback={<div className="flex justify-center items-center h-40"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+            <TripForm
+              trip={editingTrip}
+              onSave={handleSaveTrip}
+              onCancel={() => { setIsFormOpen(false); setEditingTrip(undefined); }}
+              isSubmitting={isSubmitting}
+            />
+          </Suspense>
         </DialogContent>
       </Dialog>
 
@@ -101,10 +106,6 @@ export default function TripsPage() {
                 <CardHeader>
                   <div className="flex justify-between items-start">
                     <CardTitle className="text-xl group-hover:text-primary">{trip.name}</CardTitle>
-                    {/* Placeholder for future edit/delete trip actions */}
-                    {/* <Button variant="ghost" size="icon" className="h-8 w-8" disabled>
-                       <MoreHorizontal className="h-4 w-4" />
-                    </Button> */}
                   </div>
                   <CardDescription className="text-xs">
                     Created: {format(new Date(trip.createdAt), 'PP')}

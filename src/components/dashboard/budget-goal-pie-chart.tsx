@@ -3,7 +3,7 @@
 
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { useAppContext } from '@/contexts/app-context';
+import { usePersonalFinance } from '@/contexts/personal-finance-context'; // Changed context
 import { DEFAULT_CURRENCY } from '@/lib/constants';
 import { useMemo } from 'react';
 import type { Category, BudgetGoal } from '@/lib/types';
@@ -15,7 +15,7 @@ interface PieChartDataItem {
 }
 
 export function BudgetGoalPieChart() {
-  const { budgetGoals, getCategoryById } = useAppContext();
+  const { budgetGoals, getCategoryById } = usePersonalFinance(); // Changed context
 
   const pieData: PieChartDataItem[] = useMemo(() => {
     return budgetGoals.map(goal => {
@@ -23,9 +23,9 @@ export function BudgetGoalPieChart() {
       return {
         name: category?.name || 'Uncategorized',
         value: goal.amount,
-        fill: category?.color || '#8884d8', // Fallback color
+        fill: category?.color || '#8884d8', 
       };
-    }).filter(item => item.value > 0); // Only include goals with a budget amount
+    }).filter(item => item.value > 0);
   }, [budgetGoals, getCategoryById]);
 
   if (budgetGoals.length === 0 || pieData.length === 0) {

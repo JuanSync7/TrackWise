@@ -3,13 +3,13 @@
 
 import type { TripSettlement, CalculatedMemberFinancials } from '@/lib/types';
 import { TripSettlementItem } from './trip-settlement-item';
-import { PotPayoutItem } from './pot-payout-item';
-import { HandCoins, Scale, Wallet } from 'lucide-react'; 
-import { useAppContext } from '@/contexts/app-context';
+import { PotPayoutItem } from './pot-payout-item'; // Ensure this is imported
+import { HandCoins, Scale, Wallet } from 'lucide-react';
+import { useTrips } from '@/contexts/trip-context'; // Changed context
 import { DEFAULT_CURRENCY } from '@/lib/constants';
 import React, { useMemo } from 'react';
 
-const EPSILON = 0.005; // For floating point comparisons
+const EPSILON = 0.005;
 
 interface TripSettlementListProps {
   settlements: TripSettlement[];
@@ -19,7 +19,7 @@ interface TripSettlementListProps {
 }
 
 export function TripSettlementList({ settlements, tripId, finalMemberFinancials, remainingCashInPot }: TripSettlementListProps) {
-  const { getTripMemberById } = useAppContext();
+  const { getTripMemberById } = useTrips(); // Changed context
 
   const potPayouts = useMemo(() => {
     if (!finalMemberFinancials || Object.keys(finalMemberFinancials).length === 0 || remainingCashInPot <= EPSILON) {
@@ -29,34 +29,33 @@ export function TripSettlementList({ settlements, tripId, finalMemberFinancials,
     let undistributedPotCash = remainingCashInPot;
     const payouts: { tripMemberId: string, memberName: string, amount: number }[] = [];
 
-    // Get members who are net creditors to the system overall
     const membersOwedBySystem = Object.values(finalMemberFinancials)
-        .filter(fm => fm.finalNetShareForSettlement > EPSILON) // Members who are owed money by the system
-        .sort((a,b) => b.finalNetShareForSettlement - a.finalNetShareForSettlement); // Prioritize larger creditors
+        .filter(fm => fm.finalNetShareForSettlement > EPSILON)
+        .sort((a,b) => b.finalNetShareForSettlement - a.finalNetShareForSettlement);
 
     for (const financial of membersOwedBySystem) {
       if (undistributedPotCash <= EPSILON) break;
 
       const member = getTripMemberById(financial.memberId);
-      if (!member) continue; 
+      if (!member) continue;
 
       const alreadyReceivingFromDebtors = settlements
         .filter(s => s.owedToTripMemberId === financial.memberId)
         .reduce((sum, s) => sum + s.amount, 0);
-      
+
       const netOwedBySystemOverall = financial.finalNetShareForSettlement - alreadyReceivingFromDebtors;
 
       if (netOwedBySystemOverall > EPSILON) {
         const payoutAmount = Math.min(netOwedBySystemOverall, undistributedPotCash);
-        
-        if (payoutAmount > EPSILON) { 
+
+        if (payoutAmount > EPSILON) {
             payouts.push({
                 tripMemberId: member.id,
                 memberName: member.name,
-                amount: parseFloat(payoutAmount.toFixed(2)), 
+                amount: parseFloat(payoutAmount.toFixed(2)),
             });
             undistributedPotCash -= payoutAmount;
-            undistributedPotCash = parseFloat(undistributedPotCash.toFixed(2)); // Ensure precision after subtraction
+            undistributedPotCash = parseFloat(undistributedPotCash.toFixed(2));
         }
       }
     }
@@ -79,7 +78,6 @@ export function TripSettlementList({ settlements, tripId, finalMemberFinancials,
 
   return (
     <div className="space-y-6">
-      {/* Member-to-Member Settlements */}
       <div>
         {noMemberToMemberSettlements ? (
           <div className="text-center py-3 border border-dashed border-muted-foreground/20 rounded-md">
@@ -100,7 +98,7 @@ export function TripSettlementList({ settlements, tripId, finalMemberFinancials,
         )}
       </div>
 
-      {(remainingCashInPot > EPSILON || potPayouts.length > 0) && ( 
+      {(remainingCashInPot > EPSILON || potPayouts.length > 0) && (
         <div>
           <h4 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
             <Wallet className="h-4 w-4" /> Pot Distribution (Initial Pot Surplus: {DEFAULT_CURRENCY}{remainingCashInPot.toFixed(2)}):

@@ -1,11 +1,13 @@
 
 "use client";
 
-import type { Expense, Member } from '@/lib/types';
-import { useAppContext } from '@/contexts/app-context';
+import type { Expense, HouseholdExpense, TripExpense, Member } from '@/lib/types'; // Adjusted types
+import { usePersonalFinance } from '@/contexts/personal-finance-context'; // For categories
+import { useHousehold } from '@/contexts/household-context'; // For household member names
+import { useTrips } from '@/contexts/trip-context'; // For trip member names
 import { DEFAULT_CURRENCY } from '@/lib/constants';
 import { format } from 'date-fns';
-import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card'; // Removed CardFooter
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Edit2, Trash2, Users, UserCheck } from 'lucide-react';
@@ -13,22 +15,46 @@ import { CategoryIcon } from '@/components/shared/category-icon';
 import { Badge } from '@/components/ui/badge';
 
 interface ExpenseItemProps {
-  expense: Expense;
-  onEdit: (expense: Expense) => void;
+  expense: Expense | HouseholdExpense | TripExpense; // Can be any type
+  onEdit: (expense: Expense | HouseholdExpense | TripExpense) => void;
   onDelete: (expenseId: string) => void;
+  // Add a prop to indicate context if needed for specific member lookups
+  // For now, try to resolve member names from available contexts
+  expenseContext?: 'personal' | 'household' | 'trip';
 }
 
-export function ExpenseItem({ expense, onEdit, onDelete }: ExpenseItemProps) {
-  const { getCategoryById, getMemberById } = useAppContext();
+export function ExpenseItem({ expense, onEdit, onDelete, expenseContext = 'personal' }: ExpenseItemProps) {
+  const { getCategoryById } = usePersonalFinance();
+  const { getMemberById: getHouseholdMemberById } = useHousehold();
+  const { getTripMemberById } = useTrips();
+
   const category = getCategoryById(expense.categoryId);
-  const payer = expense.paidByMemberId ? getMemberById(expense.paidByMemberId) : null;
-  
-  const splitWithNames = expense.isSplit && expense.splitWithMemberIds 
-    ? expense.splitWithMemberIds
-        .map(id => getMemberById(id)?.name)
+
+  let payer: Member | undefined | null = null;
+  let splitWithNames: string | null = null;
+
+  if ('isSplit' in expense && expense.isSplit) {
+    const expWithSplit = expense as HouseholdExpense | TripExpense;
+    if (expWithSplit.paidByMemberId) {
+      if (expenseContext === 'household') {
+        payer = getHouseholdMemberById(expWithSplit.paidByMemberId);
+      } else if (expenseContext === 'trip') {
+        payer = getTripMemberById(expWithSplit.paidByMemberId);
+      }
+    }
+
+    if (expWithSplit.splitWithMemberIds && expWithSplit.splitWithMemberIds.length > 0) {
+      splitWithNames = expWithSplit.splitWithMemberIds
+        .map(id => {
+          if (expenseContext === 'household') return getHouseholdMemberById(id)?.name;
+          if (expenseContext === 'trip') return getTripMemberById(id)?.name;
+          return null;
+        })
         .filter(name => !!name)
-        .join(', ')
-    : null;
+        .join(', ');
+    }
+  }
+
 
   return (
     <Card className="overflow-hidden transition-shadow hover:shadow-lg">
@@ -41,7 +67,7 @@ export function ExpenseItem({ expense, onEdit, onDelete }: ExpenseItemProps) {
               <p className="text-sm text-muted-foreground">
                 {category?.name || 'Uncategorized'} &bull; {format(new Date(expense.date), 'MMM d, yyyy')}
               </p>
-              {expense.isSplit && payer && (
+              {'isSplit' in expense && expense.isSplit && payer && (
                  <p className="text-xs text-muted-foreground mt-0.5 flex items-center">
                     <UserCheck className="h-3 w-3 mr-1 text-primary" /> Paid by: {payer.name}
                  </p>
@@ -52,7 +78,7 @@ export function ExpenseItem({ expense, onEdit, onDelete }: ExpenseItemProps) {
              <p className="text-lg font-bold text-primary">
               {DEFAULT_CURRENCY}{expense.amount.toFixed(2)}
             </p>
-            {expense.isSplit && (
+            {'isSplit' in expense && expense.isSplit && (
               <Badge variant="outline" className="mt-1 text-xs flex items-center gap-1 border-primary text-primary">
                 <Users className="h-3 w-3"/> Split
               </Badge>

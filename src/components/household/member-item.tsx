@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { User, Trash2, MoreVertical, DollarSign, Scale, TrendingUp, TrendingDown, Landmark } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { useAppContext } from '@/contexts/app-context';
+import { useHousehold } from '@/contexts/household-context'; // Changed context
 import { DEFAULT_CURRENCY } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 
@@ -29,13 +29,11 @@ const MemberItem = React.memo(function MemberItem({
   onDelete,
   onAddContribution,
 }: MemberItemProps) {
-  const { getHouseholdMemberNetPotData } = useAppContext();
+  const { getHouseholdMemberNetData } = useHousehold(); // Changed context
 
-  const rawCalculatedData = useMemo(() => {
-    return getHouseholdMemberNetPotData(member.id);
-  }, [member.id, getHouseholdMemberNetPotData]);
-
-  const calculatedNetData: MemberDisplayFinancials = rawCalculatedData || defaultFinancials;
+  const calculatedNetData: MemberDisplayFinancials = useMemo(() => {
+    return getHouseholdMemberNetData(member.id) || defaultFinancials;
+  }, [member.id, getHouseholdMemberNetData]);
 
 
   return (

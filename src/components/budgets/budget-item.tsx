@@ -2,9 +2,9 @@
 "use client";
 
 import type { BudgetGoal } from '@/lib/types';
-import { useAppContext } from '@/contexts/app-context';
+import { usePersonalFinance } from '@/contexts/personal-finance-context'; // Changed context
 import { DEFAULT_CURRENCY } from '@/lib/constants';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'; // Removed CardFooter
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -19,7 +19,7 @@ interface BudgetItemProps {
 }
 
 export function BudgetItem({ budgetGoal, onEdit, onDelete }: BudgetItemProps) {
-  const { getCategoryById } = useAppContext();
+  const { getCategoryById } = usePersonalFinance(); // Changed context
   const category = getCategoryById(budgetGoal.categoryId);
 
   const progressPercentage = budgetGoal.amount > 0 ? Math.min((budgetGoal.currentSpending / budgetGoal.amount) * 100, 100) : 0;
@@ -64,14 +64,14 @@ export function BudgetItem({ budgetGoal, onEdit, onDelete }: BudgetItemProps) {
           <div className="flex justify-between text-sm mb-1">
             <span className="text-muted-foreground">Spent: {DEFAULT_CURRENCY}{budgetGoal.currentSpending.toFixed(2)}</span>
             <span className={cn("font-medium", isOverBudget ? "text-destructive" : "text-accent")}>
-              {isOverBudget 
+              {isOverBudget
                 ? `Over by ${DEFAULT_CURRENCY}${Math.abs(remainingAmount).toFixed(2)}`
                 : `Remaining: ${DEFAULT_CURRENCY}${remainingAmount.toFixed(2)}`}
             </span>
           </div>
-          <Progress 
-            value={progressPercentage} 
-            className={cn("h-3", isOverBudget ? '[&>div]:bg-destructive' : '[&>div]:bg-accent')} 
+          <Progress
+            value={progressPercentage}
+            className={cn("h-3", isOverBudget ? '[&>div]:bg-destructive' : '[&>div]:bg-accent')}
             aria-label={`${category?.name || 'Budget'} progress ${progressPercentage.toFixed(0)}%`}
           />
         </div>
@@ -82,4 +82,3 @@ export function BudgetItem({ budgetGoal, onEdit, onDelete }: BudgetItemProps) {
     </Card>
   );
 }
-

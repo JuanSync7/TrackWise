@@ -1,28 +1,37 @@
 
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, Suspense } from 'react'; // Added React, Suspense
 import { useParams, useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/shared/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Users, Banknote, ListChecks, ArrowLeft, HandCoins, CircleDollarSign, Shuffle, Wallet, Receipt } from 'lucide-react';
+import { PlusCircle, Users, Banknote, ListChecks, ArrowLeft, Shuffle, Wallet, Receipt, Loader2 } from 'lucide-react'; // Removed HandCoins, CircleDollarSign, Added Loader2
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'; // Removed CardFooter
 import { Progress } from '@/components/ui/progress';
-import { useAppContext } from '@/contexts/app-context';
+import { useTrips } from '@/contexts/trip-context'; // Changed context
+import { usePersonalFinance } from '@/contexts/personal-finance-context'; // For categories
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from "@/hooks/use-toast";
 import type { Trip, TripMember, TripContribution, TripExpense, TripSettlement, CalculatedMemberFinancials, MemberDisplayFinancials } from '@/lib/types';
-import { TripMemberForm, type TripMemberFormValues } from '@/components/trips/trip-member-form';
+// import { TripMemberForm, type TripMemberFormValues } from '@/components/trips/trip-member-form'; // Dynamic
+// import { TripContributionForm, type TripContributionFormValues } from '@/components/trips/trip-contribution-form'; // Dynamic
+// import { ExpenseForm, type ExpenseFormValues as GenericExpenseFormValues } from '@/components/expenses/expense-form'; // Dynamic
 import { TripMemberList } from '@/components/trips/trip-member-list';
-import { TripContributionForm, type TripContributionFormValues } from '@/components/trips/trip-contribution-form';
-import { ExpenseForm, type ExpenseFormValues as GenericExpenseFormValues } from '@/components/expenses/expense-form';
 import { TripSettlementList } from '@/components/trips/trip-settlement-list';
 import { DEFAULT_CURRENCY, POT_PAYER_ID } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { format as formatDate } from 'date-fns';
+
+const TripMemberForm = React.lazy(() => import('@/components/trips/trip-member-form').then(module => ({ default: module.TripMemberForm })));
+type TripMemberFormValues = import('@/components/trips/trip-member-form').TripMemberFormValues;
+const TripContributionForm = React.lazy(() => import('@/components/trips/trip-contribution-form').then(module => ({ default: module.TripContributionForm })));
+type TripContributionFormValues = import('@/components/trips/trip-contribution-form').TripContributionFormValues;
+const ExpenseForm = React.lazy(() => import('@/components/expenses/expense-form').then(module => ({ default: module.ExpenseForm })));
+type GenericExpenseFormValues = import('@/components/expenses/expense-form').ExpenseFormValues;
+
 
 export default function TripDetailPage() {
   const params = useParams();
@@ -32,18 +41,19 @@ export default function TripDetailPage() {
   const {
     getTripById,
     addTripMember, deleteTripMember: contextDeleteTripMember, getTripMemberById,
-    addTripContribution, 
-    tripMembers: globalTripMembers, 
-    tripContributions: globalTripContributions, 
+    addTripContribution,
+    tripMembers: globalTripMembers,
+    tripContributions: globalTripContributions,
     addTripExpense,
-    tripExpenses: globalTripExpenses, 
-    getTripMembers, 
-    getTripExpenses, 
-    getTripSettlements, 
+    tripExpenses: globalTripExpenses,
+    getTripMembers,
+    getTripExpenses,
+    getTripSettlements,
     triggerTripSettlementCalculation,
     tripFinancialSummaries,
-    getTripMemberNetData, // Added to get individual member financial details for summary cards
-  } = useAppContext();
+    getTripMemberNetData,
+  } = useTrips();
+  const { getCategoryById } = usePersonalFinance(); // For ExpenseForm categories
   const { user: authUser } = useAuth();
   const { toast } = useToast();
 
@@ -61,10 +71,6 @@ export default function TripDetailPage() {
     return tripId ? getTripMembers(tripId) : [];
   }, [tripId, getTripMembers]);
 
-  const memoizedTripExpensesList = useMemo(() => { 
-    return tripId ? getTripExpenses(tripId) : [];
-  }, [tripId, getTripExpenses]);
-
   const rawSettlements = useMemo(() => {
     return tripId ? getTripSettlements(tripId) : [];
   }, [tripId, getTripSettlements]);
@@ -75,9 +81,9 @@ export default function TripDetailPage() {
       s => memberIds.has(s.owedByTripMemberId) && memberIds.has(s.owedToTripMemberId)
     );
   }, [rawSettlements, memoizedTripMembers]);
-  
-  const currentTripFinancialsObject = useMemo(() => {
-    return tripFinancialSummaries[tripId] || {}; 
+
+  const currentTripFinancials = useMemo(() => {
+    return tripFinancialSummaries[tripId] || {};
   }, [tripFinancialSummaries, tripId]);
 
 
@@ -137,7 +143,7 @@ export default function TripDetailPage() {
   }, [tripMemberToDelete, tripId, contextDeleteTripMember, getTripMemberById, toast]);
 
   const handleAddTripContributionClick = useCallback((memberId: string) => {
-    const member = getTripMemberById(memberId); 
+    const member = getTripMemberById(memberId);
     if (member) {
       setSelectedTripMemberForContribution(member);
       setIsContributionFormOpen(true);
@@ -163,7 +169,7 @@ export default function TripDetailPage() {
     if (!tripId) return;
     setIsSubmittingExpense(true);
     try {
-      const tripExpenseData: Omit<TripExpense, 'id'> = {
+      const tripExpenseData: Omit<TripExpense, 'id' | 'tripId'> & { tripId: string } = {
         tripId: tripId,
         description: formData.description,
         amount: formData.amount,
@@ -171,7 +177,7 @@ export default function TripDetailPage() {
         categoryId: formData.categoryId,
         notes: formData.notes,
         isSplit: formData.isSplit,
-        paidByTripMemberId: formData.paidByMemberId, 
+        paidByTripMemberId: formData.paidByMemberId,
         splitWithTripMemberIds: formData.splitWithMemberIds,
       };
       addTripExpense(tripExpenseData);
@@ -187,19 +193,17 @@ export default function TripDetailPage() {
  const tripFinancialSummary = useMemo(() => {
     let totalCashInPot = 0;
     let totalMemberPaidExpenses = 0;
-    let totalPotPaidExpenses = 0;
-    
-    Object.values(currentTripFinancialsObject).forEach(financials => {
+
+    Object.values(currentTripFinancials).forEach(financials => {
       totalCashInPot += financials.directCashContribution;
       totalMemberPaidExpenses += financials.amountPersonallyPaidForGroup;
     });
 
-    globalTripExpenses.forEach(exp => {
-      if (exp.tripId === tripId && exp.paidByTripMemberId === POT_PAYER_ID) {
-        totalPotPaidExpenses += exp.amount;
-      }
-    });
-    
+    const expensesForThisTrip = globalTripExpenses.filter(exp => exp.tripId === tripId);
+    const totalPotPaidExpenses = expensesForThisTrip
+      .filter(exp => exp.paidByTripMemberId === POT_PAYER_ID)
+      .reduce((sum, exp) => sum + exp.amount, 0);
+
     const remainingCashInPot = totalCashInPot - totalPotPaidExpenses;
     const potUsagePercentage = totalCashInPot > 0 ? Math.min((totalPotPaidExpenses / totalCashInPot) * 100, 100) : 0;
 
@@ -210,7 +214,7 @@ export default function TripDetailPage() {
       remainingCashInPot,
       potUsagePercentage,
     };
-  }, [currentTripFinancialsObject, globalTripExpenses, tripId]);
+  }, [currentTripFinancials, globalTripExpenses, tripId]);
 
 
   if (!trip) {
@@ -249,11 +253,13 @@ export default function TripDetailPage() {
             <DialogTitle>Add New Trip Member</DialogTitle>
             <DialogDescription>Enter the name of the new member for this trip.</DialogDescription>
           </DialogHeader>
-          <TripMemberForm
-            onSave={handleSaveTripMember}
-            onCancel={() => setIsMemberFormOpen(false)}
-            isSubmitting={isSubmittingMember}
-          />
+          <Suspense fallback={<div className="flex justify-center items-center h-32"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+            <TripMemberForm
+              onSave={handleSaveTripMember}
+              onCancel={() => setIsMemberFormOpen(false)}
+              isSubmitting={isSubmittingMember}
+            />
+          </Suspense>
         </DialogContent>
       </Dialog>
 
@@ -266,15 +272,17 @@ export default function TripDetailPage() {
             <DialogTitle>Add Contribution for {selectedTripMemberForContribution?.name}</DialogTitle>
             <DialogDescription>Record a new cash contribution from this trip member to the communal trip pot.</DialogDescription>
           </DialogHeader>
-          <TripContributionForm
-            onSave={handleSaveTripContribution}
-            onCancel={() => {
-              setIsContributionFormOpen(false);
-              setSelectedTripMemberForContribution(null);
-            }}
-            isSubmitting={isSubmittingContribution}
-            tripMemberName={selectedTripMemberForContribution?.name}
-          />
+           <Suspense fallback={<div className="flex justify-center items-center h-48"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+            <TripContributionForm
+              onSave={handleSaveTripContribution}
+              onCancel={() => {
+                setIsContributionFormOpen(false);
+                setSelectedTripMemberForContribution(null);
+              }}
+              isSubmitting={isSubmittingContribution}
+              tripMemberName={selectedTripMemberForContribution?.name}
+            />
+          </Suspense>
         </DialogContent>
       </Dialog>
 
@@ -286,16 +294,18 @@ export default function TripDetailPage() {
               Fill in details for a new trip expense. Select "Paid from Pot" if communal funds were used.
             </DialogDescription>
           </DialogHeader>
-          <ExpenseForm
-            onSave={handleSaveTripExpense}
-            onCancel={() => setIsExpenseFormOpen(false)}
-            isSubmitting={isSubmittingExpense}
-            hideSharedBudgetLink={true}
-            hideSplittingFeature={false}
-            availableMembersForSplitting={memoizedTripMembers}
-            currentUserIdForDefaultPayer={currentAuthUserAsTripMember?.id}
-            allowPotPayer={true} 
-          />
+          <Suspense fallback={<div className="flex justify-center items-center h-96"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+            <ExpenseForm
+              onSave={handleSaveTripExpense}
+              onCancel={() => setIsExpenseFormOpen(false)}
+              isSubmitting={isSubmittingExpense}
+              showSharedBudgetLink={false} // No shared household budgets for trips
+              showSplittingFeature={true} // Splitting is key for trips
+              availableMembersForSplitting={memoizedTripMembers}
+              currentUserIdForDefaultPayer={currentAuthUserAsTripMember?.id}
+              allowPotPayer={true}
+            />
+          </Suspense>
         </DialogContent>
       </Dialog>
 
@@ -330,7 +340,6 @@ export default function TripDetailPage() {
                 tripMembers={memoizedTripMembers}
                 onDeleteTripMember={handleDeleteTripMemberRequest}
                 onAddTripContribution={handleAddTripContributionClick}
-                numberOfTripMembers={memoizedTripMembers.length} 
               />
             </CardContent>
           </Card>
@@ -344,10 +353,10 @@ export default function TripDetailPage() {
               <CardDescription>Who owes whom to balance all trip finances (contributions, pot expenses, and member-paid shared expenses).</CardDescription>
             </CardHeader>
             <CardContent>
-                <TripSettlementList 
-                    settlements={validSettlements} 
+                <TripSettlementList
+                    settlements={validSettlements}
                     tripId={tripId}
-                    finalMemberFinancials={currentTripFinancialsObject} // Pass the object here
+                    finalMemberFinancials={currentTripFinancials}
                     remainingCashInPot={tripFinancialSummary.remainingCashInPot}
                 />
             </CardContent>
@@ -394,4 +403,3 @@ export default function TripDetailPage() {
     </div>
   );
 }
-

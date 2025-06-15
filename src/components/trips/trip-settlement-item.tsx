@@ -2,27 +2,22 @@
 "use client";
 
 import type { TripSettlement } from '@/lib/types';
-import { useAppContext } from '@/contexts/app-context';
+import { useTrips } from '@/contexts/trip-context'; // Changed context
 import { DEFAULT_CURRENCY } from '@/lib/constants';
 import { ArrowRight, User } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"; // For initials
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"; // Removed AvatarImage
 
 interface TripSettlementItemProps {
   settlement: TripSettlement;
 }
 
 export function TripSettlementItem({ settlement }: TripSettlementItemProps) {
-  const { getTripMemberById } = useAppContext();
+  const { getTripMemberById } = useTrips(); // Changed context
 
   const owedByMember = getTripMemberById(settlement.owedByTripMemberId);
   const owedToMember = getTripMemberById(settlement.owedToTripMemberId);
 
-  // If either member is not found (e.g., deleted but settlement list is stale),
-  // we simply don't render this item or render a placeholder.
-  // This check should ideally be done before passing to this component.
   if (!owedByMember || !owedToMember) {
-    // This specific item will not be rendered if filtered out by parent.
-    // If it does reach here due to some race condition, this is a fallback.
     return (
         <div className="flex items-center justify-between p-3 rounded-md border bg-destructive/10 text-destructive text-sm">
              <User className="h-4 w-4 mr-2 text-destructive-foreground" />
@@ -33,7 +28,7 @@ export function TripSettlementItem({ settlement }: TripSettlementItemProps) {
 
   const getInitials = (name: string) => {
     if (!name) return "?";
-    return name.split(' ').map(n => n[0]).join('').toUpperCase();
+    return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
   }
 
   return (

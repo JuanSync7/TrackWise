@@ -3,7 +3,7 @@
 
 import { PageHeader } from '@/components/shared/page-header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { useAppContext } from '@/contexts/app-context';
+import { usePersonalFinance } from '@/contexts/personal-finance-context'; // Changed context
 import { CategoryIcon } from '@/components/shared/category-icon';
 import { Button } from '@/components/ui/button';
 import { List, Palette, Bell, ShieldCheck, Trash2, Edit3, PlusCircle, Moon, Sun } from 'lucide-react';
@@ -11,7 +11,7 @@ import { useTheme } from "next-themes";
 import { useEffect, useState } from 'react';
 
 export default function SettingsPage() {
-  const { categories } = useAppContext();
+  const { categories } = usePersonalFinance(); // Changed context
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
@@ -24,12 +24,12 @@ export default function SettingsPage() {
   };
 
   if (!mounted) {
-    return null; // Avoid hydration mismatch
+    return null;
   }
 
   return (
     <div className="container mx-auto">
-      <PageHeader 
+      <PageHeader
         title="Settings"
         description="Manage your application preferences and account details."
       />
@@ -79,7 +79,7 @@ export default function SettingsPage() {
             </Button>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><Bell className="h-5 w-5 text-primary"/> Notifications</CardTitle>

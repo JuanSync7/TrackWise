@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { User, Trash2, MoreVertical, DollarSign, Scale, TrendingUp, TrendingDown, Landmark } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { useAppContext } from '@/contexts/app-context';
+import { useTrips } from '@/contexts/trip-context'; // Changed context
 import { DEFAULT_CURRENCY } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 
@@ -15,7 +15,7 @@ interface TripMemberItemProps {
   tripMember: TripMember;
   onDelete: (tripMemberId: string) => void;
   onAddContribution: (tripMemberId: string) => void;
-  numberOfTripMembers: number;
+  // numberOfTripMembers prop is no longer strictly needed here as financial calculations are centralized
 }
 
 const defaultFinancials: MemberDisplayFinancials = {
@@ -30,13 +30,11 @@ const TripMemberItem = React.memo(function TripMemberItem({
   onDelete,
   onAddContribution,
 }: TripMemberItemProps) {
-  const { getTripMemberNetData } = useAppContext();
+  const { getTripMemberNetData } = useTrips(); // Changed context
 
-  const rawCalculatedData = useMemo(() => {
-    return getTripMemberNetData(tripMember.tripId, tripMember.id);
+  const calculatedNetData: MemberDisplayFinancials = useMemo(() => {
+    return getTripMemberNetData(tripMember.tripId, tripMember.id) || defaultFinancials;
   }, [tripMember.id, tripMember.tripId, getTripMemberNetData]);
-
-  const calculatedNetData: MemberDisplayFinancials = rawCalculatedData || defaultFinancials;
 
 
   return (

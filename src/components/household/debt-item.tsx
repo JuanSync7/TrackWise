@@ -2,7 +2,7 @@
 "use client";
 
 import type { Debt } from '@/lib/types';
-import { useAppContext } from '@/contexts/app-context';
+import { useHousehold } from '@/contexts/household-context'; // Changed context
 import { DEFAULT_CURRENCY } from '@/lib/constants';
 import { format } from 'date-fns';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,7 +27,7 @@ interface DebtItemProps {
 }
 
 export function DebtItem({ debt }: DebtItemProps) {
-  const { getMemberById, settleDebt, unsettleDebt } = useAppContext();
+  const { getMemberById, settleDebt, unsettleDebt } = useHousehold(); // Changed context
   const { toast } = useToast();
   const [isConfirmingSettlement, setIsConfirmingSettlement] = useState(false);
   const [isConfirmingUnsettlement, setIsConfirmingUnsettlement] = useState(false);

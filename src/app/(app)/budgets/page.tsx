@@ -1,14 +1,14 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react'; // Added React, Suspense
 import { PageHeader } from '@/components/shared/page-header';
-import { BudgetForm } from '@/components/budgets/budget-form';
+// import { BudgetForm } from '@/components/budgets/budget-form'; // Dynamic import
 import { BudgetList } from '@/components/budgets/budget-list';
 import type { BudgetGoal } from '@/lib/types';
-import { useAppContext } from '@/contexts/app-context';
+import { usePersonalFinance } from '@/contexts/personal-finance-context'; // Changed context
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Download } from 'lucide-react';
+import { PlusCircle, Download, Loader2 } from 'lucide-react'; // Added Loader2
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -27,13 +27,15 @@ import { exportToCsv } from '@/lib/utils';
 import { format as formatDate } from 'date-fns';
 import { DEFAULT_CURRENCY } from '@/lib/constants';
 
+const BudgetForm = React.lazy(() => import('@/components/budgets/budget-form').then(module => ({ default: module.BudgetForm })));
+
 
 export default function BudgetsPage() {
-  const { budgetGoals, addBudgetGoal, updateBudgetGoal, deleteBudgetGoal: contextDeleteBudget, getCategoryById } = useAppContext();
+  const { budgetGoals, addBudgetGoal, updateBudgetGoal, deleteBudgetGoal: contextDeleteBudget, getCategoryById } = usePersonalFinance(); // Changed context
   const { toast } = useToast();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingBudget, setEditingBudget] = useState<BudgetGoal | undefined>(undefined); 
+  const [editingBudget, setEditingBudget] = useState<BudgetGoal | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [budgetToDelete, setBudgetToDelete] = useState<string | null>(null);
 
@@ -48,8 +50,7 @@ export default function BudgetsPage() {
     setIsSubmitting(true);
     try {
       if (editingBudget) {
-        // The updateBudgetGoal function in AppContext will handle preserving currentSpending and id
-        updateBudgetGoal({ ...editingBudget, ...data }); 
+        updateBudgetGoal({ ...editingBudget, ...data });
         toast({ title: "Budget Updated", description: `Budget goal for "${getCategoryById(data.categoryId)?.name || 'Category'}" has been successfully updated.` });
       } else {
         addBudgetGoal(data);
@@ -81,7 +82,7 @@ export default function BudgetsPage() {
       setBudgetToDelete(null);
     }
   };
-  
+
   const openFormForNew = () => {
     setEditingBudget(undefined);
     setIsFormOpen(true);
@@ -112,7 +113,7 @@ export default function BudgetsPage() {
 
   return (
     <div className="container mx-auto">
-      <PageHeader 
+      <PageHeader
         title="Set Your Budget Goals"
         description="Define your spending limits for different categories and track your progress."
         actions={
@@ -126,7 +127,7 @@ export default function BudgetsPage() {
           </div>
         }
       />
-      
+
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="sm:max-w-[425px] md:max-w-md">
           <DialogHeader>
@@ -135,12 +136,14 @@ export default function BudgetsPage() {
               {editingBudget ? 'Update the details of your budget goal.' : 'Fill in the details to set a new budget goal.'}
             </DialogDescription>
           </DialogHeader>
-          <BudgetForm
-            budgetGoal={editingBudget}
-            onSave={handleSaveBudget}
-            onCancel={() => { setIsFormOpen(false);}}
-            isSubmitting={isSubmitting}
-          />
+          <Suspense fallback={<div className="flex justify-center items-center h-40"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+            <BudgetForm
+              budgetGoal={editingBudget}
+              onSave={handleSaveBudget}
+              onCancel={() => { setIsFormOpen(false);}}
+              isSubmitting={isSubmitting}
+            />
+          </Suspense>
         </DialogContent>
       </Dialog>
 
@@ -165,7 +168,7 @@ export default function BudgetsPage() {
         </div>
       )}
 
-      <BudgetList 
+      <BudgetList
         budgetGoals={budgetGoals}
         onEditBudget={handleEditBudget}
         onDeleteBudget={handleDeleteBudget}
@@ -173,4 +176,3 @@ export default function BudgetsPage() {
     </div>
   );
 }
-

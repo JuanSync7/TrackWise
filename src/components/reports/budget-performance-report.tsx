@@ -5,12 +5,12 @@ import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { useAppContext } from '@/contexts/app-context';
+import { usePersonalFinance } from '@/contexts/personal-finance-context'; // Changed context
 import { DEFAULT_CURRENCY } from '@/lib/constants';
 import { format, startOfMonth, endOfMonth, isWithinInterval, parseISO } from 'date-fns';
 import { CategoryIcon } from '@/components/shared/category-icon';
 import { cn } from '@/lib/utils';
-import type { Category } from '@/lib/types';
+import type { Category, Expense } from '@/lib/types'; // Use personal Expense type for matching
 
 interface BudgetPerformanceData {
   category: Category | undefined;
@@ -22,19 +22,18 @@ interface BudgetPerformanceData {
 }
 
 export function BudgetPerformanceReport() {
-  const { budgetGoals, expenses, getCategoryById } = useAppContext();
+  const { budgetGoals, expenses, getCategoryById } = usePersonalFinance(); // Changed context
 
   const performanceData = useMemo(() => {
     const now = new Date();
     const currentMonthStart = startOfMonth(now);
     const currentMonthEnd = endOfMonth(now);
 
-    // Filter for monthly budget goals first
     const monthlyGoals = budgetGoals.filter(goal => goal.period === 'monthly');
 
     return monthlyGoals.map(goal => {
       const category = getCategoryById(goal.categoryId);
-      const spendingThisMonth = expenses
+      const spendingThisMonth = expenses // Personal expenses
         .filter(expense => {
             if (expense.categoryId !== goal.categoryId) return false;
             try {
@@ -49,7 +48,7 @@ export function BudgetPerformanceReport() {
       if (spendingThisMonth === 0 && goal.amount > 0) status = 'No Spending';
       else if (difference < 0) status = 'Over Budget';
       else if (difference > 0) status = 'Under Budget';
-      
+
       return {
         category,
         budgetId: goal.id,
@@ -112,9 +111,9 @@ export function BudgetPerformanceReport() {
                 </TableCell>
                 <TableCell className="text-center">
                   <Badge variant={
-                    item.status === 'Over Budget' ? 'destructive' : 
-                    item.status === 'Under Budget' ? 'default' : // Using primary for "Under Budget"
-                    item.status === 'No Spending' ? 'secondary' : 'outline' 
+                    item.status === 'Over Budget' ? 'destructive' :
+                    item.status === 'Under Budget' ? 'default' :
+                    item.status === 'No Spending' ? 'secondary' : 'outline'
                   }
                   className={cn(item.status === 'Under Budget' && "bg-accent text-accent-foreground hover:bg-accent/80")}
                   >

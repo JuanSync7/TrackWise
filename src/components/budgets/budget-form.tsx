@@ -20,7 +20,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import type { BudgetGoal } from '@/lib/types';
-import { useAppContext } from '@/contexts/app-context';
+import { usePersonalFinance } from '@/contexts/personal-finance-context'; // Changed context
 import { CategoryIcon } from '@/components/shared/category-icon';
 import { useState, useEffect } from "react";
 
@@ -33,19 +33,18 @@ const budgetFormSchema = z.object({
 type BudgetFormValues = z.infer<typeof budgetFormSchema>;
 
 interface BudgetFormProps {
-  budgetGoal?: BudgetGoal; 
+  budgetGoal?: BudgetGoal;
   onSave: (data: Omit<BudgetGoal, 'id' | 'currentSpending'>) => void;
   onCancel?: () => void;
   isSubmitting?: boolean;
 }
 
 export function BudgetForm({ budgetGoal, onSave, onCancel, isSubmitting }: BudgetFormProps) {
-  const { categories, getCategoryById } = useAppContext();
+  const { categories, getCategoryById } = usePersonalFinance(); // Changed context
   const [categoryPopoverOpen, setCategoryPopoverOpen] = useState(false);
 
   const form = useForm<BudgetFormValues>({
     resolver: zodResolver(budgetFormSchema),
-    // defaultValues are set in useEffect to handle dynamic budgetGoal prop
   });
 
   useEffect(() => {
@@ -67,7 +66,7 @@ export function BudgetForm({ budgetGoal, onSave, onCancel, isSubmitting }: Budge
 
   function onSubmit(data: BudgetFormValues) {
     onSave(data);
-    if (!budgetGoal) { // Reset only if it's a new item form
+    if (!budgetGoal) {
         form.reset({ categoryId: "", amount: 0, period: "monthly" });
     }
   }
@@ -89,6 +88,7 @@ export function BudgetForm({ budgetGoal, onSave, onCancel, isSubmitting }: Budge
                     <Button
                       variant="outline"
                       role="combobox"
+                      aria-expanded={categoryPopoverOpen}
                       className={cn(
                         "w-full justify-between",
                         !field.value && "text-muted-foreground"
@@ -194,4 +194,3 @@ export function BudgetForm({ budgetGoal, onSave, onCancel, isSubmitting }: Budge
     </Form>
   );
 }
-
