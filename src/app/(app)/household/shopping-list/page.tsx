@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { PageHeader } from '@/components/shared/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, CopyCheck, MilkIcon, EggIcon, SandwichIcon, Zap, Apple, Banana, Drumstick, Grape, Layers } from 'lucide-react'; // Added new icons
+import { PlusCircle, CopyCheck, MilkIcon, EggIcon, SandwichIcon, Zap, Apple, Banana, Drumstick, Grape, Layers, Download } from 'lucide-react'; // Added new icons
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +14,8 @@ import type { ShoppingListItem, Expense } from '@/lib/types';
 import { ShoppingListItemForm } from '@/components/household/shopping-list-item-form';
 import { ShoppingList } from '@/components/household/shopping-list';
 import type { ExpenseFormValues } from '@/components/expenses/expense-form';
+import { exportToCsv } from '@/lib/utils';
+import { format as formatDate, parseISO } from 'date-fns';
 
 export default function ShoppingListPage() {
   const { 
@@ -112,6 +114,25 @@ export default function ShoppingListPage() {
     }
   };
 
+  const handleExportShoppingList = () => {
+    const headerRow = [
+      "ID", "Item Name", "Quantity", "Notes", "Added At", "Is Purchased"
+    ];
+
+    const dataRows = shoppingListItems.map(item => [
+      item.id,
+      item.itemName,
+      item.quantity,
+      item.notes || '',
+      formatDate(parseISO(item.addedAt), 'yyyy-MM-dd HH:mm:ss'),
+      item.isPurchased ? 'Yes' : 'No'
+    ]);
+
+    const filename = `trackwise_shopping_list_${formatDate(new Date(), 'yyyy-MM-dd')}.csv`;
+    exportToCsv(filename, [headerRow, ...dataRows]);
+    toast({ title: "Shopping List Exported", description: `Shopping list has been exported to ${filename}` });
+  };
+
   return (
     <div className="container mx-auto flex flex-col h-full">
       <div className="sticky top-0 z-10 bg-background py-4 mb-0"> 
@@ -120,6 +141,9 @@ export default function ShoppingListPage() {
           description="Manage items your household needs to buy together."
           actions={
             <div className="flex flex-wrap gap-2">
+              <Button onClick={handleExportShoppingList} variant="outline" disabled={shoppingListItems.length === 0}>
+                <Download className="mr-2 h-4 w-4" /> Export List
+              </Button>
               <Button onClick={handleCopyItems} variant="outline">
                 <CopyCheck className="mr-2 h-4 w-4" /> Add Recent Purchases
               </Button>

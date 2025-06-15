@@ -8,7 +8,7 @@ import { BudgetList } from '@/components/budgets/budget-list';
 import type { BudgetGoal } from '@/lib/types';
 import { useAppContext } from '@/contexts/app-context';
 import { Button } from '@/components/ui/button';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, Download } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -23,10 +23,13 @@ import {
 } from "@/components/ui/alert-dialog"
 import { BudgetGoalPieChart } from '@/components/dashboard/budget-goal-pie-chart';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { exportToCsv } from '@/lib/utils';
+import { format as formatDate } from 'date-fns';
+import { DEFAULT_CURRENCY } from '@/lib/constants';
 
 
 export default function BudgetsPage() {
-  const { budgetGoals, addBudgetGoal, updateBudgetGoal, deleteBudgetGoal: contextDeleteBudget } = useAppContext();
+  const { budgetGoals, addBudgetGoal, updateBudgetGoal, deleteBudgetGoal: contextDeleteBudget, getCategoryById } = useAppContext();
   const { toast } = useToast();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -78,6 +81,28 @@ export default function BudgetsPage() {
     setIsFormOpen(true);
   }
 
+  const handleExportBudgetGoals = () => {
+    const headerRow = [
+      "ID", "Category Name", "Budgeted Amount", "Period", "Current Spending", "Currency"
+    ];
+
+    const dataRows = budgetGoals.map(goal => {
+      const categoryName = getCategoryById(goal.categoryId)?.name || 'N/A';
+      return [
+        goal.id,
+        categoryName,
+        goal.amount,
+        goal.period,
+        goal.currentSpending,
+        DEFAULT_CURRENCY
+      ];
+    });
+
+    const filename = `trackwise_budget_goals_${formatDate(new Date(), 'yyyy-MM-dd')}.csv`;
+    exportToCsv(filename, [headerRow, ...dataRows]);
+    toast({ title: "Budget Goals Exported", description: `Budget goals have been exported to ${filename}` });
+  };
+
 
   return (
     <div className="container mx-auto">
@@ -85,9 +110,14 @@ export default function BudgetsPage() {
         title="Set Your Budget Goals"
         description="Define your spending limits for different categories and track your progress."
         actions={
-          <Button onClick={openFormForNew}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Set New Budget
-          </Button>
+          <div className="flex gap-2 flex-wrap">
+            <Button onClick={handleExportBudgetGoals} variant="outline" disabled={budgetGoals.length === 0}>
+              <Download className="mr-2 h-4 w-4" /> Export Budget Goals
+            </Button>
+            <Button onClick={openFormForNew}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Set New Budget
+            </Button>
+          </div>
         }
       />
       
