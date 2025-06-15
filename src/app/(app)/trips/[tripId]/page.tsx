@@ -31,10 +31,11 @@ export default function TripDetailPage() {
     getTripById, 
     addTripMember, deleteTripMember: contextDeleteTripMember, getTripMemberById,
     addTripContribution, getTripMemberTotalDirectContribution,
-    tripMembers, // From context for general updates
-    tripExpenses, // From context for general updates
-    addTripExpense, getTripExpenses, // Trip expense functions
-    getTripMembers // Specific function to get members for THIS trip
+    tripMembers, 
+    tripContributions, // Destructure tripContributions here
+    addTripExpense, getTripExpenses, 
+    tripExpenses, 
+    getTripMembers 
   } = useAppContext();
   const { toast } = useToast();
 
@@ -43,12 +44,12 @@ export default function TripDetailPage() {
   
   const [isMemberFormOpen, setIsMemberFormOpen] = useState(false);
   const [isContributionFormOpen, setIsContributionFormOpen] = useState(false);
-  const [isExpenseFormOpen, setIsExpenseFormOpen] = useState(false); // State for expense form dialog
+  const [isExpenseFormOpen, setIsExpenseFormOpen] = useState(false); 
   const [selectedTripMemberForContribution, setSelectedTripMemberForContribution] = useState<TripMember | null>(null);
   
   const [isSubmittingMember, setIsSubmittingMember] = useState(false);
   const [isSubmittingContribution, setIsSubmittingContribution] = useState(false);
-  const [isSubmittingExpense, setIsSubmittingExpense] = useState(false); // State for expense form submission
+  const [isSubmittingExpense, setIsSubmittingExpense] = useState(false); 
   const [tripMemberToDelete, setTripMemberToDelete] = useState<string | null>(null);
 
   useEffect(() => {
@@ -68,7 +69,7 @@ export default function TripDetailPage() {
     if (tripId) {
         setCurrentTripMembers(getTripMembers(tripId));
     }
-  }, [getTripMembers, tripId, tripMembers]); // Listen to global tripMembers for updates
+  }, [getTripMembers, tripId, tripMembers]); 
 
   const handleSaveTripMember = async (data: TripMemberFormValues) => {
     if (!tripId) return;
@@ -129,7 +130,7 @@ export default function TripDetailPage() {
         description: data.description,
         amount: data.amount,
         date: formatDate(data.date, "yyyy-MM-dd"),
-        categoryId: data.categoryId, // Using general category ID for now
+        categoryId: data.categoryId, 
         notes: data.notes,
       };
       addTripExpense(tripExpenseData);
@@ -145,12 +146,12 @@ export default function TripDetailPage() {
 
   const totalTripContributions = useMemo(() => {
     return currentTripMembers.reduce((sum, member) => sum + getTripMemberTotalDirectContribution(member.id), 0);
-  }, [currentTripMembers, getTripMemberTotalDirectContribution, tripContributions]); // Also listen to global tripContributions
+  }, [currentTripMembers, getTripMemberTotalDirectContribution, tripContributions]); 
 
   const currentTripExpenses = useMemo(() => {
     if (!tripId) return [];
     return getTripExpenses(tripId);
-  }, [tripId, getTripExpenses, tripExpenses]); // Listen to global tripExpenses from context
+  }, [tripId, getTripExpenses, tripExpenses]); 
 
   const totalTripSpending = useMemo(() => {
     return currentTripExpenses.reduce((sum, exp) => sum + exp.amount, 0);
@@ -316,3 +317,4 @@ export default function TripDetailPage() {
     </div>
   );
 }
+
