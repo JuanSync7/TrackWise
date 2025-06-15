@@ -448,16 +448,16 @@ export default function HouseholdPage() {
             <CardHeader>
               <CardTitle  className="flex items-center gap-2">
                 <Receipt className="h-6 w-6 text-primary" />
-                All Shared Transactions
+                Log Shared Household Transaction
               </CardTitle>
-              <CardDescription>Log and view all transactions shared within the household, regardless of payer.</CardDescription>
+              <CardDescription>Record new expenses or income shared by the household. These can be linked to shared budgets or categorized as general household items.</CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">Track shared utilities, groceries, rent, etc. that are attributed to the household, whether paid from the pot or by an individual for the group.</p>
             </CardContent>
              <CardFooter>
                 <Button className="w-full" onClick={() => setIsExpenseFormOpen(true)}>
-                  <ListChecks className="mr-2 h-4 w-4" /> Add/View Shared Transactions
+                  <ListChecks className="mr-2 h-4 w-4" /> Log Shared Transaction
                 </Button>
             </CardFooter>
           </Card>
@@ -543,3 +543,5 @@ export default function HouseholdPage() {
 
 
     
+
+      
