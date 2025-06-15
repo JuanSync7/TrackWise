@@ -6,7 +6,7 @@ import React, { createContext, useContext, useCallback } from 'react';
 import type { 
   Expense, Category, BudgetGoal, AppState, AppContextType, 
   Member, Contribution, ShoppingListItem, SharedBudget, Debt,
-  Trip, TripMember, TripContribution, TripExpense // Added Trip types
+  Trip, TripMember, TripContribution, TripExpense
 } from '@/lib/types';
 import { INITIAL_CATEGORIES, HOUSEHOLD_EXPENSE_CATEGORY_ID } from '@/lib/constants';
 import useLocalStorage from '@/hooks/use-local-storage';
@@ -32,7 +32,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [trips, setTrips] = useLocalStorage<Trip[]>('trackwise_trips', []);
   const [tripMembers, setTripMembers] = useLocalStorage<TripMember[]>('trackwise_trip_members', []);
   const [tripContributions, setTripContributions] = useLocalStorage<TripContribution[]>('trackwise_trip_contributions', []);
-  // Future: tripExpenses, tripSharedBudgets, tripDebts
+  const [tripExpenses, setTripExpenses] = useLocalStorage<TripExpense[]>('trackwise_trip_expenses', []);
+
 
   const getMemberById = useCallback((memberId: string) => {
     return members.find(member => member.id === memberId);
@@ -303,9 +304,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, [tripMembers]);
 
   const deleteTripMember = (tripMemberId: string) => {
-    // Also delete associated contributions for this trip member
     setTripContributions(prev => prev.filter(contrib => contrib.tripMemberId !== tripMemberId));
-    // Future: also delete associated trip debts for this member
     setTripMembers(prev => prev.filter(member => member.id !== tripMemberId));
   };
 
@@ -333,6 +332,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       .filter(contrib => contrib.tripMemberId === tripMemberId)
       .reduce((sum, contrib) => sum + contrib.amount, 0);
   }, [tripContributions]);
+
+  // Trip Expense Functions
+  const addTripExpense = (expenseData: Omit<TripExpense, 'id'>) => {
+    const newTripExpense: TripExpense = {
+      ...expenseData,
+      id: uuidv4(),
+    };
+    setTripExpenses(prev => [...prev, newTripExpense]);
+  };
+
+  const getTripExpenses = useCallback((tripIdToFilter: string): TripExpense[] => {
+    return tripExpenses.filter(expense => expense.tripId === tripIdToFilter);
+  }, [tripExpenses]);
 
 
   // --- Effects for dynamic calculations ---
@@ -370,7 +382,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const value: AppContextType = {
     expenses, categories, budgetGoals, members, contributions, sharedBudgets, debts,
     shoppingListItems,
-    trips, tripMembers, tripContributions,
+    trips, tripMembers, tripContributions, tripExpenses,
     addExpense, updateExpense, deleteExpense,
     addBudgetGoal, updateBudgetGoal, deleteBudgetGoal, getCategoryById,
     addMember, deleteMember, getMemberById,
@@ -382,6 +394,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addTrip, getTripById, getTrips,
     addTripMember, getTripMembers, deleteTripMember, getTripMemberById,
     addTripContribution, getTripContributionsForMember, getTripMemberTotalDirectContribution,
+    addTripExpense, getTripExpenses,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

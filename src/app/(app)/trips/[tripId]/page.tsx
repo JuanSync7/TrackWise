@@ -12,13 +12,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Progress } from '@/components/ui/progress';
 import { useAppContext } from '@/contexts/app-context';
 import { useToast } from "@/hooks/use-toast";
-import type { Trip, TripMember, TripContribution } from '@/lib/types';
+import type { Trip, TripMember, TripContribution, TripExpense } from '@/lib/types';
 import { TripMemberForm, type TripMemberFormValues } from '@/components/trips/trip-member-form';
 import { TripMemberList } from '@/components/trips/trip-member-list';
 import { TripContributionForm, type TripContributionFormValues } from '@/components/trips/trip-contribution-form';
+import { ExpenseForm, type ExpenseFormValues as GenericExpenseFormValues } from '@/components/expenses/expense-form';
 import { DEFAULT_CURRENCY } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import { format as formatDate } from 'date-fns';
 
 export default function TripDetailPage() {
   const params = useParams();
@@ -29,7 +31,8 @@ export default function TripDetailPage() {
     getTripById, 
     getTripMembers, addTripMember, deleteTripMember: contextDeleteTripMember, getTripMemberById,
     addTripContribution, getTripMemberTotalDirectContribution,
-    tripMembers // Destructure tripMembers here
+    tripMembers, // From context
+    addTripExpense, getTripExpenses // Trip expense functions
   } = useAppContext();
   const { toast } = useToast();
 
@@ -38,10 +41,12 @@ export default function TripDetailPage() {
   
   const [isMemberFormOpen, setIsMemberFormOpen] = useState(false);
   const [isContributionFormOpen, setIsContributionFormOpen] = useState(false);
+  const [isExpenseFormOpen, setIsExpenseFormOpen] = useState(false); // State for expense form dialog
   const [selectedTripMemberForContribution, setSelectedTripMemberForContribution] = useState<TripMember | null>(null);
   
   const [isSubmittingMember, setIsSubmittingMember] = useState(false);
   const [isSubmittingContribution, setIsSubmittingContribution] = useState(false);
+  const [isSubmittingExpense, setIsSubmittingExpense] = useState(false); // State for expense form submission
   const [tripMemberToDelete, setTripMemberToDelete] = useState<string | null>(null);
 
   useEffect(() => {
@@ -57,12 +62,11 @@ export default function TripDetailPage() {
     }
   }, [tripId, getTripById, getTripMembers, router, toast]);
 
-  // Recalculate members when context updates (e.g., after adding/deleting)
   useEffect(() => {
     if (tripId) {
         setCurrentTripMembers(getTripMembers(tripId));
     }
-  }, [getTripMembers, tripId, tripMembers]); // Use the destructured tripMembers here
+  }, [getTripMembers, tripId, tripMembers]);
 
   const handleSaveTripMember = async (data: TripMemberFormValues) => {
     if (!tripId) return;
@@ -113,17 +117,42 @@ export default function TripDetailPage() {
       setIsSubmittingContribution(false);
     }
   };
+  
+  const handleSaveTripExpense = async (data: GenericExpenseFormValues) => {
+    if (!tripId) return;
+    setIsSubmittingExpense(true);
+    try {
+      const tripExpenseData: Omit<TripExpense, 'id'> = {
+        tripId: tripId,
+        description: data.description,
+        amount: data.amount,
+        date: formatDate(data.date, "yyyy-MM-dd"),
+        categoryId: data.categoryId, // Using general category ID for now
+        notes: data.notes,
+      };
+      addTripExpense(tripExpenseData);
+      toast({ title: "Trip Expense Added", description: `Expense "${data.description}" recorded for the trip.` });
+      setIsExpenseFormOpen(false);
+    } catch (error) {
+      toast({ variant: "destructive", title: "Save Failed", description: "Could not save trip expense." });
+    } finally {
+      setIsSubmittingExpense(false);
+    }
+  };
+
 
   const totalTripContributions = useMemo(() => {
     return currentTripMembers.reduce((sum, member) => sum + getTripMemberTotalDirectContribution(member.id), 0);
   }, [currentTripMembers, getTripMemberTotalDirectContribution]);
 
-  // Placeholder for trip spending - will be implemented later
+  const currentTripExpenses = useMemo(() => {
+    if (!tripId) return [];
+    return getTripExpenses(tripId);
+  }, [tripId, getTripExpenses, tripExpenses]); // Listen to tripExpenses from context
+
   const totalTripSpending = useMemo(() => {
-    // const tripSpecificExpenses = getTripExpenses(tripId); // Future function
-    // return tripSpecificExpenses.reduce((sum, exp) => sum + exp.amount, 0);
-    return 0; // Placeholder
-  }, [tripId /*, getTripExpenses */]);
+    return currentTripExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+  }, [currentTripExpenses]);
   
   const remainingTripPot = totalTripContributions - totalTripSpending;
   const tripPotUsagePercentage = totalTripContributions > 0 ? Math.min((totalTripSpending / totalTripContributions) * 100, 100) : 0;
@@ -144,7 +173,9 @@ export default function TripDetailPage() {
         description={trip.description || "Manage your trip's finances and members."}
         actions={
           <div className="flex gap-2 flex-wrap">
-            {/* Future buttons: Export Trip Data, Add Trip Expense */}
+            <Button variant="outline" onClick={() => setIsExpenseFormOpen(true)}>
+              <ListChecks className="mr-2 h-4 w-4" /> Add Trip Expense
+            </Button>
             <Button variant="outline" onClick={() => setIsMemberFormOpen(true)}>
               <PlusCircle className="mr-2 h-4 w-4" /> Add Trip Member
             </Button>
@@ -191,6 +222,25 @@ export default function TripDetailPage() {
           />
         </DialogContent>
       </Dialog>
+
+      <Dialog open={isExpenseFormOpen} onOpenChange={setIsExpenseFormOpen}>
+        <DialogContent className="sm:max-w-[425px] md:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add New Trip Expense</DialogTitle>
+            <DialogDescription>
+              Fill in the details for a new expense for this trip. This will affect the trip pot.
+            </DialogDescription>
+          </DialogHeader>
+          <ExpenseForm
+            onSave={handleSaveTripExpense}
+            onCancel={() => setIsExpenseFormOpen(false)}
+            isSubmitting={isSubmittingExpense}
+            // Note: ExpenseForm still uses general categories and household members for splitting.
+            // Trip-specific member selection for paidBy/splitWith is a future enhancement.
+          />
+        </DialogContent>
+      </Dialog>
+
 
       <AlertDialog open={!!tripMemberToDelete} onOpenChange={() => setTripMemberToDelete(null)}>
         <AlertDialogContent>
@@ -258,7 +308,7 @@ export default function TripDetailPage() {
                         <p className="text-xs text-muted-foreground mt-1 text-right">{tripPotUsagePercentage.toFixed(0)}% of pot used.</p>
                     </div>
                 )}
-                 <p className="text-xs text-muted-foreground pt-1">Trip spending will be tracked via trip-specific expenses (feature coming soon).</p>
+                 <p className="text-xs text-muted-foreground pt-1">Trip spending is tracked via expenses logged on this page.</p>
             </CardContent>
            </Card>
             {/* Placeholder for future cards like Trip Shared Budgets, Trip Expense Splitting, Trip Shopping List */}

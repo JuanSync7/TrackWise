@@ -69,15 +69,22 @@ export interface TripContribution {
   notes?: string;
 }
 
-// Placeholder for future trip-specific expense, budget, debt types
-export interface TripExpense extends Omit<Expense, 'paidByMemberId' | 'splitWithMemberIds'> {
+export interface TripExpense {
+  id: string;
   tripId: string;
-  paidByTripMemberId?: string;
-  splitWithTripMemberIds?: string[];
+  description: string;
+  amount: number;
+  date: string; // ISO string date
+  categoryId: string; // Uses general categories for now
+  notes?: string;
+  // Future: paidByTripMemberId?: string;
+  // Future: splitWithTripMemberIds?: string[];
 }
+
+// Placeholder for future trip-specific budget, debt types
 export interface TripSharedBudget extends Omit<SharedBudget, 'currentSpending'> {
   tripId: string;
-  currentSpending: number; // Will need to be calculated based on TripExpenses
+  currentSpending: number; 
 }
 export interface TripDebt extends Omit<Debt, 'owedByMemberId' | 'owedToMemberId'> {
   tripId: string;
@@ -129,13 +136,13 @@ export interface AppState {
   sharedBudgets: SharedBudget[];
   debts: Debt[];
   
-  shoppingListItems: ShoppingListItem[]; // Can be shared or trip-specific later if needed
+  shoppingListItems: ShoppingListItem[];
 
   // Trip data
   trips: Trip[];
   tripMembers: TripMember[];
   tripContributions: TripContribution[];
-  // Future: tripExpenses: TripExpense[], tripSharedBudgets: TripSharedBudget[], tripDebts: TripDebt[]
+  tripExpenses: TripExpense[]; 
 }
 
 export type AppContextType = AppState & {
@@ -185,7 +192,6 @@ export type AppContextType = AppState & {
   // Trip functions
   addTrip: (tripData: Omit<Trip, 'id' | 'createdAt'>) => void;
   getTripById: (tripId: string) => Trip | undefined;
-  // deleteTrip: (tripId: string) => void; // Future: with conditions
   getTrips: () => Trip[];
 
   // Trip Member functions
@@ -198,7 +204,11 @@ export type AppContextType = AppState & {
   addTripContribution: (tripId: string, tripMemberId: string, contributionData: Omit<TripContribution, 'id' | 'tripId' | 'tripMemberId'>) => void;
   getTripContributionsForMember: (tripMemberId: string) => TripContribution[];
   getTripMemberTotalDirectContribution: (tripMemberId: string) => number;
-  // Future: getTotalTripSpending: (tripId: string) => number;
+  
+  // Trip Expense functions
+  addTripExpense: (expenseData: Omit<TripExpense, 'id'>) => void; // tripId will be in expenseData
+  getTripExpenses: (tripId: string) => TripExpense[];
+  // Future: updateTripExpense, deleteTripExpense
 };
 
 export interface NavItem {
