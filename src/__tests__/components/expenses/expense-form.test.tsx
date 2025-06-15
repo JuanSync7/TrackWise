@@ -10,13 +10,20 @@ import type { User as FirebaseUser } from 'firebase/auth';
 import { INITIAL_CATEGORIES } from '@/lib/constants';
 import { format } from 'date-fns';
 
-// Mock the AI flow
+// Mock the AI flows
 jest.mock('@/ai/flows/suggest-expense-category', () => ({
   suggestExpenseCategory: jest.fn().mockResolvedValue({
-    category: 'Food', // Or any default suggestion
-    reasoning: 'Mocked AI suggestion.',
+    category: 'Food', 
+    reasoning: 'Mocked AI category suggestion.',
   }),
 }));
+jest.mock('@/ai/flows/suggest-expense-notes', () => ({
+  suggestExpenseNotes: jest.fn().mockResolvedValue({
+    suggestedNote: 'Mocked AI note suggestion.',
+    reasoning: 'AI thinks this is a good note.',
+  }),
+}));
+
 
 // Mock useToast
 const mockToast = jest.fn();
@@ -36,7 +43,7 @@ const mockCategories: Category[] = INITIAL_CATEGORIES;
 const mockMembers: Member[] = [
   { id: 'member-1', name: 'Alice' },
   { id: 'member-2', name: 'Bob' },
-  { id: 'user-123', name: 'Current User' }, // Mock current user as a member
+  { id: 'user-123', name: 'Current User' }, 
 ];
 const mockSharedBudgets: SharedBudget[] = [
   { id: 'sb-1', name: 'Groceries Budget', amount: 300, period: 'monthly', createdAt: new Date().toISOString(), currentSpending: 50 },
@@ -52,7 +59,6 @@ const mockAppContext: Partial<AppContextType> = {
 const mockAuthContext = {
   user: mockUser,
   loading: false,
-  // other auth functions if needed by form indirectly
 };
 
 describe('ExpenseForm', () => {
@@ -80,6 +86,7 @@ describe('ExpenseForm', () => {
     mockOnCancel.mockClear();
     mockToast.mockClear();
     (require('@/ai/flows/suggest-expense-category').suggestExpenseCategory as jest.Mock).mockClear();
+    (require('@/ai/flows/suggest-expense-notes').suggestExpenseNotes as jest.Mock).mockClear();
   });
 
   it('renders all basic fields', () => {
@@ -97,7 +104,7 @@ describe('ExpenseForm', () => {
       id: 'exp1',
       description: 'Old Dinner',
       amount: 75,
-      date: '2023-10-25', // Needs to be parsable by new Date()
+      date: '2023-10-25', 
       categoryId: 'food',
       notes: 'Was good',
       sharedBudgetId: 'sb-1',
@@ -109,27 +116,24 @@ describe('ExpenseForm', () => {
 
     expect(screen.getByLabelText(/description/i)).toHaveValue('Old Dinner');
     expect(screen.getByLabelText(/amount/i)).toHaveValue(75);
-    // Date is tricky, check presence or specific format if possible via its trigger button
     expect(screen.getByText(format(new Date('2023-10-25'), "PPP"))).toBeInTheDocument(); 
-    expect(screen.getByRole('combobox', { name: /select category/i })).toHaveTextContent('Food'); // Assuming 'food' category is named 'Food'
+    expect(screen.getByRole('combobox', { name: /select category/i })).toHaveTextContent('Food'); 
     expect(screen.getByLabelText(/notes \(optional\)/i)).toHaveValue('Was good');
     expect(screen.getByRole('button', { name: /save changes/i })).toBeInTheDocument();
     
     expect(screen.getByLabelText(/link to shared budget/i)).toHaveTextContent('Groceries Budget');
     expect(screen.getByLabelText(/split this expense/i)).toBeChecked();
     expect(screen.getByRole('combobox', {name: /select member who paid/i})).toHaveTextContent('Alice');
-    // Check selected members for split (this is more complex to assert directly)
   });
 
   it('calls onSave with form data when submitted', async () => {
     renderForm();
     await user.type(screen.getByLabelText(/description/i), 'Test Coffee');
-    await user.clear(screen.getByLabelText(/amount/i)); // Clear default 0
+    await user.clear(screen.getByLabelText(/amount/i)); 
     await user.type(screen.getByLabelText(/amount/i), '5.50');
     
-    // Select category
     await user.click(screen.getByRole('combobox', { name: /select category/i }));
-    await user.click(screen.getByText(mockCategories[1].name)); // Select second category
+    await user.click(screen.getByText(mockCategories[1].name)); 
 
     await user.click(screen.getByRole('button', { name: /add expense/i }));
 
@@ -138,24 +142,36 @@ describe('ExpenseForm', () => {
       description: 'Test Coffee',
       amount: 5.50,
       categoryId: mockCategories[1].id,
-      // date will be the default current date, difficult to assert exactly without mocking Date
     }));
   });
   
-  it('calls AI suggestion for category when description is typed and category is empty', async () => {
+  it('calls AI for category and notes when description is typed', async () => {
     renderForm();
-    await user.type(screen.getByLabelText(/description/i), 'Expensive Dinner');
+    await user.type(screen.getByLabelText(/description/i), 'Expensive Dinner Out');
     
     await waitFor(() => {
       expect(require('@/ai/flows/suggest-expense-category').suggestExpenseCategory).toHaveBeenCalledTimes(1);
     });
-    // Check if AI suggestion alert appears (if implemented to show)
-    // For now, the mock for suggestExpenseCategory is enough to show it's called.
-    // If the AI suggestion sets the category, we could check that too.
-    // await waitFor(() => {
-    //   expect(screen.getByRole('combobox', { name: /select category/i })).toHaveTextContent('Food');
-    // });
+    await waitFor(() => {
+      expect(require('@/ai/flows/suggest-expense-notes').suggestExpenseNotes).toHaveBeenCalledTimes(1);
+    });
+    
+    // Check if AI suggestion alert appears for category (if category is not already set by AI auto-apply)
+    // For now, the mock call is enough. If it auto-applies, the category would be set.
+    // Example: await waitFor(() => expect(screen.getByRole('combobox', { name: /select category/i })).toHaveTextContent('Food'));
+    
+    // Check for AI note suggestion
+    await waitFor(() => {
+        expect(screen.getByText(/ai note suggestion/i)).toBeInTheDocument();
+        expect(screen.getByText(/"mocked ai note suggestion."/i)).toBeInTheDocument();
+    });
+
+    // Test applying note suggestion
+    const applyNoteButton = screen.getByRole('button', { name: /apply suggestion/i });
+    await user.click(applyNoteButton);
+    expect(screen.getByLabelText(/notes \(optional\)/i)).toHaveValue('Mocked AI note suggestion.');
   });
+
 
   it('handles expense splitting fields correctly', async () => {
     renderForm();
@@ -165,17 +181,14 @@ describe('ExpenseForm', () => {
     expect(screen.getByLabelText(/who paid\?/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/split with whom\?/i)).toBeInTheDocument();
     
-    // Default payer should be current user
     await waitFor(() => {
          expect(screen.getByRole('combobox', {name: /select member who paid/i})).toHaveTextContent('Current User');
     });
 
-    // Select payer
     await user.click(screen.getByRole('combobox', {name: /select member who paid/i}));
-    await user.click(screen.getByText(mockMembers[0].name)); // Alice
+    await user.click(screen.getByText(mockMembers[0].name)); 
     expect(screen.getByRole('combobox', {name: /select member who paid/i})).toHaveTextContent('Alice');
 
-    // Select members to split with
     const aliceCheckbox = screen.getByRole('checkbox', { name: mockMembers[0].name });
     const bobCheckbox = screen.getByRole('checkbox', { name: mockMembers[1].name });
     await user.click(aliceCheckbox);
@@ -185,7 +198,7 @@ describe('ExpenseForm', () => {
     await user.clear(screen.getByLabelText(/amount/i));
     await user.type(screen.getByLabelText(/amount/i), '30');
     await user.click(screen.getByRole('combobox', { name: /select category/i }));
-    await user.click(screen.getByText(mockCategories[0].name)); // Food
+    await user.click(screen.getByText(mockCategories[0].name)); 
 
     await user.click(screen.getByRole('button', { name: /add expense/i }));
 
@@ -200,11 +213,9 @@ describe('ExpenseForm', () => {
     renderForm();
     await user.click(screen.getByLabelText(/split this expense/i));
 
-    // Select payer as Alice
     await user.click(screen.getByRole('combobox', {name: /select member who paid/i}));
     await user.click(screen.getByText(mockMembers[0].name));
 
-    // Select only Bob to split with
     const bobCheckbox = screen.getByRole('checkbox', { name: mockMembers[1].name });
     await user.click(bobCheckbox);
     
@@ -212,7 +223,7 @@ describe('ExpenseForm', () => {
     await user.clear(screen.getByLabelText(/amount/i));
     await user.type(screen.getByLabelText(/amount/i), '10');
     await user.click(screen.getByRole('combobox', { name: /select category/i }));
-    await user.click(screen.getByText(mockCategories[0].name)); // Food
+    await user.click(screen.getByText(mockCategories[0].name)); 
 
     await user.click(screen.getByRole('button', { name: /add expense/i }));
     

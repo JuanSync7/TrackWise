@@ -17,7 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Check, ChevronsUpDown, Sparkles as AiSparklesIcon, Users, Landmark, CheckSquare, Square } from "lucide-react";
+import { CalendarIcon, Check, ChevronsUpDown, Sparkles as AiSparklesIcon, Users, Landmark, CheckSquare, Square, MessageSquarePlus, Edit } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -29,6 +29,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { format } from "date-fns";
 import { useEffect, useState, useCallback, useMemo }  from "react";
 import { suggestExpenseCategory, type SuggestExpenseCategoryInput, type SuggestExpenseCategoryOutput } from "@/ai/flows/suggest-expense-category";
+import { suggestExpenseNotes, type SuggestExpenseNotesInput, type SuggestExpenseNotesOutput } from "@/ai/flows/suggest-expense-notes";
 import { useToast } from "@/hooks/use-toast";
 import { CategoryIcon } from '@/components/shared/category-icon';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -87,8 +88,10 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
   const { categories, getCategoryById, sharedBudgets, members } = useAppContext();
   const { user } = useAuth();
   const { toast } = useToast();
-  const [aiSuggestion, setAiSuggestion] = useState<SuggestExpenseCategoryOutput | null>(null);
-  const [isSuggesting, setIsSuggesting] = useState(false);
+  const [aiCategorySuggestion, setAiCategorySuggestion] = useState<SuggestExpenseCategoryOutput | null>(null);
+  const [isSuggestingCategory, setIsSuggestingCategory] = useState(false);
+  const [aiNoteSuggestion, setAiNoteSuggestion] = useState<SuggestExpenseNotesOutput | null>(null);
+  const [isSuggestingNote, setIsSuggestingNote] = useState(false);
   const [categoryPopoverOpen, setCategoryPopoverOpen] = useState(false);
 
 
@@ -117,6 +120,8 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
   });
 
   const watchedDescription = form.watch("description");
+  const watchedNotes = form.watch("notes");
+  const watchedCategoryId = form.watch("categoryId");
   const watchedIsSplit = form.watch("isSplit");
   const watchedPaidByMemberId = form.watch("paidByMemberId");
   const watchedSplitWithMemberIds = form.watch("splitWithMemberIds");
@@ -137,36 +142,65 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
 
 
   const handleSuggestCategory = useCallback(async () => {
-    if (!watchedDescription || watchedDescription.length < 3) return;
-    setIsSuggesting(true);
-    setAiSuggestion(null);
+    if (!watchedDescription || watchedDescription.length < 3 || watchedCategoryId) return;
+    setIsSuggestingCategory(true);
+    setAiCategorySuggestion(null);
     try {
       const input: SuggestExpenseCategoryInput = {
         description: watchedDescription,
         availableCategories: categories.map(c => c.name),
       };
       const suggestion = await suggestExpenseCategory(input);
-      setAiSuggestion(suggestion);
+      setAiCategorySuggestion(suggestion);
+      // Auto-apply if no category is selected yet
       const suggestedCat = categories.find(c => c.name.toLowerCase() === suggestion.category.toLowerCase());
-      if (suggestedCat) {
+      if (suggestedCat && !form.getValues("categoryId")) {
          form.setValue("categoryId", suggestedCat.id, { shouldValidate: true });
       }
     } catch (error) {
       console.error("Error suggesting category:", error);
-      toast({ variant: "destructive", title: "AI Suggestion Failed", description: "Could not get category suggestion." });
+      toast({ variant: "destructive", title: "AI Category Suggestion Failed", description: "Could not get category suggestion." });
     } finally {
-      setIsSuggesting(false);
+      setIsSuggestingCategory(false);
     }
-  }, [watchedDescription, categories, toast, form]);
+  }, [watchedDescription, categories, toast, form, watchedCategoryId]);
   
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (watchedDescription && watchedDescription.length >= 5 && !form.getValues("categoryId")) { 
+      if (watchedDescription && watchedDescription.length >= 5 && !watchedCategoryId) { 
         handleSuggestCategory();
       }
     }, 1000);
     return () => clearTimeout(timer);
-  }, [watchedDescription, handleSuggestCategory, form]);
+  }, [watchedDescription, handleSuggestCategory, watchedCategoryId]);
+
+  const handleSuggestNotes = useCallback(async () => {
+    if (!watchedDescription || watchedDescription.length < 5 || (watchedNotes && watchedNotes.length > 10)) return;
+    setIsSuggestingNote(true);
+    setAiNoteSuggestion(null);
+    try {
+      const input: SuggestExpenseNotesInput = {
+        description: watchedDescription,
+        currentNotes: watchedNotes,
+      };
+      const suggestion = await suggestExpenseNotes(input);
+      setAiNoteSuggestion(suggestion);
+    } catch (error) {
+      console.error("Error suggesting notes:", error);
+      toast({ variant: "destructive", title: "AI Note Suggestion Failed", description: "Could not get note suggestion." });
+    } finally {
+      setIsSuggestingNote(false);
+    }
+  }, [watchedDescription, watchedNotes, toast]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (watchedDescription && watchedDescription.length >= 5 && (!watchedNotes || watchedNotes.length < 20)) {
+        handleSuggestNotes();
+      }
+    }, 1200); // Slightly longer debounce
+    return () => clearTimeout(timer);
+  }, [watchedDescription, watchedNotes, handleSuggestNotes]);
 
 
   function onSubmit(data: ExpenseFormValues) {
@@ -188,7 +222,8 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
       paidByMemberId: "",
       splitWithMemberIds: [],
     });
-    setAiSuggestion(null);
+    setAiCategorySuggestion(null);
+    setAiNoteSuggestion(null);
   }
   
   const selectedCategory = getCategoryById(form.watch("categoryId"));
@@ -316,7 +351,7 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
                             key={category.id}
                             onSelect={() => {
                               form.setValue("categoryId", category.id);
-                              setAiSuggestion(null); 
+                              setAiCategorySuggestion(null); 
                               setCategoryPopoverOpen(false);
                             }}
                           >
@@ -344,21 +379,21 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
           )}
         />
 
-        {isSuggesting && (
+        {isSuggestingCategory && (
           <div className="flex items-center text-sm text-muted-foreground">
             <AiSparklesIcon className="mr-2 h-4 w-4 animate-spin" />
             Getting AI category suggestion...
           </div>
         )}
 
-        {aiSuggestion && !form.getValues("categoryId") && (
+        {aiCategorySuggestion && !form.getValues("categoryId") && (
           <Alert variant="default" className="bg-primary/10 border-primary/30">
             <AiSparklesIcon className="h-5 w-5 text-primary" />
-            <AlertTitle className="text-primary font-semibold">AI Suggestion</AlertTitle>
+            <AlertTitle className="text-primary font-semibold">AI Category Suggestion</AlertTitle>
             <AlertDescription className="text-primary/80">
-              We think this might be <span className="font-semibold">{aiSuggestion.category}</span>.
+              We think this might be <span className="font-semibold">{aiCategorySuggestion.category}</span>.
               <br />
-              <span className="text-xs italic">Reasoning: {aiSuggestion.reasoning}</span>
+              <span className="text-xs italic">Reasoning: {aiCategorySuggestion.reasoning}</span>
             </AlertDescription>
             <Button 
               type="button" 
@@ -366,12 +401,12 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
               variant="ghost"
               className="mt-2 text-primary hover:bg-primary/20"
               onClick={() => {
-                const suggestedCat = categories.find(c => c.name.toLowerCase() === aiSuggestion.category.toLowerCase());
+                const suggestedCat = categories.find(c => c.name.toLowerCase() === aiCategorySuggestion.category.toLowerCase());
                 if (suggestedCat) {
                   form.setValue("categoryId", suggestedCat.id, { shouldValidate: true });
-                  setAiSuggestion(null); 
+                  setAiCategorySuggestion(null); 
                 } else {
-                  toast({variant: "destructive", title: "Category not found", description: `AI suggested "${aiSuggestion.category}" which is not an available category.`})
+                  toast({variant: "destructive", title: "Category not found", description: `AI suggested "${aiCategorySuggestion.category}" which is not an available category.`})
                 }
               }}
             >
@@ -432,7 +467,6 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
                           form.setValue("paidByMemberId", "");
                           form.setValue("splitWithMemberIds", []);
                         } else {
-                           // Default to current user if they are a member when 'isSplit' is checked
                            if (currentUserMember && !form.getValues("paidByMemberId")) {
                             form.setValue("paidByMemberId", currentUserMember.id, { shouldValidate: true });
                           }
@@ -539,7 +573,6 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
           </div>
         )}
 
-
         <FormField
           control={form.control}
           name="notes"
@@ -553,6 +586,37 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
             </FormItem>
           )}
         />
+        
+        {isSuggestingNote && (
+          <div className="flex items-center text-sm text-muted-foreground">
+            <MessageSquarePlus className="mr-2 h-4 w-4 animate-pulse" />
+            Getting AI note suggestion...
+          </div>
+        )}
+
+        {aiNoteSuggestion && (
+          <Alert variant="default" className="bg-accent/20 border-accent/50">
+            <MessageSquarePlus className="h-5 w-5 text-accent-foreground/80" />
+            <AlertTitle className="text-accent-foreground/90 font-semibold">AI Note Suggestion</AlertTitle>
+            <AlertDescription className="text-accent-foreground/70">
+              "{aiNoteSuggestion.suggestedNote}"
+              {aiNoteSuggestion.reasoning && <span className="text-xs italic block mt-1">Reasoning: {aiNoteSuggestion.reasoning}</span>}
+            </AlertDescription>
+            <Button 
+              type="button" 
+              size="sm" 
+              variant="ghost"
+              className="mt-2 text-accent-foreground/80 hover:bg-accent/30"
+              onClick={() => {
+                form.setValue("notes", aiNoteSuggestion.suggestedNote, { shouldValidate: true });
+                setAiNoteSuggestion(null);
+              }}
+            >
+              <Edit className="mr-2 h-3 w-3" /> Apply Suggestion
+            </Button>
+          </Alert>
+        )}
+
 
         <div className="flex justify-end space-x-2 pt-4">
           {onCancel && (
@@ -560,7 +624,7 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
               Cancel
             </Button>
           )}
-          <Button type="submit" disabled={isSubmitting}>
+          <Button type="submit" disabled={isSubmitting || isSuggestingCategory || isSuggestingNote}>
             {isSubmitting ? (expense ? "Saving..." : "Adding...") : (expense ? "Save Changes" : "Add Expense")}
           </Button>
         </div>
@@ -568,4 +632,3 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting }: Expense
     </Form>
   );
 }
-
