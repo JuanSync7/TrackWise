@@ -64,7 +64,7 @@ export function TripContributionForm({ onSave, onCancel, isSubmitting, tripMembe
             <FormItem>
               <FormLabel>Contribution Amount</FormLabel>
               <FormControl>
-                <Input type="number" placeholder="0.00" {...field} />
+                <Input type="number" placeholder="0.00" {...field} step="0.01" />
               </FormControl>
               <FormMessage />
             </FormItem>
