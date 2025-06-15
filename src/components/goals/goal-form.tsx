@@ -43,6 +43,12 @@ interface GoalFormProps {
 export function GoalForm({ goal, onSave, onCancel, isSubmitting }: GoalFormProps) {
   const form = useForm<GoalFormValues>({
     resolver: zodResolver(goalFormSchema),
+    defaultValues: { // Initialize default values here
+      name: "",
+      targetAmount: 0,
+      deadlineDate: undefined,
+      notes: "",
+    },
   });
 
   useEffect(() => {
@@ -54,6 +60,8 @@ export function GoalForm({ goal, onSave, onCancel, isSubmitting }: GoalFormProps
         notes: goal.notes || "",
       });
     } else {
+      // Reset to initial defaults if goal is not present or removed
+      // This ensures the form is in a clean state for new entries
       form.reset({
         name: "",
         targetAmount: 0,
@@ -152,7 +160,7 @@ export function GoalForm({ goal, onSave, onCancel, isSubmitting }: GoalFormProps
             <FormItem>
               <FormLabel>Notes (Optional)</FormLabel>
               <FormControl>
-                <Textarea placeholder="Add any relevant notes or details about this goal..." {...field} />
+                <Textarea placeholder="Add any relevant notes or details about this goal..." {...field} value={field.value || ""} />
               </FormControl>
               <FormMessage />
             </FormItem>
