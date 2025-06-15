@@ -1,12 +1,12 @@
 
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, Suspense } from 'react'; // Added Suspense
+import React, { useState, useEffect, useCallback, useMemo, Suspense } from 'react'; // Added React
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { Menu, Search, UserCircle, LogOutIcon, SettingsIcon, ArrowLeft, XIcon, PlusCircle, Loader2 } from "lucide-react"; // Added PlusCircle, Loader2
+import { Menu, Search, UserCircle, LogOutIcon, SettingsIcon, ArrowLeft, XIcon, PlusCircle, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'; // Added Dialog components
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,7 +26,7 @@ import { format as formatDate } from 'date-fns';
 import { CategoryIcon } from '@/components/shared/category-icon';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { useToast } from "@/hooks/use-toast"; // Added useToast
+import { useToast } from "@/hooks/use-toast";
 
 const TransactionForm = React.lazy(() => import('@/components/transactions/transaction-form').then(module => ({ default: module.TransactionForm })));
 type TransactionFormValuesType = import('@/components/transactions/transaction-form').TransactionFormValues;
@@ -36,8 +36,8 @@ const DEBOUNCE_DELAY = 300;
 export function AppHeader() {
   const { user, logout, loading: authLoading } = useAuth();
   const router = useRouter();
-  const { transactions, getCategoryById, addTransaction: contextAddTransaction } = usePersonalFinance(); // Added contextAddTransaction
-  const { toast } = useToast(); // Added toast
+  const { transactions, getCategoryById, addTransaction: contextAddTransaction } = usePersonalFinance();
+  const { toast } = useToast();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
