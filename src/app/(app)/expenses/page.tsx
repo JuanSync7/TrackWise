@@ -1,12 +1,13 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react'; // Added useMemo
 import { PageHeader } from '@/components/shared/page-header';
 import { ExpenseForm } from '@/components/expenses/expense-form';
 import { ExpenseList } from '@/components/expenses/expense-list';
 import type { Expense } from '@/lib/types';
 import { useAppContext } from '@/contexts/app-context';
+import { useAuth } from '@/contexts/auth-context'; // Import useAuth
 import { Button } from '@/components/ui/button';
 import { PlusCircle, X, Download } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -27,12 +28,21 @@ import { DEFAULT_CURRENCY } from '@/lib/constants';
 
 export default function ExpensesPage() {
   const { expenses, addExpense, updateExpense, deleteExpense: contextDeleteExpense, categories, sharedBudgets, members, getCategoryById, getMemberById } = useAppContext();
+  const { user: authUser } = useAuth(); // Get authenticated user
   const { toast } = useToast();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null);
+
+  const currentUserAsHouseholdMember = useMemo(() => {
+    if (!authUser || !members || members.length === 0) return undefined;
+    return members.find(m => 
+        (authUser.displayName && m.name.toLowerCase() === authUser.displayName.toLowerCase()) ||
+        (authUser.email && m.name.toLowerCase() === authUser.email.split('@')[0].toLowerCase())
+    );
+  }, [authUser, members]);
 
 
   const handleSaveExpense = async (data: any) => {
@@ -148,6 +158,10 @@ export default function ExpensesPage() {
             onSave={handleSaveExpense}
             onCancel={() => { setIsFormOpen(false); setEditingExpense(undefined);}}
             isSubmitting={isSubmitting}
+            availableMembersForSplitting={members} // Pass household members
+            currentUserIdForDefaultPayer={currentUserAsHouseholdMember?.id} // Pass current user's household member ID
+            // hideSharedBudgetLink can default to false or be explicitly false
+            // hideSplittingFeature can default to false or be explicitly false
           />
         </DialogContent>
       </Dialog>

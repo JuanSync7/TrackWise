@@ -306,6 +306,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const deleteTripMember = (tripMemberId: string) => {
     setTripContributions(prev => prev.filter(contrib => contrib.tripMemberId !== tripMemberId));
     setTripMembers(prev => prev.filter(member => member.id !== tripMemberId));
+    // Also delete trip expenses paid by or split with this member if needed (future enhancement)
   };
 
   const getTripMemberById = useCallback((tripMemberId: string): TripMember | undefined => {
@@ -353,6 +354,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       prevGoals.map(goal => {
         const relevantExpenses = expenses.filter(exp => {
           if (exp.categoryId !== goal.categoryId) return false;
+          // Further filtering by period could be added here if needed, e.g., for monthly goals
           return true; 
         });
         const currentSpending = relevantExpenses.reduce((sum, exp) => sum + exp.amount, 0);
@@ -407,3 +409,4 @@ export const useAppContext = (): AppContextType => {
   }
   return context;
 };
+

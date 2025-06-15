@@ -11,6 +11,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { useAppContext } from '@/contexts/app-context';
+import { useAuth } from '@/contexts/auth-context'; // Import useAuth
 import { useToast } from "@/hooks/use-toast";
 import type { Trip, TripMember, TripContribution, TripExpense } from '@/lib/types';
 import { TripMemberForm, type TripMemberFormValues } from '@/components/trips/trip-member-form';
@@ -31,12 +32,13 @@ export default function TripDetailPage() {
     getTripById,
     addTripMember, deleteTripMember: contextDeleteTripMember, getTripMemberById,
     addTripContribution, getTripMemberTotalDirectContribution,
-    tripMembers, // Destructured for dependency array
-    tripContributions, // Destructured for dependency array
+    tripMembers: globalTripMembers, 
+    tripContributions: globalTripContributions, 
     addTripExpense, getTripExpenses,
-    tripExpenses, // Destructured for dependency array
+    tripExpenses: globalTripExpenses, 
     getTripMembers
   } = useAppContext();
+  const { user: authUser } = useAuth(); // Get authenticated user
   const { toast } = useToast();
 
   const [trip, setTrip] = useState<Trip | undefined>(undefined);
@@ -69,7 +71,17 @@ export default function TripDetailPage() {
     if (tripId) {
         setCurrentTripMembers(getTripMembers(tripId));
     }
-  }, [getTripMembers, tripId, tripMembers]); // Listen to tripMembers from context as well
+  }, [getTripMembers, tripId, globalTripMembers]); 
+
+  const currentAuthUserAsTripMember = useMemo(() => {
+    if (!authUser || !currentTripMembers || currentTripMembers.length === 0) return undefined;
+    // Match by name (case-insensitive) or potentially by email prefix if names are not unique
+    return currentTripMembers.find(tm => 
+        (authUser.displayName && tm.name.toLowerCase() === authUser.displayName.toLowerCase()) ||
+        (authUser.email && tm.name.toLowerCase() === authUser.email.split('@')[0].toLowerCase())
+    );
+  }, [authUser, currentTripMembers]);
+
 
   const handleSaveTripMember = async (data: TripMemberFormValues) => {
     if (!tripId) return;
@@ -121,22 +133,23 @@ export default function TripDetailPage() {
     }
   };
 
-  const handleSaveTripExpense = async (data: GenericExpenseFormValues) => {
+  const handleSaveTripExpense = async (formData: GenericExpenseFormValues) => {
     if (!tripId) return;
     setIsSubmittingExpense(true);
     try {
       const tripExpenseData: Omit<TripExpense, 'id'> = {
         tripId: tripId,
-        description: data.description,
-        amount: data.amount,
-        date: formatDate(data.date, "yyyy-MM-dd"),
-        categoryId: data.categoryId,
-        notes: data.notes,
-        // sharedBudgetId will be undefined as we are hiding it for trip expenses for now
-        // isSplit, paidByMemberId, splitWithMemberIds are also not applicable for simple trip expenses yet
+        description: formData.description,
+        amount: formData.amount,
+        date: formatDate(formData.date, "yyyy-MM-dd"),
+        categoryId: formData.categoryId,
+        notes: formData.notes,
+        isSplit: formData.isSplit,
+        paidByTripMemberId: formData.paidByMemberId, // Form uses paidByMemberId, map to paidByTripMemberId
+        splitWithTripMemberIds: formData.splitWithMemberIds, // Form uses splitWithMemberIds
       };
       addTripExpense(tripExpenseData);
-      toast({ title: "Trip Expense Added", description: `Expense "${data.description}" recorded for the trip.` });
+      toast({ title: "Trip Expense Added", description: `Expense "${formData.description}" recorded for the trip.` });
       setIsExpenseFormOpen(false);
     } catch (error) {
       toast({ variant: "destructive", title: "Save Failed", description: "Could not save trip expense." });
@@ -148,12 +161,12 @@ export default function TripDetailPage() {
 
   const totalTripContributions = useMemo(() => {
     return currentTripMembers.reduce((sum, member) => sum + getTripMemberTotalDirectContribution(member.id), 0);
-  }, [currentTripMembers, getTripMemberTotalDirectContribution, tripContributions]); // Also listen to global tripContributions
+  }, [currentTripMembers, getTripMemberTotalDirectContribution, globalTripContributions]); 
 
   const currentTripExpenses = useMemo(() => {
     if (!tripId) return [];
     return getTripExpenses(tripId);
-  }, [tripId, getTripExpenses, tripExpenses]); // Listen to tripExpenses from context
+  }, [tripId, getTripExpenses, globalTripExpenses]); 
 
   const totalTripSpending = useMemo(() => {
     return currentTripExpenses.reduce((sum, exp) => sum + exp.amount, 0);
@@ -240,8 +253,10 @@ export default function TripDetailPage() {
             onSave={handleSaveTripExpense}
             onCancel={() => setIsExpenseFormOpen(false)}
             isSubmitting={isSubmittingExpense}
-            hideSharedBudgetLink={true} // Hide household shared budget link
-            hideSplittingFeature={true} // Hide household member splitting
+            hideSharedBudgetLink={true} 
+            hideSplittingFeature={false} // Enable splitting for trips
+            availableMembersForSplitting={currentTripMembers}
+            currentUserIdForDefaultPayer={currentAuthUserAsTripMember?.id}
           />
         </DialogContent>
       </Dialog>

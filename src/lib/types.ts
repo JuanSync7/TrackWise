@@ -77,8 +77,9 @@ export interface TripExpense {
   date: string; // ISO string date
   categoryId: string; // Uses general categories for now
   notes?: string;
-  // Future: paidByTripMemberId?: string;
-  // Future: splitWithTripMemberIds?: string[];
+  isSplit?: boolean;
+  paidByTripMemberId?: string; 
+  splitWithTripMemberIds?: string[];
 }
 
 // Placeholder for future trip-specific budget, debt types
@@ -206,9 +207,8 @@ export type AppContextType = AppState & {
   getTripMemberTotalDirectContribution: (tripMemberId: string) => number;
   
   // Trip Expense functions
-  addTripExpense: (expenseData: Omit<TripExpense, 'id'>) => void; // tripId will be in expenseData
+  addTripExpense: (expenseData: Omit<TripExpense, 'id'>) => void; 
   getTripExpenses: (tripId: string) => TripExpense[];
-  // Future: updateTripExpense, deleteTripExpense
 };
 
 export interface NavItem {
@@ -218,3 +218,4 @@ export interface NavItem {
   label?: string;
   variant?: 'default' | 'ghost';
 }
+

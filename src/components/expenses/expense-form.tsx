@@ -23,9 +23,8 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import type { Expense, SharedBudget, Member } from "@/lib/types";
+import type { Expense, SharedBudget, Member, TripMember } from "@/lib/types"; // Added TripMember
 import { useAppContext } from "@/contexts/app-context";
-import { useAuth } from "@/contexts/auth-context";
 import { format } from "date-fns";
 import { useEffect, useState, useCallback, useMemo }  from "react";
 import { suggestExpenseCategory, type SuggestExpenseCategoryInput, type SuggestExpenseCategoryOutput } from "@/ai/flows/suggest-expense-category";
@@ -41,10 +40,10 @@ const expenseFormSchemaBase = z.object({
   date: z.date({ required_error: "A date is required." }),
   categoryId: z.string({ required_error: "Please select a category." }),
   notes: z.string().max(200).optional(),
-  sharedBudgetId: z.string().optional(),
+  sharedBudgetId: z.string().optional(), // For household shared budgets
   isSplit: z.boolean().optional().default(false),
-  paidByMemberId: z.string().optional(),
-  splitWithMemberIds: z.array(z.string()).optional().default([]),
+  paidByMemberId: z.string().optional(), // Generic ID for who paid (could be Member['id'] or TripMember['id'])
+  splitWithMemberIds: z.array(z.string()).optional().default([]), // Array of generic IDs
 });
 
 const expenseFormSchema = expenseFormSchemaBase.superRefine((data, ctx) => {
@@ -75,20 +74,33 @@ const expenseFormSchema = expenseFormSchemaBase.superRefine((data, ctx) => {
 
 export type ExpenseFormValues = z.infer<typeof expenseFormSchema>;
 
+// MemberLike type for props
+type MemberLike = { id: string; name: string };
+
 interface ExpenseFormProps {
-  expense?: Expense;
+  expense?: Expense; // Can be household or trip expense if shape matches
   onSave: (data: ExpenseFormValues) => void;
   onCancel?: () => void;
   isSubmitting?: boolean;
-  hideSharedBudgetLink?: boolean; // New prop
-  hideSplittingFeature?: boolean; // New prop
+  hideSharedBudgetLink?: boolean; 
+  hideSplittingFeature?: boolean;
+  availableMembersForSplitting?: MemberLike[]; // Use MemberLike
+  currentUserIdForDefaultPayer?: string;
 }
 
 const NONE_SHARED_BUDGET_VALUE = "__NONE__";
 
-export function ExpenseForm({ expense, onSave, onCancel, isSubmitting, hideSharedBudgetLink = false, hideSplittingFeature = false }: ExpenseFormProps) {
-  const { categories, getCategoryById, sharedBudgets, members } = useAppContext();
-  const { user } = useAuth();
+export function ExpenseForm({ 
+    expense, 
+    onSave, 
+    onCancel, 
+    isSubmitting, 
+    hideSharedBudgetLink = false, 
+    hideSplittingFeature = false,
+    availableMembersForSplitting = [], // Default to empty array
+    currentUserIdForDefaultPayer 
+}: ExpenseFormProps) {
+  const { categories, getCategoryById, sharedBudgets: householdSharedBudgets } = useAppContext(); // Use specific name
   const { toast } = useToast();
   const [aiCategorySuggestion, setAiCategorySuggestion] = useState<SuggestExpenseCategoryOutput | null>(null);
   const [isSuggestingCategory, setIsSuggestingCategory] = useState(false);
@@ -104,9 +116,11 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting, hideShare
           ...expense,
           date: new Date(expense.date),
           sharedBudgetId: expense.sharedBudgetId || NONE_SHARED_BUDGET_VALUE,
+          // For editing, paidByMemberId and splitWithMemberIds will come from the expense object
+          // which should have correct (generic) IDs if it's a trip expense that was already split
           isSplit: expense.isSplit || false,
-          paidByMemberId: expense.paidByMemberId || "",
-          splitWithMemberIds: expense.splitWithMemberIds || [],
+          paidByMemberId: expense.paidByMemberId || (expense as any).paidByTripMemberId || "", 
+          splitWithMemberIds: expense.splitWithMemberIds || (expense as any).splitWithTripMemberIds || [],
         }
       : {
           description: "",
@@ -116,7 +130,7 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting, hideShare
           notes: "",
           sharedBudgetId: NONE_SHARED_BUDGET_VALUE,
           isSplit: false,
-          paidByMemberId: "",
+          paidByMemberId: "", // Will be set by useEffect if applicable
           splitWithMemberIds: [],
         },
   });
@@ -128,19 +142,17 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting, hideShare
   const watchedPaidByMemberId = form.watch("paidByMemberId");
   const watchedSplitWithMemberIds = form.watch("splitWithMemberIds");
 
-  const currentUserMember = useMemo(() => {
-    if (!user || !members) return null;
-    return members.find(m =>
-      (user.displayName && m.name.toLowerCase().includes(user.displayName.toLowerCase())) ||
-      (user.email && m.name.toLowerCase().includes(user.email.split('@')[0].toLowerCase()))
-    );
-  }, [user, members]);
 
   useEffect(() => {
-    if (watchedIsSplit && !watchedPaidByMemberId && currentUserMember && !expense && !hideSplittingFeature) { // Only default for new expenses in household context
-      form.setValue("paidByMemberId", currentUserMember.id, { shouldValidate: true });
+    // Default payer if splitting is enabled, no expense is being edited, and a current user ID is provided
+    if (watchedIsSplit && !watchedPaidByMemberId && currentUserIdForDefaultPayer && !expense) {
+        // Check if the currentUserIdForDefaultPayer is in the availableMembersForSplitting
+        const isCurrentUserInList = availableMembersForSplitting.some(m => m.id === currentUserIdForDefaultPayer);
+        if (isCurrentUserInList) {
+            form.setValue("paidByMemberId", currentUserIdForDefaultPayer, { shouldValidate: true });
+        }
     }
-  }, [watchedIsSplit, watchedPaidByMemberId, currentUserMember, form, expense, hideSplittingFeature]);
+  }, [watchedIsSplit, watchedPaidByMemberId, currentUserIdForDefaultPayer, form, expense, availableMembersForSplitting]);
 
 
   const handleSuggestCategory = useCallback(async () => {
@@ -154,7 +166,6 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting, hideShare
       };
       const suggestion = await suggestExpenseCategory(input);
       setAiCategorySuggestion(suggestion);
-      // Auto-apply if no category is selected yet
       const suggestedCat = categories.find(c => c.name.toLowerCase() === suggestion.category.toLowerCase());
       if (suggestedCat && !form.getValues("categoryId")) {
          form.setValue("categoryId", suggestedCat.id, { shouldValidate: true });
@@ -200,7 +211,7 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting, hideShare
       if (watchedDescription && watchedDescription.length >= 5 && (!watchedNotes || watchedNotes.length < 20)) {
         handleSuggestNotes();
       }
-    }, 1200); // Slightly longer debounce
+    }, 1200); 
     return () => clearTimeout(timer);
   }, [watchedDescription, watchedNotes, handleSuggestNotes]);
 
@@ -209,37 +220,39 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting, hideShare
     const dataToSave: ExpenseFormValues = {
       ...data,
       sharedBudgetId: (hideSharedBudgetLink || data.sharedBudgetId === NONE_SHARED_BUDGET_VALUE) ? undefined : data.sharedBudgetId,
-      isSplit: hideSplittingFeature ? false : data.isSplit,
-      paidByMemberId: (hideSplittingFeature || !data.isSplit || !data.paidByMemberId) ? undefined : data.paidByMemberId,
-      splitWithMemberIds: (hideSplittingFeature || !data.isSplit || !data.splitWithMemberIds) ? [] : data.splitWithMemberIds,
+      // Splitting fields are kept as is from the form; the calling component will map them if needed
     };
     onSave(dataToSave);
-    form.reset({
-      description: "",
-      amount: 0,
-      date: new Date(),
-      categoryId: "",
-      notes: "",
-      sharedBudgetId: NONE_SHARED_BUDGET_VALUE,
-      isSplit: false,
-      paidByMemberId: "",
-      splitWithMemberIds: [],
-    });
-    setAiCategorySuggestion(null);
-    setAiNoteSuggestion(null);
+    // Resetting the form after submission should be handled by the parent if it's a dialog
+    // For now, let's keep the reset for a non-edit case.
+    if (!expense) {
+        form.reset({
+            description: "",
+            amount: 0,
+            date: new Date(),
+            categoryId: "",
+            notes: "",
+            sharedBudgetId: NONE_SHARED_BUDGET_VALUE,
+            isSplit: false,
+            paidByMemberId: "",
+            splitWithMemberIds: [],
+        });
+        setAiCategorySuggestion(null);
+        setAiNoteSuggestion(null);
+    }
   }
 
   const selectedCategory = getCategoryById(form.watch("categoryId"));
 
   const handleSelectAllSplitMembers = (checked: boolean) => {
     if (checked) {
-      form.setValue("splitWithMemberIds", members.map(m => m.id), { shouldValidate: true });
+      form.setValue("splitWithMemberIds", availableMembersForSplitting.map(m => m.id), { shouldValidate: true });
     } else {
       form.setValue("splitWithMemberIds", [], { shouldValidate: true });
     }
   };
 
-  const areAllMembersSelected = members.length > 0 && watchedSplitWithMemberIds?.length === members.length;
+  const areAllMembersSelected = availableMembersForSplitting.length > 0 && watchedSplitWithMemberIds?.length === availableMembersForSplitting.length;
 
 
   return (
@@ -418,27 +431,27 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting, hideShare
           </Alert>
         )}
 
-        {!hideSharedBudgetLink && sharedBudgets.length > 0 && (
+        {!hideSharedBudgetLink && householdSharedBudgets.length > 0 && (
           <FormField
             control={form.control}
             name="sharedBudgetId"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Link to Shared Budget (Optional)</FormLabel>
+                <FormLabel>Link to Household Shared Budget (Optional)</FormLabel>
                 <Select
                   onValueChange={(value) => {
-                    field.onChange(value === NONE_SHARED_BUDGET_VALUE ? "" : value);
+                    field.onChange(value === NONE_SHARED_BUDGET_VALUE ? undefined : value);
                   }}
                   value={field.value || NONE_SHARED_BUDGET_VALUE}
                 >
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select a shared budget" />
+                      <SelectValue placeholder="Select a household shared budget" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
                     <SelectItem value={NONE_SHARED_BUDGET_VALUE}>None</SelectItem>
-                    {sharedBudgets.map((budget: SharedBudget) => (
+                    {householdSharedBudgets.map((budget: SharedBudget) => (
                       <SelectItem key={budget.id} value={budget.id}>
                         {budget.name}
                       </SelectItem>
@@ -454,7 +467,7 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting, hideShare
           />
         )}
 
-        {!hideSplittingFeature && members.length > 0 && (
+        {!hideSplittingFeature && availableMembersForSplitting.length > 0 && (
           <div className="space-y-4 p-4 border rounded-md">
             <FormField
               control={form.control}
@@ -467,17 +480,20 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting, hideShare
                       onCheckedChange={(checked) => {
                         field.onChange(checked);
                         if (!checked) {
-                          form.setValue("paidByMemberId", "");
+                          form.setValue("paidByMemberId", undefined);
                           form.setValue("splitWithMemberIds", []);
                         } else {
-                           if (currentUserMember && !form.getValues("paidByMemberId")) {
-                            form.setValue("paidByMemberId", currentUserMember.id, { shouldValidate: true });
+                           if (currentUserIdForDefaultPayer && !form.getValues("paidByMemberId")) {
+                            const isCurrentUserInList = availableMembersForSplitting.some(m => m.id === currentUserIdForDefaultPayer);
+                            if (isCurrentUserInList) {
+                                form.setValue("paidByMemberId", currentUserIdForDefaultPayer, { shouldValidate: true });
+                            }
                           }
                         }
                       }}
                     />
                   </FormControl>
-                  <FormLabel className="font-normal text-sm">Split this expense among household members?</FormLabel>
+                  <FormLabel className="font-normal text-sm">Split this expense?</FormLabel>
                 </FormItem>
               )}
             />
@@ -497,7 +513,7 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting, hideShare
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {members.map((member) => (
+                          {availableMembersForSplitting.map((member) => (
                             <SelectItem key={member.id} value={member.id}>
                               {member.name}
                             </SelectItem>
@@ -524,7 +540,7 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting, hideShare
                             variant="outline"
                             size="sm"
                             onClick={() => handleSelectAllSplitMembers(!areAllMembersSelected)}
-                            disabled={members.length === 0}
+                            disabled={availableMembersForSplitting.length === 0}
                             className="ml-auto"
                         >
                             {areAllMembersSelected ? <CheckSquare className="mr-2 h-4 w-4" /> : <Square className="mr-2 h-4 w-4" />}
@@ -532,7 +548,7 @@ export function ExpenseForm({ expense, onSave, onCancel, isSubmitting, hideShare
                         </Button>
                       </div>
                       <ScrollArea className="h-32 w-full rounded-md border p-2">
-                        {members.map((member) => (
+                        {availableMembersForSplitting.map((member) => (
                           <FormField
                             key={member.id}
                             control={form.control}
