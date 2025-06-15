@@ -4,7 +4,7 @@
 import React, { useState, useMemo, useEffect, useCallback, Suspense } from 'react';
 import { PageHeader } from '@/components/shared/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Users, DollarSign, WalletCards, DivideSquare, ListChecks, Download, Shuffle, Wallet, Receipt, Loader2, Trash2 } from 'lucide-react';
+import { PlusCircle, Users, DollarSign, WalletCards, DivideSquare, ListChecks, Download, Shuffle, Wallet, Receipt, Loader2, Trash2, ShoppingBasket } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -462,7 +462,6 @@ export default function HouseholdPage() {
             </CardFooter>
           </Card>
 
-
            <Card>
             <CardHeader>
               <CardTitle  className="flex items-center gap-2">
@@ -475,7 +474,6 @@ export default function HouseholdPage() {
               <p className="text-sm text-muted-foreground">Keep a clear record of who has put money into the shared funds. Member specific contributions can be added via the member cards.</p>
             </CardContent>
           </Card>
-
 
            <Card>
             <CardHeader>
@@ -516,8 +514,32 @@ export default function HouseholdPage() {
               </Link>
             </CardFooter>
           </Card>
+
+          <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <ShoppingBasket className="h-6 w-6 text-primary" />
+                    Shopping List
+                </CardTitle>
+                 <CardDescription>Collaborate on a shared shopping list for the household.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <p className="text-sm text-muted-foreground">Keep track of what needs to be bought, who bought what, and manage your grocery runs efficiently.</p>
+            </CardContent>
+            <CardFooter>
+               <Link href="/household/shopping-list" className="w-full">
+                <Button className="w-full">
+                  <ShoppingBasket className="mr-2 h-4 w-4" /> View Shopping List
+                </Button>
+              </Link>
+            </CardFooter>
+          </Card>
+
         </div>
       </div>
     </div>
   );
 }
+
+
+    
