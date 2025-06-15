@@ -3,7 +3,7 @@
 
 import type { TripSettlement, CalculatedMemberFinancials } from '@/lib/types';
 import { TripSettlementItem } from './trip-settlement-item';
-import { PotPayoutItem } from './pot-payout-item'; // Ensure this import is used
+import { PotPayoutItem } from './pot-payout-item';
 import { HandCoins, Scale, Wallet } from 'lucide-react'; 
 import { useAppContext } from '@/contexts/app-context';
 import { DEFAULT_CURRENCY } from '@/lib/constants';
@@ -12,9 +12,9 @@ import React, { useMemo } from 'react';
 const EPSILON = 0.005; // For floating point comparisons
 
 interface TripSettlementListProps {
-  settlements: TripSettlement[]; // Member-to-member settlements
+  settlements: TripSettlement[];
   tripId: string;
-  finalMemberFinancials: Map<string, CalculatedMemberFinancials> | undefined;
+  finalMemberFinancials: Record<string, CalculatedMemberFinancials> | undefined; // Changed from Map
   remainingCashInPot: number;
 }
 
@@ -22,7 +22,7 @@ export function TripSettlementList({ settlements, tripId, finalMemberFinancials,
   const { getTripMemberById } = useAppContext();
 
   const potPayouts = useMemo(() => {
-    if (!finalMemberFinancials || remainingCashInPot <= EPSILON) {
+    if (!finalMemberFinancials || Object.keys(finalMemberFinancials).length === 0 || remainingCashInPot <= EPSILON) {
       return [];
     }
 
@@ -30,7 +30,7 @@ export function TripSettlementList({ settlements, tripId, finalMemberFinancials,
     const payouts: { tripMemberId: string, memberName: string, amount: number }[] = [];
 
     // Get members who are net creditors to the system overall
-    const membersOwedBySystem = Array.from(finalMemberFinancials.values())
+    const membersOwedBySystem = Object.values(finalMemberFinancials) // Changed from finalMemberFinancials.values()
         .filter(fm => fm.finalNetShareForSettlement > EPSILON) // Members who are owed money by the system
         .sort((a,b) => b.finalNetShareForSettlement - a.finalNetShareForSettlement); // Prioritize larger creditors
 
@@ -38,29 +38,25 @@ export function TripSettlementList({ settlements, tripId, finalMemberFinancials,
       if (undistributedPotCash <= EPSILON) break;
 
       const member = getTripMemberById(financial.memberId);
-      if (!member) continue; // Should not happen if data is consistent
+      if (!member) continue; 
 
-      // How much is this member already set to receive from other members directly?
       const alreadyReceivingFromDebtors = settlements
         .filter(s => s.owedToTripMemberId === financial.memberId)
         .reduce((sum, s) => sum + s.amount, 0);
       
-      // The amount this member is still owed by the *system* after direct debtor payments
-      // This is the maximum they can claim from the pot.
       const netOwedBySystemOverall = financial.finalNetShareForSettlement - alreadyReceivingFromDebtors;
 
       if (netOwedBySystemOverall > EPSILON) {
-        // The actual payout cannot exceed what's left in the pot OR what they are still owed by the system.
         const payoutAmount = Math.min(netOwedBySystemOverall, undistributedPotCash);
         
-        if (payoutAmount > EPSILON) { // Only add if there's a meaningful amount to pay out
+        if (payoutAmount > EPSILON) { 
             payouts.push({
                 tripMemberId: member.id,
                 memberName: member.name,
-                amount: parseFloat(payoutAmount.toFixed(2)), // Ensure 2 decimal places
+                amount: parseFloat(payoutAmount.toFixed(2)), 
             });
             undistributedPotCash -= payoutAmount;
-            undistributedPotCash = parseFloat(undistributedPotCash.toFixed(2)); // Update remaining pot cash accurately
+            undistributedPotCash = parseFloat(undistributedPotCash.toFixed(2)); 
         }
       }
     }
@@ -104,8 +100,6 @@ export function TripSettlementList({ settlements, tripId, finalMemberFinancials,
         )}
       </div>
 
-      {/* Pot Payouts */}
-      {/* Only show pot payout section if there was cash in pot to begin with AND there are payouts */}
       {(remainingCashInPot > EPSILON || potPayouts.length > 0) && ( 
         <div>
           <h4 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
