@@ -19,14 +19,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useState } from 'react';
+import React, { useState } from 'react'; // Added React
 import { useToast } from "@/hooks/use-toast";
 
 interface DebtItemProps {
   debt: Debt;
 }
 
-export function DebtItem({ debt }: DebtItemProps) {
+const DebtItemComponent = ({ debt }: DebtItemProps) => {
   const { getMemberById, settleDebt, unsettleDebt } = useHousehold(); // Changed context
   const { toast } = useToast();
   const [isConfirmingSettlement, setIsConfirmingSettlement] = useState(false);
@@ -136,3 +136,5 @@ export function DebtItem({ debt }: DebtItemProps) {
     </>
   );
 }
+
+export const DebtItem = React.memo(DebtItemComponent);

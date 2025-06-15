@@ -10,6 +10,7 @@ import { Progress } from '@/components/ui/progress';
 import { MoreHorizontal, Trash2, WalletCards, Edit2 } from 'lucide-react'; // Removed Eye
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import React from 'react';
 // No context needed here as all data is passed via props
 
 interface SharedBudgetItemProps {
@@ -18,7 +19,7 @@ interface SharedBudgetItemProps {
   onEdit: (budget: SharedBudget) => void;
 }
 
-export function SharedBudgetItem({ sharedBudget, onDelete, onEdit }: SharedBudgetItemProps) {
+const SharedBudgetItemComponent = ({ sharedBudget, onDelete, onEdit }: SharedBudgetItemProps) => {
   const progressPercentage = sharedBudget.amount > 0 ? Math.min((sharedBudget.currentSpending / sharedBudget.amount) * 100, 100) : 0;
   const isOverBudget = sharedBudget.currentSpending > sharedBudget.amount;
   const remainingAmount = sharedBudget.amount - sharedBudget.currentSpending;
@@ -86,3 +87,5 @@ export function SharedBudgetItem({ sharedBudget, onDelete, onEdit }: SharedBudge
     </Card>
   );
 }
+
+export const SharedBudgetItem = React.memo(SharedBudgetItemComponent);

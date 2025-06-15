@@ -4,6 +4,7 @@
 import { DEFAULT_CURRENCY } from '@/lib/constants';
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Wallet } from 'lucide-react';
+import React from 'react';
 
 interface PotPayoutItemProps {
   payout: {
@@ -20,7 +21,7 @@ const getInitials = (name: string) => {
     return names.map(n => n[0]).join('').substring(0, 2).toUpperCase();
 }
 
-export function PotPayoutItem({ payout }: PotPayoutItemProps) {
+const PotPayoutItemComponent = ({ payout }: PotPayoutItemProps) => {
   return (
     <div className="flex items-center justify-between p-3 rounded-md border bg-accent/10 hover:bg-accent/20 transition-colors text-sm shadow-sm">
       <div className="flex items-center gap-2">
@@ -39,3 +40,5 @@ export function PotPayoutItem({ payout }: PotPayoutItemProps) {
     </div>
   );
 }
+
+export const PotPayoutItem = React.memo(PotPayoutItemComponent);

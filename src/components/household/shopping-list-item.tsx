@@ -10,6 +10,7 @@ import { MoreHorizontal, Edit3, Trash2, ShoppingBag, MinusCircle, PlusCircle } f
 import { cn } from '@/lib/utils';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { useHousehold } from '@/contexts/household-context'; // Changed context
+import React from 'react';
 
 interface ShoppingListItemProps {
   item: ShoppingListItemType;
@@ -18,7 +19,7 @@ interface ShoppingListItemProps {
   onTogglePurchased: (itemId: string) => void;
 }
 
-export function ShoppingListItem({ item, onEdit, onDelete, onTogglePurchased }: ShoppingListItemProps) {
+const ShoppingListItemComponent = ({ item, onEdit, onDelete, onTogglePurchased }: ShoppingListItemProps) => {
   const { editShoppingListItem } = useHousehold(); // Changed context
   const timeAgo = formatDistanceToNowStrict(new Date(item.addedAt), { addSuffix: true });
 
@@ -104,3 +105,5 @@ export function ShoppingListItem({ item, onEdit, onDelete, onTogglePurchased }: 
     </Card>
   );
 }
+
+export const ShoppingListItem = React.memo(ShoppingListItemComponent);

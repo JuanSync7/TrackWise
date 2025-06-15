@@ -14,7 +14,7 @@ import { MoreHorizontal, Edit2, Trash2, Users, UserCheck, TrendingDown, Trending
 import { CategoryIcon } from '@/components/shared/category-icon';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { useMemo } from 'react';
+import React, { useMemo } from 'react';
 
 interface TransactionItemProps {
   transaction: Transaction | HouseholdTransaction | TripTransaction;
@@ -23,7 +23,7 @@ interface TransactionItemProps {
   transactionContext?: 'personal' | 'household' | 'trip';
 }
 
-export function TransactionItem({ transaction, onEdit, onDelete, transactionContext = 'personal' }: TransactionItemProps) {
+const TransactionItemComponent = ({ transaction, onEdit, onDelete, transactionContext = 'personal' }: TransactionItemProps) => {
   const { getCategoryById } = usePersonalFinance();
   const { getMemberById: getHouseholdMemberById } = useHousehold();
   const { getTripMemberById } = useTrips();
@@ -149,3 +149,5 @@ export function TransactionItem({ transaction, onEdit, onDelete, transactionCont
     </Card>
   );
 }
+
+export const TransactionItem = React.memo(TransactionItemComponent);

@@ -11,6 +11,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { MoreHorizontal, Edit2, Trash2 } from 'lucide-react';
 import { CategoryIcon } from '@/components/shared/category-icon';
 import { cn } from '@/lib/utils';
+import React from 'react';
 
 interface BudgetItemProps {
   budgetGoal: BudgetGoal;
@@ -18,7 +19,7 @@ interface BudgetItemProps {
   onDelete: (budgetGoalId: string) => void;
 }
 
-export function BudgetItem({ budgetGoal, onEdit, onDelete }: BudgetItemProps) {
+const BudgetItemComponent = ({ budgetGoal, onEdit, onDelete }: BudgetItemProps) => {
   const { getCategoryById } = usePersonalFinance(); // Changed context
   const category = getCategoryById(budgetGoal.categoryId);
 
@@ -82,3 +83,5 @@ export function BudgetItem({ budgetGoal, onEdit, onDelete }: BudgetItemProps) {
     </Card>
   );
 }
+
+export const BudgetItem = React.memo(BudgetItemComponent);

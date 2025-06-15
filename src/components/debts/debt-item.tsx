@@ -7,9 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Edit2, Trash2, Landmark, CalendarDays, Percent, CircleDollarSign } from 'lucide-react';
+import { MoreHorizontal, Edit2, Trash2, Landmark, CalendarDays, Percent, CircleDollarSign, DollarSign } from 'lucide-react'; // Added DollarSign
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
+import React from 'react';
 
 interface DebtItemProps {
   debt: PersonalDebt;
@@ -18,7 +19,7 @@ interface DebtItemProps {
   onLogPayment: (debt: PersonalDebt) => void;
 }
 
-export function DebtItem({ debt, onEdit, onDelete, onLogPayment }: DebtItemProps) {
+const DebtItemComponent = ({ debt, onEdit, onDelete, onLogPayment }: DebtItemProps) => {
   const progressPercentage = debt.initialAmount > 0 ? Math.max(0, ((debt.initialAmount - debt.currentBalance) / debt.initialAmount) * 100) : 0;
   const isPaidOff = debt.currentBalance <= 0;
 
@@ -104,3 +105,5 @@ export function DebtItem({ debt, onEdit, onDelete, onLogPayment }: DebtItemProps
     </Card>
   );
 }
+
+export const DebtItem = React.memo(DebtItemComponent);

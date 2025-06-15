@@ -25,15 +25,22 @@ const defaultFinancials: MemberDisplayFinancials = {
   netOverallPosition: 0,
 };
 
-const TripMemberItem = React.memo(function TripMemberItem({
+const TripMemberItemComponent = ({
   tripMember,
   onDelete,
   onAddContribution,
-}: TripMemberItemProps) {
+}: TripMemberItemProps) => {
   const { getTripMemberNetData } = useTrips(); // Changed context
 
   const calculatedNetData: MemberDisplayFinancials = useMemo(() => {
-    return getTripMemberNetData(tripMember.tripId, tripMember.id) || defaultFinancials;
+    const data = getTripMemberNetData(tripMember.tripId, tripMember.id);
+    // Ensure all properties are present, even if 0, to prevent toFixed errors
+    return {
+        directCashContribution: data?.directCashContribution || 0,
+        amountPersonallyPaidForGroup: data?.amountPersonallyPaidForGroup || 0,
+        totalShareOfAllGroupExpenses: data?.totalShareOfAllGroupExpenses || 0,
+        netOverallPosition: data?.netOverallPosition || 0,
+    };
   }, [tripMember.id, tripMember.tripId, getTripMemberNetData]);
 
 
@@ -89,6 +96,6 @@ const TripMemberItem = React.memo(function TripMemberItem({
       </CardContent>
     </Card>
   );
-});
+};
 
-export { TripMemberItem };
+export const TripMemberItem = React.memo(TripMemberItemComponent);

@@ -10,6 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { MoreHorizontal, Edit2, Trash2, Target, CalendarDays, DollarSign } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
+import React from 'react';
 
 interface GoalItemProps {
   goal: FinancialGoal;
@@ -18,7 +19,7 @@ interface GoalItemProps {
   onContribute: (goal: FinancialGoal) => void;
 }
 
-export function GoalItem({ goal, onEdit, onDelete, onContribute }: GoalItemProps) {
+const GoalItemComponent = ({ goal, onEdit, onDelete, onContribute }: GoalItemProps) => {
   const progressPercentage = goal.targetAmount > 0 ? Math.min((goal.currentAmount / goal.targetAmount) * 100, 100) : 0;
   const isAchieved = goal.currentAmount >= goal.targetAmount;
 
@@ -84,3 +85,5 @@ export function GoalItem({ goal, onEdit, onDelete, onContribute }: GoalItemProps
     </Card>
   );
 }
+
+export const GoalItem = React.memo(GoalItemComponent);

@@ -24,11 +24,11 @@ const defaultFinancials: MemberDisplayFinancials = {
   netOverallPosition: 0,
 };
 
-const MemberItem = React.memo(function MemberItem({
+const MemberItemComponent = ({
   member,
   onDelete,
   onAddContribution,
-}: MemberItemProps) {
+}: MemberItemProps) => {
   const { getHouseholdMemberNetData } = useHousehold(); // Changed context
 
   const calculatedNetData: MemberDisplayFinancials = useMemo(() => {
@@ -88,6 +88,6 @@ const MemberItem = React.memo(function MemberItem({
       </CardContent>
     </Card>
   );
-});
+};
 
-export { MemberItem };
+export const MemberItem = React.memo(MemberItemComponent);

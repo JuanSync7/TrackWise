@@ -6,12 +6,13 @@ import { useTrips } from '@/contexts/trip-context'; // Changed context
 import { DEFAULT_CURRENCY } from '@/lib/constants';
 import { ArrowRight, User } from 'lucide-react';
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"; // Removed AvatarImage
+import React from 'react';
 
 interface TripSettlementItemProps {
   settlement: TripSettlement;
 }
 
-export function TripSettlementItem({ settlement }: TripSettlementItemProps) {
+const TripSettlementItemComponent = ({ settlement }: TripSettlementItemProps) => {
   const { getTripMemberById } = useTrips(); // Changed context
 
   const owedByMember = getTripMemberById(settlement.owedByTripMemberId);
@@ -55,3 +56,5 @@ export function TripSettlementItem({ settlement }: TripSettlementItemProps) {
     </div>
   );
 }
+
+export const TripSettlementItem = React.memo(TripSettlementItemComponent);
