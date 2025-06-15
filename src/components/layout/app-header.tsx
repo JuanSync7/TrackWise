@@ -62,11 +62,10 @@ export function AppHeader() {
         .slice(0, 10); // Limit results
 
       setSearchResults(results);
-      // Open popover if query is valid (debounced and long enough), regardless of having results (to show "no results" message)
       setIsSearchPopoverOpen(true); 
     } else {
       setSearchResults([]);
-      setIsSearchPopoverOpen(false); // Close popover if query is too short
+      setIsSearchPopoverOpen(false); 
     }
   }, [debouncedSearchQuery, transactions, getCategoryById]);
 
@@ -85,11 +84,11 @@ export function AppHeader() {
 
   const handleSearchResultClick = (transactionId: string) => {
     console.log("Clicked transaction:", transactionId);
-    setSearchQuery(""); // This will clear debouncedSearchQuery via useEffect, closing popover
+    setSearchQuery(""); 
   };
 
   const clearSearch = () => {
-    setSearchQuery(""); // This will clear debouncedSearchQuery via useEffect, closing popover
+    setSearchQuery(""); 
   };
 
   return (
@@ -132,8 +131,12 @@ export function AppHeader() {
               </div>
             </form>
           </PopoverAnchor>
-          {isSearchPopoverOpen && ( // Only render content if popover should be open
-            <PopoverContent className="w-[--radix-popover-trigger-width] p-0 mt-1 shadow-lg" sideOffset={5}>
+          {isSearchPopoverOpen && ( 
+            <PopoverContent 
+              className="w-[--radix-popover-trigger-width] p-0 mt-1 shadow-lg" 
+              sideOffset={5}
+              onOpenAutoFocus={(e) => e.preventDefault()} // Prevent popover from stealing focus
+            >
               <ScrollArea className="max-h-[400px]">
                 {searchResults.length > 0 ? (
                   <div className="py-1">
@@ -164,7 +167,7 @@ export function AppHeader() {
                     })}
                   </div>
                 ) : (
-                  debouncedSearchQuery.trim().length > 1 && ( // Show "no results" only if a valid debounced query exists
+                  debouncedSearchQuery.trim().length > 1 && ( 
                     <div className="p-4 text-center text-sm text-muted-foreground">
                       No results found for "{debouncedSearchQuery}".
                     </div>
