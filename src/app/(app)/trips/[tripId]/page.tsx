@@ -13,7 +13,7 @@ import { Progress } from '@/components/ui/progress';
 import { useAppContext } from '@/contexts/app-context';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from "@/hooks/use-toast";
-import type { Trip, TripMember, TripContribution, TripExpense, TripSettlement, MemberDisplayFinancials, CalculatedMemberFinancials } from '@/lib/types';
+import type { Trip, TripMember, TripContribution, TripExpense, TripSettlement, CalculatedMemberFinancials, MemberDisplayFinancials } from '@/lib/types';
 import { TripMemberForm, type TripMemberFormValues } from '@/components/trips/trip-member-form';
 import { TripMemberList } from '@/components/trips/trip-member-list';
 import { TripContributionForm, type TripContributionFormValues } from '@/components/trips/trip-contribution-form';
@@ -41,7 +41,8 @@ export default function TripDetailPage() {
     getTripExpenses, 
     getTripSettlements, 
     triggerTripSettlementCalculation,
-    tripFinancialSummaries, // Use the map directly
+    tripFinancialSummaries,
+    getTripMemberNetData, // Added to get individual member financial details for summary cards
   } = useAppContext();
   const { user: authUser } = useAuth();
   const { toast } = useToast();
@@ -60,7 +61,7 @@ export default function TripDetailPage() {
     return tripId ? getTripMembers(tripId) : [];
   }, [tripId, getTripMembers]);
 
-  const memoizedTripExpensesList = useMemo(() => { // Not currently used in JSX, but available
+  const memoizedTripExpensesList = useMemo(() => { 
     return tripId ? getTripExpenses(tripId) : [];
   }, [tripId, getTripExpenses]);
 
@@ -68,16 +69,15 @@ export default function TripDetailPage() {
     return tripId ? getTripSettlements(tripId) : [];
   }, [tripId, getTripSettlements]);
 
-  // Filter settlements to ensure all referenced members exist
   const validSettlements = useMemo(() => {
     const memberIds = new Set(memoizedTripMembers.map(m => m.id));
     return rawSettlements.filter(
       s => memberIds.has(s.owedByTripMemberId) && memberIds.has(s.owedToTripMemberId)
     );
   }, [rawSettlements, memoizedTripMembers]);
-
-  const currentTripFinancials = useMemo(() => {
-    return tripFinancialSummaries[tripId] || new Map<string, CalculatedMemberFinancials>();
+  
+  const currentTripFinancialsObject = useMemo(() => {
+    return tripFinancialSummaries[tripId] || {}; 
   }, [tripFinancialSummaries, tripId]);
 
 
@@ -184,19 +184,16 @@ export default function TripDetailPage() {
     }
   }, [tripId, addTripExpense, toast]);
 
-  // --- Summary Card Calculations ---
  const tripFinancialSummary = useMemo(() => {
     let totalCashInPot = 0;
     let totalMemberPaidExpenses = 0;
     let totalPotPaidExpenses = 0;
     
-    // Use currentTripFinancials which is derived from the centralized map
-    currentTripFinancials.forEach(financials => {
+    Object.values(currentTripFinancialsObject).forEach(financials => {
       totalCashInPot += financials.directCashContribution;
       totalMemberPaidExpenses += financials.amountPersonallyPaidForGroup;
     });
 
-    // Pot paid expenses still need to be summed from raw expenses list
     globalTripExpenses.forEach(exp => {
       if (exp.tripId === tripId && exp.paidByTripMemberId === POT_PAYER_ID) {
         totalPotPaidExpenses += exp.amount;
@@ -213,7 +210,7 @@ export default function TripDetailPage() {
       remainingCashInPot,
       potUsagePercentage,
     };
-  }, [currentTripFinancials, globalTripExpenses, tripId]);
+  }, [currentTripFinancialsObject, globalTripExpenses, tripId]);
 
 
   if (!trip) {
@@ -350,7 +347,7 @@ export default function TripDetailPage() {
                 <TripSettlementList 
                     settlements={validSettlements} 
                     tripId={tripId}
-                    finalMemberFinancials={currentTripFinancials}
+                    finalMemberFinancials={currentTripFinancialsObject} // Pass the object here
                     remainingCashInPot={tripFinancialSummary.remainingCashInPot}
                 />
             </CardContent>
