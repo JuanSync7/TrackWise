@@ -1,4 +1,3 @@
-
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -55,7 +54,7 @@ const transactionFormSchemaBase = z.object({
   notes: z.string().max(200).optional(),
   isRecurring: z.boolean().optional().default(false),
   recurrencePeriod: recurrencePeriodEnum.optional(),
-  recurrenceEndDate: z.date().optional(),
+  recurrenceEndDate: z.date().optional().nullable(), // Allow null for easier reset
   sharedBudgetId: z.string().optional(),
   isSplit: z.boolean().optional().default(false),
   paidByMemberId: z.string().optional(),
@@ -89,7 +88,7 @@ const transactionFormSchema = transactionFormSchemaBase.superRefine((data, ctx) 
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Custom split amounts are required.", path: ["customSplitAmounts"] });
       } else {
         const sumOfCustomSplits = data.customSplitAmounts.reduce((sum, item) => sum + (item.amount || 0), 0);
-        if (Math.abs(sumOfCustomSplits - data.amount) > 0.005) {
+        if (Math.abs(sumOfCustomSplits - data.amount) > 0.005) { // Using a small epsilon for float comparison
           ctx.addIssue({ code: z.ZodIssueCode.custom, message: `Sum of custom splits (${DEFAULT_CURRENCY}${sumOfCustomSplits.toFixed(2)}) must equal total amount (${DEFAULT_CURRENCY}${data.amount.toFixed(2)}). Difference: ${DEFAULT_CURRENCY}${Math.abs(sumOfCustomSplits - data.amount).toFixed(2)}`, path: ["customSplitAmounts"] });
         }
         const customSplitMemberIds = new Set(data.customSplitAmounts.map(s => s.memberId));
@@ -122,32 +121,65 @@ interface TransactionFormProps {
 
 const NONE_SHARED_BUDGET_VALUE = "__NONE__";
 
-const getInitialFormValues = (
-  showSplittingFeatureProp: boolean,
-  allowPotPayerProp: boolean,
+// Memoized initial values for the form
+const useFormInitialValues = (
+  transaction?: Transaction | HouseholdTransaction | TripTransaction,
+  showSplittingFeatureProp?: boolean,
+  allowPotPayerProp?: boolean,
   currentUserIdForDefaultPayerProp?: string,
   availableMembersForSplittingProp: MemberLike[] = []
-): TransactionFormValues => ({
-  transactionType: 'expense' as TransactionType,
-  description: "",
-  amount: 0,
-  date: new Date(),
-  categoryId: "",
-  notes: "",
-  isRecurring: false,
-  recurrencePeriod: undefined,
-  recurrenceEndDate: undefined,
-  sharedBudgetId: NONE_SHARED_BUDGET_VALUE,
-  isSplit: showSplittingFeatureProp,
-  paidByMemberId: allowPotPayerProp
-    ? POT_PAYER_ID
-    : (currentUserIdForDefaultPayerProp && availableMembersForSplittingProp.some(m => m.id === currentUserIdForDefaultPayerProp)
-        ? currentUserIdForDefaultPayerProp
-        : (availableMembersForSplittingProp.length > 0 ? availableMembersForSplittingProp[0].id : "")),
-  splitWithMemberIds: showSplittingFeatureProp ? availableMembersForSplittingProp.map(m => m.id) : [],
-  splitType: showSplittingFeatureProp ? 'even' : undefined,
-  customSplitAmounts: [],
-});
+): TransactionFormValues => {
+  return useMemo(() => {
+    if (transaction) {
+      const typedTransaction = transaction as (HouseholdTransaction | TripTransaction); // Type assertion for split properties
+      const initialSplitType = typedTransaction.splitType || (typedTransaction.isSplit ? 'even' : undefined);
+      const initialCustomSplits = typedTransaction.customSplitAmounts?.map(s => ({
+        ...s,
+        memberName: availableMembersForSplittingProp.find(m => m.id === s.memberId)?.name || 'Unknown'
+      })) || [];
+      return {
+        transactionType: transaction.transactionType,
+        description: transaction.description,
+        amount: transaction.amount,
+        date: new Date(transaction.date),
+        categoryId: transaction.categoryId,
+        notes: transaction.notes || "",
+        isRecurring: transaction.isRecurring || false,
+        recurrencePeriod: transaction.recurrencePeriod,
+        recurrenceEndDate: transaction.recurrenceEndDate ? new Date(transaction.recurrenceEndDate) : null,
+        sharedBudgetId: typedTransaction.sharedBudgetId || NONE_SHARED_BUDGET_VALUE,
+        isSplit: typedTransaction.isSplit || false,
+        paidByMemberId: typedTransaction.paidByMemberId || (allowPotPayerProp ? POT_PAYER_ID : (currentUserIdForDefaultPayerProp || "")),
+        splitWithMemberIds: typedTransaction.splitWithMemberIds || [],
+        splitType: initialSplitType,
+        customSplitAmounts: initialCustomSplits,
+      };
+    }
+    // Default values for a new form
+    return {
+      transactionType: 'expense' as TransactionType,
+      description: "",
+      amount: 0,
+      date: new Date(),
+      categoryId: "",
+      notes: "",
+      isRecurring: false,
+      recurrencePeriod: undefined,
+      recurrenceEndDate: null,
+      sharedBudgetId: NONE_SHARED_BUDGET_VALUE,
+      isSplit: !!showSplittingFeatureProp,
+      paidByMemberId: allowPotPayerProp
+        ? POT_PAYER_ID
+        : (currentUserIdForDefaultPayerProp && availableMembersForSplittingProp.some(m => m.id === currentUserIdForDefaultPayerProp)
+            ? currentUserIdForDefaultPayerProp
+            : (availableMembersForSplittingProp.length > 0 ? availableMembersForSplittingProp[0].id : "")),
+      splitWithMemberIds: showSplittingFeatureProp ? availableMembersForSplittingProp.map(m => m.id) : [],
+      splitType: showSplittingFeatureProp ? 'even' : undefined,
+      customSplitAmounts: [],
+    };
+  }, [transaction, showSplittingFeatureProp, allowPotPayerProp, currentUserIdForDefaultPayerProp, availableMembersForSplittingProp]);
+};
+
 
 export function TransactionForm({
     transaction,
@@ -170,70 +202,51 @@ export function TransactionForm({
   const [isSuggestingNote, setIsSuggestingNote] = useState(false);
   const [categoryPopoverOpen, setCategoryPopoverOpen] = useState(false);
 
-  const formInitialValues = useMemo(() => {
-    if (transaction) {
-      const initialSplitType = (transaction as HouseholdTransaction | TripTransaction).splitType || ((transaction as HouseholdTransaction | TripTransaction).isSplit ? 'even' : undefined);
-      const initialCustomSplits = (transaction as HouseholdTransaction | TripTransaction).customSplitAmounts?.map(s => ({
-        ...s,
-        memberName: availableMembersForSplitting.find(m => m.id === s.memberId)?.name || 'Unknown'
-      })) || [];
-      return {
-        ...(transaction as Partial<TransactionFormValues>), // Cast to allow spreading potentially incomplete TransactionFormValues
-        transactionType: transaction.transactionType,
-        description: transaction.description,
-        amount: transaction.amount,
-        date: new Date(transaction.date),
-        categoryId: transaction.categoryId,
-        notes: transaction.notes || "",
-        isRecurring: transaction.isRecurring || false,
-        recurrencePeriod: transaction.recurrencePeriod,
-        recurrenceEndDate: transaction.recurrenceEndDate ? new Date(transaction.recurrenceEndDate) : undefined,
-        sharedBudgetId: (transaction as HouseholdTransaction).sharedBudgetId || NONE_SHARED_BUDGET_VALUE,
-        isSplit: (transaction as HouseholdTransaction | TripTransaction).isSplit || false,
-        paidByMemberId: (transaction as HouseholdTransaction).paidByMemberId || (transaction as TripTransaction).paidByTripMemberId || (allowPotPayer ? POT_PAYER_ID : (currentUserIdForDefaultPayer || "")),
-        splitWithMemberIds: (transaction as HouseholdTransaction).splitWithMemberIds || (transaction as TripTransaction).splitWithTripMemberIds || [],
-        splitType: initialSplitType,
-        customSplitAmounts: initialCustomSplits,
-      };
-    }
-    return getInitialFormValues(showSplittingFeature, allowPotPayer, currentUserIdForDefaultPayer, availableMembersForSplitting);
-  }, [transaction, showSplittingFeature, allowPotPayer, currentUserIdForDefaultPayer, availableMembersForSplitting]);
+  const initialValues = useFormInitialValues(
+    transaction,
+    showSplittingFeature,
+    allowPotPayer,
+    currentUserIdForDefaultPayer,
+    availableMembersForSplitting
+  );
 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionFormSchema),
-    defaultValues: formInitialValues,
+    defaultValues: initialValues,
   });
+  
+  useEffect(() => {
+    form.reset(initialValues);
+  }, [initialValues, form]);
+
 
   const { fields: customSplitFields, replace: replaceCustomSplits } = useFieldArray({
     control: form.control,
     name: "customSplitAmounts",
-    keyName: "fieldId"
+    keyName: "fieldId" // Use a different key name if 'id' is part of your field structure
   });
-
-  useEffect(() => {
-    form.reset(formInitialValues);
-  }, [formInitialValues, form]);
 
   const watchedTransactionType = form.watch("transactionType");
   const watchedDescription = form.watch("description");
   const watchedNotes = form.watch("notes");
   const watchedCategoryId = form.watch("categoryId");
   const watchedIsSplit = form.watch("isSplit");
-  const watchedPaidByMemberId = form.watch("paidByMemberId");
-  const watchedSplitWithMemberIds = form.watch("splitWithMemberIds") || [];
+  const watchedSplitWithMemberIds = form.watch("splitWithMemberIds") || []; // Ensure it's an array
   const watchedIsRecurring = form.watch("isRecurring");
   const watchedSplitType = form.watch("splitType");
   const watchedAmount = form.watch("amount");
   const watchedCustomSplitAmounts = form.watch("customSplitAmounts");
 
+  // Effect to handle default state of splitting options when 'isSplit' changes
   useEffect(() => {
     if (watchedIsSplit) {
         if (!form.getValues("splitType")) {
             form.setValue("splitType", "even");
         }
         if (!form.getValues("paidByMemberId")) {
-            if (allowPotPayer) form.setValue("paidByMemberId", POT_PAYER_ID, {shouldValidate: true});
-            else if (currentUserIdForDefaultPayer && availableMembersForSplitting.some(m => m.id === currentUserIdForDefaultPayer)) {
+            if (allowPotPayer) {
+                form.setValue("paidByMemberId", POT_PAYER_ID, {shouldValidate: true});
+            } else if (currentUserIdForDefaultPayer && availableMembersForSplitting.some(m => m.id === currentUserIdForDefaultPayer)) {
                 form.setValue("paidByMemberId", currentUserIdForDefaultPayer, { shouldValidate: true });
             } else if (availableMembersForSplitting.length > 0) {
                 form.setValue("paidByMemberId", availableMembersForSplitting[0].id, { shouldValidate: true });
@@ -244,6 +257,7 @@ export function TransactionForm({
             form.setValue("splitWithMemberIds", availableMembersForSplitting.map(m => m.id), { shouldValidate: true });
         }
     } else {
+        // When unchecking isSplit, clear related fields
         form.setValue("splitType", undefined);
         form.setValue("customSplitAmounts", []);
         form.setValue("paidByMemberId", undefined);
@@ -252,6 +266,7 @@ export function TransactionForm({
   }, [watchedIsSplit, form, allowPotPayer, currentUserIdForDefaultPayer, availableMembersForSplitting]);
 
 
+  // Effect to manage customSplitAmounts array based on selected members for splitting
   useEffect(() => {
     if (watchedIsSplit && watchedSplitType === 'custom') {
       const newCustomSplits = watchedSplitWithMemberIds.map(memberId => {
@@ -259,14 +274,20 @@ export function TransactionForm({
         const member = availableMembersForSplitting.find(m => m.id === memberId);
         return {
           memberId,
-          amount: existing?.amount ?? 0,
-          memberName: member?.name || 'Unknown'
+          amount: existing?.amount ?? 0, // Default to 0 or existing amount
+          memberName: member?.name || 'Unknown Member'
         };
       });
-      if (JSON.stringify(newCustomSplits.map(cs => ({memberId: cs.memberId, amount: cs.amount}))) !== JSON.stringify(form.getValues("customSplitAmounts")?.map(cs => ({memberId: cs.memberId, amount: cs.amount})))) {
+      // Only replace if the structure or member list has actually changed
+      // This avoids unnecessary re-renders and potential loss of user input
+      const currentCustomSplitMembers = form.getValues("customSplitAmounts")?.map(cs => cs.memberId).sort().join(',') || "";
+      const newCustomSplitMembers = newCustomSplits.map(cs => cs.memberId).sort().join(',');
+
+      if (newCustomSplitMembers !== currentCustomSplitMembers) {
         replaceCustomSplits(newCustomSplits);
       }
     } else if (watchedIsSplit && watchedSplitType === 'even') {
+      // Clear custom amounts if switching back to even split
       if (form.getValues("customSplitAmounts")?.length > 0) {
         replaceCustomSplits([]);
       }
@@ -295,16 +316,16 @@ export function TransactionForm({
   useEffect(() => {
     const currentCategoryIdVal = form.getValues("categoryId");
     if (currentCategoryIdVal && !filteredCategories.some(cat => cat.id === currentCategoryIdVal)) {
-        form.setValue("categoryId", "");
+        form.setValue("categoryId", ""); // Reset if current category not valid for new type
     }
+    // Clear AI category suggestion if transaction type changes
     setAiCategorySuggestion(null);
   }, [watchedTransactionType, form, filteredCategories]);
 
+  // Clear splitting fields if transaction type changes to income
   useEffect(() => {
     if (watchedTransactionType === 'income') {
-      form.setValue('isSplit', false);
-      form.setValue('splitType', undefined);
-      form.setValue('customSplitAmounts', []);
+      form.setValue('isSplit', false); // This should trigger the useEffect above to clear split details
     }
   }, [watchedTransactionType, form]);
 
@@ -316,7 +337,7 @@ export function TransactionForm({
       setAiCategorySuggestion(suggestion);
       const suggestedCat = filteredCategories.find(c => c.name.toLowerCase() === suggestion.category.toLowerCase());
       if (suggestedCat && !form.getValues("categoryId")) form.setValue("categoryId", suggestedCat.id, { shouldValidate: true });
-    } catch (error) { toast({ variant: "destructive", title: "AI Category Suggestion Failed" }); }
+    } catch (error) { console.error("Error suggesting category:", error); toast({ variant: "destructive", title: "AI Category Suggestion Failed" }); }
     finally { setIsSuggestingCategory(false); }
   }, [watchedDescription, filteredCategories, toast, form, watchedCategoryId, watchedTransactionType]);
 
@@ -331,7 +352,7 @@ export function TransactionForm({
     try {
       const suggestion = await suggestExpenseNotes({ description: watchedDescription, currentNotes: watchedNotes });
       setAiNoteSuggestion(suggestion);
-    } catch (error) { toast({ variant: "destructive", title: "AI Note Suggestion Failed" }); }
+    } catch (error) { console.error("Error suggesting notes:", error); toast({ variant: "destructive", title: "AI Note Suggestion Failed" }); }
     finally { setIsSuggestingNote(false); }
   }, [watchedDescription, watchedNotes, toast]);
 
@@ -345,15 +366,15 @@ export function TransactionForm({
       ...data,
       recurrenceEndDate: data.recurrenceEndDate ? format(data.recurrenceEndDate, "yyyy-MM-dd") : undefined,
       sharedBudgetId: (data.sharedBudgetId === NONE_SHARED_BUDGET_VALUE) ? undefined : data.sharedBudgetId,
-      isSplit: data.transactionType === 'expense' ? data.isSplit : false,
+      isSplit: data.transactionType === 'expense' ? data.isSplit : false, // Ensure isSplit is false for income
       splitType: data.transactionType === 'expense' && data.isSplit ? data.splitType : undefined,
       customSplitAmounts: data.transactionType === 'expense' && data.isSplit && data.splitType === 'custom' ? data.customSplitAmounts?.map(s => ({ memberId: s.memberId, amount: s.amount })) : [],
       paidByMemberId: data.transactionType === 'expense' && data.isSplit ? data.paidByMemberId : undefined,
       splitWithMemberIds: data.transactionType === 'expense' && data.isSplit ? data.splitWithMemberIds : [],
     };
     onSave(dataToSave);
-    if (!transaction) {
-        form.reset(getInitialFormValues(showSplittingFeature, allowPotPayer, currentUserIdForDefaultPayer, availableMembersForSplitting));
+    if (!transaction) { // Only reset if it's a new transaction form
+        form.reset(initialValues); // Reset to fresh initial values
         setAiCategorySuggestion(null); setAiNoteSuggestion(null);
     }
   }
@@ -378,13 +399,13 @@ export function TransactionForm({
                   className="flex space-x-4"
                 >
                   <FormItem className="flex items-center space-x-2 space-y-0">
-                    <RadioGroupItem value="expense" id="type-expense" />
+                    <FormControl><RadioGroupItem value="expense" id="type-expense"/></FormControl>
                     <FormLabel htmlFor="type-expense" className="font-normal flex items-center gap-1 cursor-pointer">
                       <TrendingDown className="h-4 w-4 text-destructive"/>Expense
                     </FormLabel>
                   </FormItem>
                   <FormItem className="flex items-center space-x-2 space-y-0">
-                    <RadioGroupItem value="income" id="type-income" />
+                    <FormControl><RadioGroupItem value="income" id="type-income"/></FormControl>
                     <FormLabel htmlFor="type-income" className="font-normal flex items-center gap-1 cursor-pointer">
                       <TrendingUp className="h-4 w-4 text-accent"/>Income
                     </FormLabel>
@@ -395,6 +416,7 @@ export function TransactionForm({
             </FormItem>
           )}
         />
+
         <FormField control={form.control} name="description" render={({ field }) => ( <FormItem> <FormLabel>Description</FormLabel> <FormControl><Input placeholder={watchedTransactionType === 'income' ? "e.g., Monthly Salary" : "e.g., Coffee run"} {...field} /></FormControl> <FormMessage /> </FormItem> )} />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormField control={form.control} name="amount" render={({ field }) => ( <FormItem> <FormLabel>Amount</FormLabel> <FormControl><Input type="number" placeholder="0.00" {...field} step="0.01" /></FormControl> <FormMessage /> </FormItem> )} />
@@ -403,8 +425,10 @@ export function TransactionForm({
         <FormField control={form.control} name="categoryId" render={({ field }) => ( <FormItem className="flex flex-col"> <FormLabel>Category</FormLabel> <Popover open={categoryPopoverOpen} onOpenChange={setCategoryPopoverOpen}> <PopoverTrigger asChild><FormControl><Button variant="outline" role="combobox" aria-expanded={categoryPopoverOpen} className={cn("w-full justify-between",!field.value && "text-muted-foreground")} disabled={filteredCategories.length === 0}>{selectedCategoryObj ? <div className="flex items-center gap-2"><CategoryIcon category={selectedCategoryObj} size="sm" />{selectedCategoryObj.name}</div> : (filteredCategories.length === 0 ? `No ${watchedTransactionType} categories` : "Select category")}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl></PopoverTrigger> <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command><CommandInput placeholder="Search category..." /><CommandList><CommandEmpty>No category found.</CommandEmpty><CommandGroup>{filteredCategories.map((category) => ( <CommandItem value={category.name} key={category.id} onSelect={() => {form.setValue("categoryId", category.id, { shouldValidate: true }); setAiCategorySuggestion(null); setCategoryPopoverOpen(false);}}><Check className={cn("mr-2 h-4 w-4",category.id === field.value ? "opacity-100" : "opacity-0")}/><div className="flex items-center gap-2"><CategoryIcon category={category} size="sm" />{category.name}</div></CommandItem>))}</CommandGroup></CommandList></Command></PopoverContent> </Popover> <FormMessage /> </FormItem> )} />
         {watchedTransactionType === 'expense' && isSuggestingCategory && <div className="flex items-center text-sm text-muted-foreground"><AiSparklesIcon className="mr-2 h-4 w-4 animate-spin" />Getting AI category suggestion...</div>}
         {watchedTransactionType === 'expense' && aiCategorySuggestion && !form.getValues("categoryId") && <Alert variant="default" className="bg-primary/10 border-primary/30"><AiSparklesIcon className="h-5 w-5 text-primary" /><AlertTitle className="text-primary font-semibold">AI Category Suggestion</AlertTitle><AlertDescription className="text-primary/80">We think this might be <span className="font-semibold">{aiCategorySuggestion.category}</span>.<br /><span className="text-xs italic">Reasoning: {aiCategorySuggestion.reasoning}</span></AlertDescription><Button type="button" size="sm" variant="ghost" className="mt-2 text-primary hover:bg-primary/20" onClick={() => { const suggestedCat = filteredCategories.find(c => c.name.toLowerCase() === aiCategorySuggestion.category.toLowerCase()); if (suggestedCat) {form.setValue("categoryId", suggestedCat.id, { shouldValidate: true }); setAiCategorySuggestion(null);} else {toast({variant: "destructive", title: "Category not found"})}}}>Apply Suggestion</Button></Alert>}
+        
         <FormField control={form.control} name="isRecurring" render={({ field }) => ( <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-3 shadow-sm bg-muted/30"> <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl> <div className="space-y-1 leading-none"> <FormLabel className="flex items-center gap-1.5 cursor-pointer"><Repeat className="h-4 w-4 text-primary" /> Is this a recurring transaction?</FormLabel> <FormDescription className="text-xs">Check if this transaction repeats.</FormDescription> </div> </FormItem> )} />
         {watchedIsRecurring && <div className="space-y-4 p-4 border rounded-md bg-muted/50"> <FormField control={form.control} name="recurrencePeriod" render={({ field }) => ( <FormItem><FormLabel>Repeats</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select period" /></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem><SelectItem value="yearly">Yearly</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} /><FormField control={form.control} name="recurrenceEndDate" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Ends On (Optional)</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal bg-background",!field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : <span>Pick end date</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date < form.getValues("date") || date < new Date("1900-01-01")} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>)} /></div>}
+        
         {showSharedBudgetLink && watchedTransactionType === 'expense' && householdSharedBudgets.length > 0 && <FormField control={form.control} name="sharedBudgetId" render={({ field }) => ( <FormItem> <FormLabel>Link to Household Shared Budget (Optional)</FormLabel> <Select onValueChange={(value) => field.onChange(value === NONE_SHARED_BUDGET_VALUE ? undefined : value)} value={field.value || NONE_SHARED_BUDGET_VALUE}> <FormControl><SelectTrigger><SelectValue placeholder="Select budget" /></SelectTrigger></FormControl> <SelectContent><SelectItem value={NONE_SHARED_BUDGET_VALUE}>None</SelectItem>{householdSharedBudgets.map((budget: SharedBudget) => ( <SelectItem key={budget.id} value={budget.id}>{budget.name}</SelectItem>))}</SelectContent> </Select> <FormDescription>Link to a shared household budget.</FormDescription> <FormMessage /> </FormItem> )} />}
         
         {showSplittingFeature && watchedTransactionType === 'expense' && availableMembersForSplitting.length > 0 && (
@@ -413,8 +437,8 @@ export function TransactionForm({
             {watchedIsSplit && (
               <>
                 <FormField control={form.control} name="paidByMemberId" render={({ field }) => ( <FormItem> <FormLabel>Who Paid?</FormLabel> <Select onValueChange={field.onChange} value={field.value || ""}> <FormControl><SelectTrigger><SelectValue placeholder="Select payer" /></SelectTrigger></FormControl> <SelectContent>{allowPotPayer && <SelectItem value={POT_PAYER_ID}><div className="flex items-center gap-2"><CircleDollarSign className="h-4 w-4 text-primary"/>Paid from Pot</div></SelectItem>}{availableMembersForSplitting.map((member) => ( <SelectItem key={member.id} value={member.id}>{member.name}</SelectItem>))}</SelectContent> </Select> <FormMessage /> </FormItem> )} />
-                <FormField control={form.control} name="splitType" render={({ field }) => ( <FormItem className="space-y-2"><FormLabel>Split Method</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex space-x-4"><FormItem className="flex items-center space-x-2 space-y-0"><RadioGroupItem value="even" id="split-even"/><FormLabel htmlFor="split-even" className="font-normal cursor-pointer">Split Evenly</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><RadioGroupItem value="custom" id="split-custom"/><FormLabel htmlFor="split-custom" className="font-normal cursor-pointer">Custom Amounts</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
-                <Controller control={form.control} name="splitWithMemberIds" render={({ field }) => ( <FormItem> <div className="mb-2 flex items-center justify-between"><div><FormLabel>Split With Whom?</FormLabel><FormDescription>Select members sharing this expense.</FormDescription></div><Button type="button" variant="outline" size="sm" onClick={() => handleSelectAllSplitMembers(!areAllMembersSelected)} disabled={availableMembersForSplitting.length === 0} className="ml-auto">{areAllMembersSelected ? <CheckSquare className="mr-2 h-4 w-4" /> : <Square className="mr-2 h-4 w-4" />}{areAllMembersSelected ? 'Deselect All' : 'Select All'}</Button></div> <ScrollArea className="h-32 w-full rounded-md border p-2">{availableMembersForSplitting.map((member) => ( <FormField key={member.id} control={form.control} name="splitWithMemberIds" render={({ field: checkboxField }) => ( <FormItem key={member.id} className="flex flex-row items-start space-x-3 space-y-0 py-2"><FormControl><Checkbox checked={checkboxField.value?.includes(member.id)} onCheckedChange={(checked) => checkboxField.onChange(checked ? [...(checkboxField.value || []), member.id] : (checkboxField.value || []).filter(id => id !== member.id))} /></FormControl><FormLabel htmlFor={`split-${member.id}`} className="text-sm font-normal cursor-pointer">{member.name}</FormLabel></FormItem> )} /> ))}</ScrollArea> <FormMessage /> {form.formState.errors.splitWithMemberIds?.message && <p className="text-sm font-medium text-destructive">{form.formState.errors.splitWithMemberIds?.message}</p>} </FormItem> )} />
+                <FormField control={form.control} name="splitType" render={({ field }) => ( <FormItem className="space-y-2"><FormLabel>Split Method</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex space-x-4"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="even" id="split-even"/></FormControl><FormLabel htmlFor="split-even" className="font-normal cursor-pointer">Split Evenly</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="custom" id="split-custom"/></FormControl><FormLabel htmlFor="split-custom" className="font-normal cursor-pointer">Custom Amounts</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
+                <Controller control={form.control} name="splitWithMemberIds" render={({ field }) => ( <FormItem> <div className="mb-2 flex items-center justify-between"><div><FormLabel>Split With Whom?</FormLabel><FormDescription>Select members sharing this expense.</FormDescription></div><Button type="button" variant="outline" size="sm" onClick={() => handleSelectAllSplitMembers(!areAllMembersSelected)} disabled={availableMembersForSplitting.length === 0} className="ml-auto">{areAllMembersSelected ? <CheckSquare className="mr-2 h-4 w-4" /> : <Square className="mr-2 h-4 w-4" />}{areAllMembersSelected ? 'Deselect All' : 'Select All'}</Button></div> <ScrollArea className="h-32 w-full rounded-md border p-2">{availableMembersForSplitting.map((member) => ( <FormField key={member.id} control={form.control} name="splitWithMemberIds" render={({ field: checkboxField }) => ( <FormItem key={member.id} className="flex flex-row items-start space-x-3 space-y-0 py-2"><FormControl><Checkbox id={`split-${member.id}`} checked={checkboxField.value?.includes(member.id)} onCheckedChange={(checked) => checkboxField.onChange(checked ? [...(checkboxField.value || []), member.id] : (checkboxField.value || []).filter(id => id !== member.id))} /></FormControl><FormLabel htmlFor={`split-${member.id}`} className="text-sm font-normal cursor-pointer">{member.name}</FormLabel></FormItem> )} /> ))}</ScrollArea> <FormMessage /> {form.formState.errors.splitWithMemberIds?.message && <p className="text-sm font-medium text-destructive">{form.formState.errors.splitWithMemberIds?.message}</p>} </FormItem> )} />
                 
                 {watchedSplitType === 'custom' && customSplitFields.map((item, index) => (
                   <FormField key={item.fieldId} control={form.control} name={`customSplitAmounts.${index}.amount`} render={({ field }) => (
