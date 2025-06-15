@@ -28,8 +28,8 @@ export default function TripDetailPage() {
   const { 
     getTripById, 
     getTripMembers, addTripMember, deleteTripMember: contextDeleteTripMember, getTripMemberById,
-    addTripContribution, getTripMemberTotalDirectContribution 
-    // Future: getTotalTripSpending
+    addTripContribution, getTripMemberTotalDirectContribution,
+    tripMembers // Destructure tripMembers here
   } = useAppContext();
   const { toast } = useToast();
 
@@ -62,7 +62,7 @@ export default function TripDetailPage() {
     if (tripId) {
         setCurrentTripMembers(getTripMembers(tripId));
     }
-  }, [getTripMembers, tripId, tripMembers]); // Listen to tripMembers from context as well
+  }, [getTripMembers, tripId, tripMembers]); // Use the destructured tripMembers here
 
   const handleSaveTripMember = async (data: TripMemberFormValues) => {
     if (!tripId) return;
