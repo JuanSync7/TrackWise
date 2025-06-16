@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, Suspense } from 'react'; // Added React and Suspense
+import React, { useState, useEffect, Suspense, useCallback } from 'react'; 
 import { PageHeader } from '@/components/shared/page-header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { usePersonalFinance } from '@/contexts/personal-finance-context';
@@ -23,9 +23,8 @@ import { useTheme } from "next-themes";
 import { Badge } from '@/components/ui/badge';
 import { useToast } from "@/hooks/use-toast";
 import type { Category } from '@/lib/types';
-import { INITIAL_CATEGORIES } from '@/lib/constants'; // To identify default categories
+import { INITIAL_CATEGORIES } from '@/lib/constants';
 
-// Lazy load CategoryForm
 const CategoryForm = React.lazy(() => import('@/components/settings/category-form').then(module => ({ default: module.CategoryForm })));
 type CategoryFormValues = import('@/components/settings/category-form').CategoryFormValues;
 
@@ -47,21 +46,21 @@ export default function SettingsPage() {
     setMounted(true);
   }, []);
 
-  const toggleTheme = () => {
+  const toggleTheme = useCallback(() => {
     setTheme(theme === 'dark' ? 'light' : 'dark');
-  };
+  }, [theme, setTheme]);
 
-  const handleOpenCategoryForm = (category?: Category) => {
+  const handleOpenCategoryForm = useCallback((category?: Category) => {
     setEditingCategory(category);
     setIsCategoryFormOpen(true);
-  };
+  }, []);
 
-  const handleCloseCategoryForm = () => {
+  const handleCloseCategoryForm = useCallback(() => {
     setIsCategoryFormOpen(false);
     setEditingCategory(undefined);
-  };
+  }, []);
 
-  const handleSaveCategory = async (data: CategoryFormValues) => {
+  const handleSaveCategory = useCallback(async (data: CategoryFormValues) => {
     setIsSubmittingCategory(true);
     try {
       if (editingCategory) {
@@ -77,23 +76,23 @@ export default function SettingsPage() {
     } finally {
       setIsSubmittingCategory(false);
     }
-  };
+  }, [editingCategory, addCategory, updateCategory, handleCloseCategoryForm, toast]);
 
-  const handleDeleteCategoryRequest = (category: Category) => {
+  const handleDeleteCategoryRequest = useCallback((category: Category) => {
     if (defaultCategoryIds.has(category.id)) {
       toast({ variant: "destructive", title: "Cannot Delete", description: `Category "${category.name}" is a default category and cannot be deleted.` });
       return;
     }
     setCategoryToDelete(category);
-  };
+  }, [defaultCategoryIds, toast]);
 
-  const confirmDeleteCategory = () => {
+  const confirmDeleteCategory = useCallback(() => {
     if (categoryToDelete) {
       contextDeleteCategory(categoryToDelete.id);
       toast({ title: "Category Deleted", description: `Category "${categoryToDelete.name}" has been deleted.` });
       setCategoryToDelete(null);
     }
-  };
+  }, [categoryToDelete, contextDeleteCategory, toast]);
 
 
   if (!mounted) {
@@ -190,7 +189,6 @@ export default function SettingsPage() {
         </Card>
       </div>
 
-      {/* Category Form Dialog */}
       <Dialog open={isCategoryFormOpen} onOpenChange={(isOpen) => { if (!isOpen) handleCloseCategoryForm(); else setIsCategoryFormOpen(isOpen); }}>
         <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
@@ -210,7 +208,6 @@ export default function SettingsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Category Confirmation Dialog */}
       <AlertDialog open={!!categoryToDelete} onOpenChange={() => setCategoryToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

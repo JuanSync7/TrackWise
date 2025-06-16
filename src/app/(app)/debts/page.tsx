@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense, useCallback } from 'react';
 import { PageHeader } from '@/components/shared/page-header';
 import type { PersonalDebt, Transaction } from '@/lib/types';
 import { usePersonalFinance } from '@/contexts/personal-finance-context';
@@ -19,7 +19,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-// import { DebtList } from '@/components/debts/debt-list'; // Lazy load
 import { Input } from '@/components/ui/input'; 
 
 const DebtForm = React.lazy(() => import('@/components/debts/debt-form').then(module => ({ default: module.DebtForm })));
@@ -43,11 +42,11 @@ export default function PersonalDebtsPage() {
     }
   }, [isFormOpen]);
 
-  const handleSaveDebt = async (data: Omit<PersonalDebt, 'id' | 'createdAt' | 'currentBalance'>) => {
+  const handleSaveDebt = useCallback(async (data: Omit<PersonalDebt, 'id' | 'createdAt' | 'currentBalance'>) => {
     setIsSubmitting(true);
     try {
       if (editingDebt) {
-        updatePersonalDebt({ ...editingDebt, ...data, currentBalance: editingDebt.currentBalance }); // Preserve currentBalance on edit, only initialAmount changes
+        updatePersonalDebt({ ...editingDebt, ...data, currentBalance: editingDebt.currentBalance });
         toast({ title: "Debt Updated", description: `Debt "${data.name}" has been successfully updated.` });
       } else {
         addPersonalDebt(data);
@@ -60,37 +59,37 @@ export default function PersonalDebtsPage() {
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [editingDebt, addPersonalDebt, updatePersonalDebt, toast]);
 
-  const handleEditDebt = (debt: PersonalDebt) => {
+  const handleEditDebt = useCallback((debt: PersonalDebt) => {
     setEditingDebt(debt);
     setIsFormOpen(true);
-  };
+  }, []);
 
-  const handleDeleteDebtRequest = (debtId: string) => {
+  const handleDeleteDebtRequest = useCallback((debtId: string) => {
     setDebtToDelete(debtId);
-  };
+  }, []);
 
-  const confirmDeleteDebt = () => {
+  const confirmDeleteDebt = useCallback(() => {
     if (debtToDelete) {
       const debtName = personalDebts.find(d => d.id === debtToDelete)?.name || "The debt";
       deletePersonalDebt(debtToDelete);
       toast({ title: "Debt Deleted", description: `"${debtName}" has been successfully deleted.` });
       setDebtToDelete(null);
     }
-  };
+  }, [debtToDelete, personalDebts, deletePersonalDebt, toast]);
 
-  const openFormForNew = () => {
+  const openFormForNew = useCallback(() => {
     setEditingDebt(undefined);
     setIsFormOpen(true);
-  };
+  }, []);
 
-  const handleOpenLogPaymentModal = (debt: PersonalDebt) => {
+  const handleOpenLogPaymentModal = useCallback((debt: PersonalDebt) => {
     setDebtToLogPaymentFor(debt);
     setPaymentAmount("");
-  };
+  }, []);
 
-  const handleConfirmLogPayment = () => {
+  const handleConfirmLogPayment = useCallback(() => {
     if (debtToLogPaymentFor && paymentAmount) {
       const amount = parseFloat(paymentAmount);
       if (amount > 0) {
@@ -102,7 +101,7 @@ export default function PersonalDebtsPage() {
         toast({ variant: "destructive", title: "Invalid Amount", description: "Payment amount must be positive." });
       }
     }
-  };
+  }, [debtToLogPaymentFor, paymentAmount, logPaymentToPersonalDebt, toast]);
 
   return (
     <div className="container mx-auto">

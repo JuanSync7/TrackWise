@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense, useCallback } from 'react';
 import { PageHeader } from '@/components/shared/page-header';
 import type { FinancialGoal } from '@/lib/types';
 import { usePersonalFinance } from '@/contexts/personal-finance-context';
@@ -19,7 +19,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-// import { GoalList } from '@/components/goals/goal-list'; // Lazy load
 
 const GoalForm = React.lazy(() => import('@/components/goals/goal-form').then(module => ({ default: module.GoalForm })));
 const GoalList = React.lazy(() => import('@/components/goals/goal-list').then(module => ({ default: module.GoalList })));
@@ -42,7 +41,7 @@ export default function FinancialGoalsPage() {
     }
   }, [isFormOpen]);
 
-  const handleSaveGoal = async (data: Omit<FinancialGoal, 'id' | 'createdAt' | 'currentAmount'>) => {
+  const handleSaveGoal = useCallback(async (data: Omit<FinancialGoal, 'id' | 'createdAt' | 'currentAmount'>) => {
     setIsSubmitting(true);
     try {
       if (editingGoal) {
@@ -59,37 +58,37 @@ export default function FinancialGoalsPage() {
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [editingGoal, addFinancialGoal, updateFinancialGoal, toast]);
 
-  const handleEditGoal = (goal: FinancialGoal) => {
+  const handleEditGoal = useCallback((goal: FinancialGoal) => {
     setEditingGoal(goal);
     setIsFormOpen(true);
-  };
+  }, []);
 
-  const handleDeleteGoalRequest = (goalId: string) => {
+  const handleDeleteGoalRequest = useCallback((goalId: string) => {
     setGoalToDelete(goalId);
-  };
+  }, []);
 
-  const confirmDeleteGoal = () => {
+  const confirmDeleteGoal = useCallback(() => {
     if (goalToDelete) {
       const goalName = financialGoals.find(g => g.id === goalToDelete)?.name || "The goal";
       deleteFinancialGoal(goalToDelete);
       toast({ title: "Goal Deleted", description: `"${goalName}" has been successfully deleted.` });
       setGoalToDelete(null);
     }
-  };
+  }, [goalToDelete, financialGoals, deleteFinancialGoal, toast]);
 
-  const openFormForNew = () => {
+  const openFormForNew = useCallback(() => {
     setEditingGoal(undefined);
     setIsFormOpen(true);
-  }
+  }, []);
 
-  const handleOpenContributeModal = (goal: FinancialGoal) => {
+  const handleOpenContributeModal = useCallback((goal: FinancialGoal) => {
     setGoalToContribute(goal);
     setContributionAmount("");
-  };
+  }, []);
 
-  const handleConfirmContribution = () => {
+  const handleConfirmContribution = useCallback(() => {
     if (goalToContribute && contributionAmount) {
       const amount = parseFloat(contributionAmount);
       if (amount > 0) {
@@ -101,7 +100,7 @@ export default function FinancialGoalsPage() {
         toast({ variant: "destructive", title: "Invalid Amount", description: "Contribution amount must be positive." });
       }
     }
-  };
+  }, [goalToContribute, contributionAmount, contributeToFinancialGoal, toast]);
 
   return (
     <div className="container mx-auto">

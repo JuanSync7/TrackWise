@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo, Suspense } from 'react';
+import React, { useState, useMemo, Suspense, useCallback } from 'react';
 import { PageHeader } from '@/components/shared/page-header';
 import type { Transaction } from '@/lib/types';
 import { usePersonalFinance } from '@/contexts/personal-finance-context';
@@ -47,7 +47,7 @@ export default function TransactionsPage() {
   const [filterEndDate, setFilterEndDate] = useState<Date | undefined>(undefined);
 
 
-  const handleSaveTransaction = async (data: any) => { // data is TransactionFormValues & { nextRecurrenceDate?: string }
+  const handleSaveTransaction = useCallback(async (data: any) => { 
     setIsSubmitting(true);
     const transactionData: Omit<Transaction, 'id'> = {
       description: data.description,
@@ -76,32 +76,31 @@ export default function TransactionsPage() {
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [editingTransaction, addTransaction, updateTransaction, toast]);
 
-  const handleEditTransaction = (transaction: Transaction) => {
+  const handleEditTransaction = useCallback((transaction: Transaction) => {
     setEditingTransaction(transaction);
     setIsFormOpen(true);
-  };
+  }, []);
 
-  const handleDeleteTransaction = (transactionId: string) => {
+  const handleDeleteTransaction = useCallback((transactionId: string) => {
     setTransactionToDelete(transactionId);
-  };
+  }, []);
 
-  const confirmDeleteTransaction = () => {
+  const confirmDeleteTransaction = useCallback(() => {
     if (transactionToDelete) {
       contextDeleteTransaction(transactionToDelete);
       toast({ title: "Transaction Deleted", description: "The transaction has been successfully deleted." });
       setTransactionToDelete(null);
     }
-  };
+  }, [transactionToDelete, contextDeleteTransaction, toast]);
 
-  // Renamed to avoid conflict with global add button if it were implemented on this page
-  const openLocalTransactionForm = () => { 
+  const openLocalTransactionForm = useCallback(() => { 
     setEditingTransaction(undefined);
     setIsFormOpen(true);
-  }
+  }, []);
 
-  const handleLogUpcomingRecurring = () => {
+  const handleLogUpcomingRecurring = useCallback(() => {
     const today = new Date();
     let count = 0;
     transactions.forEach(t => {
@@ -145,7 +144,7 @@ export default function TransactionsPage() {
     } else {
         toast({ title: "No Due Recurring Transactions", description: "No recurring transactions were due to be logged today." });
     }
-  };
+  }, [transactions, addTransaction, updateTransaction, toast]);
   
   const filteredTransactions = useMemo(() => {
     let baseTransactions = transactions.filter(t => !t.isRecurring); 
@@ -167,7 +166,7 @@ export default function TransactionsPage() {
     return baseTransactions;
   }, [transactions, activeTab, filterStartDate, filterEndDate]);
   
-  const handleExportTransactions = () => {
+  const handleExportTransactions = useCallback(() => {
     const headerRow = [
       "ID", "Description", "Amount", "Currency", "Date",
       "Category Name", "Type", "Notes", "Is Recurring", "Recurrence Period", "Recurrence End Date", "Next Recurrence Date"
@@ -194,7 +193,7 @@ export default function TransactionsPage() {
     const filename = `trackwise_transactions_${activeTab}_${formatDate(new Date(), 'yyyy-MM-dd')}.csv`;
     exportToCsv(filename, [headerRow, ...dataRows]);
     toast({ title: "Transactions Exported", description: `Transactions have been exported to ${filename}` });
-  };
+  }, [filteredTransactions, getCategoryById, activeTab, toast]);
 
   const recurringTemplates = useMemo(() => transactions.filter(t => t.isRecurring), [transactions]);
   const dueRecurringTemplatesCount = useMemo(() => {
@@ -202,10 +201,10 @@ export default function TransactionsPage() {
     return recurringTemplates.filter(t => t.nextRecurrenceDate && (isBefore(parseISO(t.nextRecurrenceDate), today) || isEqual(parseISO(t.nextRecurrenceDate), today)) && (!t.recurrenceEndDate || !isBefore(parseISO(t.recurrenceEndDate), parseISO(t.nextRecurrenceDate)))).length;
   }, [recurringTemplates]);
 
-  const clearDateFilters = () => {
+  const clearDateFilters = useCallback(() => {
     setFilterStartDate(undefined);
     setFilterEndDate(undefined);
-  };
+  }, []);
 
   return (
     <div className="container mx-auto">
@@ -256,7 +255,6 @@ export default function TransactionsPage() {
               <Button onClick={handleExportTransactions} variant="outline" disabled={filteredTransactions.length === 0}>
                 <Download className="mr-2 h-4 w-4" /> Export View
               </Button>
-              {/* This button can remain for page-specific adding, or be removed if the header button is preferred */}
               <Button onClick={openLocalTransactionForm}> 
                 <PlusCircle className="mr-2 h-4 w-4" /> Add New (Local)
               </Button>
@@ -345,6 +343,3 @@ export default function TransactionsPage() {
     </div>
   );
 }
-
-
-    

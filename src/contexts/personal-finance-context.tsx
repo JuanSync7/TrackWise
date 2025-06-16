@@ -2,7 +2,7 @@
 "use client";
 
 import type { ReactNode } from 'react';
-import React, { createContext, useContext, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useCallback, useEffect, useMemo } from 'react';
 import type { Transaction, Category, BudgetGoal, PersonalFinanceContextType, FinancialGoal, PersonalDebt } from '@/lib/types';
 import { INITIAL_CATEGORIES, DEFAULT_CURRENCY } from '@/lib/constants';
 import useLocalStorage from '@/hooks/use-local-storage';
@@ -36,7 +36,7 @@ export const PersonalFinanceProvider: React.FC<{ children: ReactNode }> = ({ chi
     setTransactions(prevTransactions => 
       prevTransactions.map(t => {
         if (t.categoryId === categoryId) {
-          return { ...t, categoryId: otherCategory ? otherCategory.id : 'other' }; // Fallback to 'other' string if no "Other" category
+          return { ...t, categoryId: otherCategory ? otherCategory.id : 'other' };
         }
         return t;
       })
@@ -77,7 +77,7 @@ export const PersonalFinanceProvider: React.FC<{ children: ReactNode }> = ({ chi
         }
         if (updatedTransaction.recurrenceEndDate && potentialNextDate && new Date(potentialNextDate) > parseISO(updatedTransaction.recurrenceEndDate)) {
             nextRecurrenceDate = undefined;
-        } else if (potentialNextDate) { // Only update if a new date is calculated
+        } else if (potentialNextDate) { 
             nextRecurrenceDate = potentialNextDate;
         }
     } else if (!updatedTransaction.isRecurring) {
@@ -110,7 +110,6 @@ export const PersonalFinanceProvider: React.FC<{ children: ReactNode }> = ({ chi
     })));
   }, [transactions, setBudgetGoals]);
 
-  // Financial Goals
   const addFinancialGoal = useCallback((goalData: Omit<FinancialGoal, 'id' | 'createdAt' | 'currentAmount'>) => {
     const newGoal: FinancialGoal = {
       ...goalData,
@@ -131,7 +130,6 @@ export const PersonalFinanceProvider: React.FC<{ children: ReactNode }> = ({ chi
 
   const contributeToFinancialGoal = useCallback((goalId: string, amount: number) => {
     setFinancialGoals(prev => prev.map(g => g.id === goalId ? { ...g, currentAmount: Math.min(g.targetAmount, g.currentAmount + amount) } : g));
-    // Optionally, create a corresponding transaction
     const goal = financialGoals.find(g => g.id === goalId);
     if (goal) {
         const savingsCategory = categories.find(c => c.name.toLowerCase() === "savings contribution");
@@ -140,20 +138,18 @@ export const PersonalFinanceProvider: React.FC<{ children: ReactNode }> = ({ chi
             amount: amount,
             date: formatISO(new Date()),
             categoryId: savingsCategory?.id || 'other',
-            transactionType: 'expense', // Saving is technically an expense from available cash
+            transactionType: 'expense',
             notes: `Automated contribution for financial goal.`
         });
     }
   }, [setFinancialGoals, financialGoals, addTransaction, categories]);
 
-
-  // Personal Debts
   const addPersonalDebt = useCallback((debtData: Omit<PersonalDebt, 'id' | 'createdAt' | 'currentBalance'>) => {
     const newDebt: PersonalDebt = {
       ...debtData,
       id: uuidv4(),
       createdAt: formatISO(new Date()),
-      currentBalance: debtData.initialAmount, // Current balance starts as initial amount
+      currentBalance: debtData.initialAmount,
     };
     setPersonalDebts(prev => [...prev, newDebt]);
   }, [setPersonalDebts]);
@@ -188,14 +184,21 @@ export const PersonalFinanceProvider: React.FC<{ children: ReactNode }> = ({ chi
   }, [setPersonalDebts, personalDebts, addTransaction, categories]);
 
 
-  const value: PersonalFinanceContextType = {
+  const value = useMemo(() => ({
     transactions, categories, budgetGoals, financialGoals, personalDebts,
     addTransaction, updateTransaction, deleteTransaction,
     addCategory, updateCategory, deleteCategory, getCategoryById,
     addBudgetGoal, updateBudgetGoal, deleteBudgetGoal,
     addFinancialGoal, updateFinancialGoal, deleteFinancialGoal, contributeToFinancialGoal,
     addPersonalDebt, updatePersonalDebt, deletePersonalDebt, logPaymentToPersonalDebt,
-  };
+  }), [
+    transactions, categories, budgetGoals, financialGoals, personalDebts,
+    addTransaction, updateTransaction, deleteTransaction,
+    addCategory, updateCategory, deleteCategory, getCategoryById,
+    addBudgetGoal, updateBudgetGoal, deleteBudgetGoal,
+    addFinancialGoal, updateFinancialGoal, deleteFinancialGoal, contributeToFinancialGoal,
+    addPersonalDebt, updatePersonalDebt, deletePersonalDebt, logPaymentToPersonalDebt,
+  ]);
 
   return <PersonalFinanceContext.Provider value={value}>{children}</PersonalFinanceContext.Provider>;
 };
@@ -207,4 +210,3 @@ export const usePersonalFinance = (): PersonalFinanceContextType => {
   }
   return context;
 };
-

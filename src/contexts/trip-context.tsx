@@ -2,9 +2,9 @@
 "use client";
 
 import type { ReactNode } from 'react';
-import React, { createContext, useContext, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useCallback, useEffect, useMemo } from 'react';
 import type {
-  Trip, TripMember, TripContribution, TripTransaction, TripSettlement, // Renamed TripExpense
+  Trip, TripMember, TripContribution, TripTransaction, TripSettlement,
   CalculatedMemberFinancials, TripContextType, MemberDisplayFinancials
 } from '@/lib/types';
 import { POT_PAYER_ID } from '@/lib/constants';
@@ -161,7 +161,7 @@ export const TripProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return defaultMemberDisplayFinancials;
   }, [tripFinancialSummaries]);
 
-  const value: TripContextType = {
+  const value = useMemo(() => ({
     trips, tripMembers, tripContributions, tripTransactions, 
     tripFinancialSummaries, tripSettlementsMap,
     addTrip, getTripById, getTrips,
@@ -169,7 +169,15 @@ export const TripProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     addTripContribution, getTripContributionsForMember, getTripMemberTotalDirectContribution,
     addTripTransaction, updateTripTransaction, deleteTripTransaction, getTripTransactions, 
     getTripMemberNetData, getTripSettlements, triggerTripSettlementCalculation,
-  };
+  }), [
+    trips, tripMembers, tripContributions, tripTransactions, 
+    tripFinancialSummaries, tripSettlementsMap,
+    addTrip, getTripById, getTrips,
+    addTripMember, getTripMembers, deleteTripMember, getTripMemberById,
+    addTripContribution, getTripContributionsForMember, getTripMemberTotalDirectContribution,
+    addTripTransaction, updateTripTransaction, deleteTripTransaction, getTripTransactions, 
+    getTripMemberNetData, getTripSettlements, triggerTripSettlementCalculation,
+  ]);
 
   return <TripContext.Provider value={value}>{children}</TripContext.Provider>;
 };
@@ -181,5 +189,3 @@ export const useTrips = (): TripContextType => {
   }
   return context;
 };
-
-    

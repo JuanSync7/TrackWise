@@ -9,8 +9,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { MoreHorizontal, Edit3, Trash2, ShoppingBag, MinusCircle, PlusCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNowStrict } from 'date-fns';
-import { useHousehold } from '@/contexts/household-context'; // Changed context
-import React from 'react';
+import { useHousehold } from '@/contexts/household-context'; 
+import React, { useCallback } from 'react';
 
 interface ShoppingListItemProps {
   item: ShoppingListItemType;
@@ -20,23 +20,23 @@ interface ShoppingListItemProps {
 }
 
 const ShoppingListItemComponent = ({ item, onEdit, onDelete, onTogglePurchased }: ShoppingListItemProps) => {
-  const { editShoppingListItem } = useHousehold(); // Changed context
+  const { editShoppingListItem } = useHousehold(); 
   const timeAgo = formatDistanceToNowStrict(new Date(item.addedAt), { addSuffix: true });
 
   const isNumericQuantity = /^\d+$/.test(item.quantity);
 
-  const handleQuantityChange = (increment: boolean) => {
+  const handleQuantityChange = useCallback((increment: boolean) => {
     if (!isNumericQuantity) return;
     const currentVal = parseInt(item.quantity, 10);
     const newVal = increment ? currentVal + 1 : Math.max(1, currentVal - 1);
 
-    editShoppingListItem({ // Context function for updating
+    editShoppingListItem({ 
       id: item.id,
       itemName: item.itemName,
       quantity: String(newVal),
       notes: item.notes,
     });
-  };
+  }, [isNumericQuantity, item, editShoppingListItem]);
 
   return (
     <Card className={cn("overflow-hidden transition-shadow hover:shadow-md", item.isPurchased && "bg-muted/50 opacity-70")}>

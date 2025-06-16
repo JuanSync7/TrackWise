@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, Suspense } from 'react';
+import React, { useState, Suspense, useCallback } from 'react';
 import { PageHeader } from '@/components/shared/page-header';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, Trash2, Loader2 } from 'lucide-react';
@@ -19,7 +19,6 @@ import {
 import { useHousehold } from '@/contexts/household-context';
 import { useToast } from "@/hooks/use-toast";
 import type { SharedBudget } from '@/lib/types';
-// import { SharedBudgetList } from '@/components/household/shared-budget-list'; // Lazy load
 
 const SharedBudgetForm = React.lazy(() => import('@/components/household/shared-budget-form').then(module => ({ default: module.SharedBudgetForm })));
 const SharedBudgetList = React.lazy(() => import('@/components/household/shared-budget-list').then(module => ({ default: module.SharedBudgetList })));
@@ -34,7 +33,7 @@ export default function SharedBudgetsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [budgetToDelete, setBudgetToDelete] = useState<string | null>(null);
 
-  const handleSaveBudget = async (data: SharedBudgetFormValues) => {
+  const handleSaveBudget = useCallback(async (data: SharedBudgetFormValues) => {
     setIsSubmitting(true);
     try {
       if (editingBudget) {
@@ -58,30 +57,30 @@ export default function SharedBudgetsPage() {
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [editingBudget, addSharedBudget, updateSharedBudget, toast]);
 
-  const handleEditBudget = (budget: SharedBudget) => {
+  const handleEditBudget = useCallback((budget: SharedBudget) => {
     setEditingBudget(budget);
     setIsFormOpen(true);
-  };
+  }, []);
 
-  const handleDeleteBudget = (budgetId: string) => {
+  const handleDeleteBudget = useCallback((budgetId: string) => {
     setBudgetToDelete(budgetId);
-  };
+  }, []);
 
-  const confirmDeleteBudget = () => {
+  const confirmDeleteBudget = useCallback(() => {
     if (budgetToDelete) {
       const budget = sharedBudgets.find(b => b.id === budgetToDelete);
       contextDeleteSharedBudget(budgetToDelete);
       toast({ title: "Shared Budget Deleted", description: `The shared budget "${budget?.name || 'The budget'}" has been successfully deleted.` });
       setBudgetToDelete(null);
     }
-  };
+  }, [budgetToDelete, sharedBudgets, contextDeleteSharedBudget, toast]);
 
-  const openFormForNew = () => {
+  const openFormForNew = useCallback(() => {
     setEditingBudget(undefined);
     setIsFormOpen(true);
-  };
+  }, []);
 
   return (
     <div className="container mx-auto">

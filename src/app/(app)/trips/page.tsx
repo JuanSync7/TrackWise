@@ -1,16 +1,15 @@
 
 "use client";
 
-import React, { useState, Suspense } from 'react'; // Added React, Suspense
+import React, { useState, Suspense, useCallback } from 'react';
 import { PageHeader } from '@/components/shared/page-header';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, PlaneTakeoff, Loader2 } from 'lucide-react'; // Added Loader2
+import { PlusCircle, PlaneTakeoff, Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { useTrips } from '@/contexts/trip-context'; // Changed to useTrips
+import { useTrips } from '@/contexts/trip-context';
 import { useToast } from "@/hooks/use-toast";
 import type { Trip } from '@/lib/types';
-// import { TripForm, type TripFormValues } from '@/components/trips/trip-form'; // Dynamic import
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -20,7 +19,7 @@ type TripFormValues = Omit<Trip, 'id' | 'createdAt'>;
 
 
 export default function TripsPage() {
-  const { addTrip, getTrips } = useTrips(); // Changed context
+  const { addTrip, getTrips } = useTrips();
   const { toast } = useToast();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -29,7 +28,7 @@ export default function TripsPage() {
 
   const allTrips = getTrips().sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-  const handleSaveTrip = async (data: TripFormValues) => {
+  const handleSaveTrip = useCallback(async (data: TripFormValues) => {
     setIsSubmitting(true);
     try {
       addTrip(data);
@@ -41,12 +40,12 @@ export default function TripsPage() {
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [addTrip, toast]);
 
-  const openFormForNew = () => {
+  const openFormForNew = useCallback(() => {
     setEditingTrip(undefined);
     setIsFormOpen(true);
-  };
+  }, []);
 
   return (
     <div className="container mx-auto">
@@ -87,7 +86,6 @@ export default function TripsPage() {
           <PlaneTakeoff className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
           <h3 className="text-xl font-semibold mb-2 text-muted-foreground">No Trips Yet</h3>
           <p className="text-muted-foreground">Click "Create New Trip" to start planning your next adventure!</p>
-          
         </div>
       )}
 
@@ -131,4 +129,3 @@ export default function TripsPage() {
     </div>
   );
 }
-

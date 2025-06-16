@@ -2,11 +2,11 @@
 "use client";
 
 import type { ReactNode } from 'react';
-import React, { createContext, useContext, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useCallback, useEffect, useMemo } from 'react';
 import type {
   HouseholdTransaction, Member, Contribution, ShoppingListItem, SharedBudget, Debt, HouseholdSettlement,
   CalculatedMemberFinancials, HouseholdContextType, MemberDisplayFinancials
-} from '@/lib/types'; // Renamed HouseholdExpense to HouseholdTransaction
+} from '@/lib/types';
 import { HOUSEHOLD_EXPENSE_CATEGORY_ID, POT_PAYER_ID } from '@/lib/constants';
 import useLocalStorage from '@/hooks/use-local-storage';
 import { v4 as uuidv4 } from 'uuid';
@@ -24,7 +24,7 @@ const defaultMemberDisplayFinancials: MemberDisplayFinancials = {
 
 export const HouseholdProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [members, setMembers] = useLocalStorage<Member[]>('trackwise_members', []);
-  const [householdTransactions, setHouseholdTransactions] = useLocalStorage<HouseholdTransaction[]>('trackwise_household_transactions', []); // Renamed
+  const [householdTransactions, setHouseholdTransactions] = useLocalStorage<HouseholdTransaction[]>('trackwise_household_transactions', []);
   const [contributions, setContributions] = useLocalStorage<Contribution[]>('trackwise_household_contributions', []);
   const [sharedBudgets, setSharedBudgets] = useLocalStorage<SharedBudget[]>('trackwise_shared_budgets', []);
   const [debts, setDebts] = useLocalStorage<Debt[]>('trackwise_household_debts', []);
@@ -35,7 +35,7 @@ export const HouseholdProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   const getMemberById = useCallback((memberId: string) => members.find(member => member.id === memberId), [members]);
 
-  const _manageDebtsForHouseholdTransaction = useCallback((transaction: HouseholdTransaction, currentDebts: Debt[]): Debt[] => { // Renamed
+  const _manageDebtsForHouseholdTransaction = useCallback((transaction: HouseholdTransaction, currentDebts: Debt[]): Debt[] => {
     let updatedDebts = currentDebts.filter(d => d.expenseId !== transaction.id);
     if (transaction.transactionType === 'expense' && transaction.isSplit && transaction.paidByMemberId && transaction.paidByMemberId !== POT_PAYER_ID && transaction.splitWithMemberIds && transaction.splitWithMemberIds.length > 0) {
       
@@ -49,7 +49,7 @@ export const HouseholdProvider: React.FC<{ children: ReactNode }> = ({ children 
             });
           }
         });
-      } else { // Even split
+      } else { 
         const amountPerPerson = transaction.amount / transaction.splitWithMemberIds!.length;
         transaction.splitWithMemberIds.forEach(memberIdInSplit => {
           if (memberIdInSplit !== transaction.paidByMemberId) {
@@ -65,24 +65,24 @@ export const HouseholdProvider: React.FC<{ children: ReactNode }> = ({ children 
     return updatedDebts;
   }, []);
 
-  const addHouseholdTransaction = useCallback((newTransactionData: Omit<HouseholdTransaction, 'id'>) => { // Renamed
+  const addHouseholdTransaction = useCallback((newTransactionData: Omit<HouseholdTransaction, 'id'>) => {
     const newTransaction = { ...newTransactionData, id: uuidv4() };
     setHouseholdTransactions(prev => [...prev, newTransaction]);
-    if (newTransaction.transactionType === 'expense') { // Only manage debts for expenses
+    if (newTransaction.transactionType === 'expense') {
       setDebts(prevDebts => _manageDebtsForHouseholdTransaction(newTransaction, prevDebts));
     }
   }, [setHouseholdTransactions, setDebts, _manageDebtsForHouseholdTransaction]);
 
-  const updateHouseholdTransaction = useCallback((updatedTransaction: HouseholdTransaction) => { // Renamed
+  const updateHouseholdTransaction = useCallback((updatedTransaction: HouseholdTransaction) => {
     setHouseholdTransactions(prev => prev.map(trans => trans.id === updatedTransaction.id ? updatedTransaction : trans));
     if (updatedTransaction.transactionType === 'expense') {
       setDebts(prevDebts => _manageDebtsForHouseholdTransaction(updatedTransaction, prevDebts));
-    } else { // If it was an expense and changed to income, remove related debts
+    } else {
       setDebts(prevDebts => prevDebts.filter(d => d.expenseId !== updatedTransaction.id));
     }
   }, [setHouseholdTransactions, setDebts, _manageDebtsForHouseholdTransaction]);
 
-  const deleteHouseholdTransaction = useCallback((transactionId: string) => { // Renamed
+  const deleteHouseholdTransaction = useCallback((transactionId: string) => {
     setHouseholdTransactions(prev => prev.filter(trans => trans.id !== transactionId));
     setDebts(prevDebts => prevDebts.filter(debt => debt.expenseId !== transactionId));
   }, [setHouseholdTransactions, setDebts]);
@@ -95,10 +95,10 @@ export const HouseholdProvider: React.FC<{ children: ReactNode }> = ({ children 
     setMembers(prev => prev.filter(mem => mem.id !== memberId));
     setContributions(prev => prev.filter(contrib => contrib.memberId !== memberId));
     setDebts(prevDebts => prevDebts.filter(debt => debt.owedByMemberId !== memberId && debt.owedToMemberId !== memberId));
-    setHouseholdTransactions(prevTransactions => prevTransactions.map(trans => { // Renamed
+    setHouseholdTransactions(prevTransactions => prevTransactions.map(trans => {
       let updatedTrans = { ...trans };
       if (updatedTrans.paidByMemberId === memberId) {
-        updatedTrans.paidByMemberId = POT_PAYER_ID; // Default to pot payer if original payer deleted
+        updatedTrans.paidByMemberId = POT_PAYER_ID;
       }
       if (updatedTrans.splitWithMemberIds?.includes(memberId)) {
         updatedTrans.splitWithMemberIds = updatedTrans.splitWithMemberIds.filter(id => id !== memberId);
@@ -107,7 +107,7 @@ export const HouseholdProvider: React.FC<{ children: ReactNode }> = ({ children 
       if (updatedTrans.customSplitAmounts?.some(cs => cs.memberId === memberId)) {
         updatedTrans.customSplitAmounts = updatedTrans.customSplitAmounts.filter(cs => cs.memberId !== memberId);
         if (updatedTrans.customSplitAmounts.length === 0 && updatedTrans.splitType === 'custom') {
-            updatedTrans.splitType = 'even'; // Fallback if all custom split members removed
+            updatedTrans.splitType = 'even';
         }
       }
       return updatedTrans;
@@ -132,12 +132,12 @@ export const HouseholdProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   const deleteSharedBudget = useCallback((budgetId: string) => {
     setSharedBudgets(prev => prev.filter(b => b.id !== budgetId));
-    setHouseholdTransactions(prevTrans => prevTrans.map(e => e.sharedBudgetId === budgetId ? { ...e, sharedBudgetId: undefined } : e)); // Renamed
+    setHouseholdTransactions(prevTrans => prevTrans.map(e => e.sharedBudgetId === budgetId ? { ...e, sharedBudgetId: undefined } : e));
   }, [setSharedBudgets, setHouseholdTransactions]);
 
   useEffect(() => {
     setSharedBudgets(prevShared => prevShared.map(sb => ({
-      ...sb, currentSpending: householdTransactions.filter(trans => trans.transactionType === 'expense' && trans.sharedBudgetId === sb.id).reduce((s, e) => s + e.amount, 0) // Renamed
+      ...sb, currentSpending: householdTransactions.filter(trans => trans.transactionType === 'expense' && trans.sharedBudgetId === sb.id).reduce((s, e) => s + e.amount, 0)
     })));
   }, [householdTransactions, setSharedBudgets]);
 
@@ -197,7 +197,7 @@ export const HouseholdProvider: React.FC<{ children: ReactNode }> = ({ children 
     const expenseInputs: ExpenseInput[] = expenseTypeTransactions.map(exp => ({
       amount: exp.amount, 
       isSplit: !!exp.isSplit,
-      splitWithTripMemberIds: exp.splitWithMemberIds || [], // Use this name for consistency with financial-utils
+      splitWithTripMemberIds: exp.splitWithMemberIds || [],
       paidByMemberId: exp.paidByMemberId,
       splitType: exp.splitType,
       customSplitAmounts: exp.customSplitAmounts?.map(cs => ({memberId: cs.memberId, amount: cs.amount}))
@@ -239,7 +239,7 @@ export const HouseholdProvider: React.FC<{ children: ReactNode }> = ({ children 
     return defaultMemberDisplayFinancials;
   }, [householdFinancialSummaries]);
 
-  const value: HouseholdContextType = {
+  const value = useMemo(() => ({
     members, householdTransactions, contributions, sharedBudgets, debts, shoppingListItems, 
     householdFinancialSummaries, householdOverallSettlements,
     addMember, deleteMember, getMemberById,
@@ -249,7 +249,17 @@ export const HouseholdProvider: React.FC<{ children: ReactNode }> = ({ children 
     settleDebt, unsettleDebt, getDebtsOwedByMember, getDebtsOwedToMember, getAllDebts,
     addShoppingListItem, editShoppingListItem, toggleShoppingListItemPurchased, deleteShoppingListItem, copyLastWeeksPurchasedItems,
     getHouseholdMemberNetData, triggerHouseholdSettlementCalculation,
-  };
+  }), [
+    members, householdTransactions, contributions, sharedBudgets, debts, shoppingListItems, 
+    householdFinancialSummaries, householdOverallSettlements,
+    addMember, deleteMember, getMemberById,
+    addHouseholdTransaction, updateHouseholdTransaction, deleteHouseholdTransaction, 
+    addContribution, getMemberContributions, getMemberTotalContribution,
+    addSharedBudget, updateSharedBudget, deleteSharedBudget,
+    settleDebt, unsettleDebt, getDebtsOwedByMember, getDebtsOwedToMember, getAllDebts,
+    addShoppingListItem, editShoppingListItem, toggleShoppingListItemPurchased, deleteShoppingListItem, copyLastWeeksPurchasedItems,
+    getHouseholdMemberNetData, triggerHouseholdSettlementCalculation,
+  ]);
 
   return <HouseholdContext.Provider value={value}>{children}</HouseholdContext.Provider>;
 };
@@ -261,5 +271,3 @@ export const useHousehold = (): HouseholdContextType => {
   }
   return context;
 };
-
-    

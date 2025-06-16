@@ -2,14 +2,10 @@
 "use client";
 
 import type { ReactNode } from 'react';
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import type { User as FirebaseUser } from 'firebase/auth';
 import { 
   auth,
-  // createUserWithEmailAndPassword, // Mocked
-  // signInWithEmailAndPassword, // Mocked
-  // signOut, // Mocked
-  // updateProfile, // Mocked
   GoogleAuthProvider, 
   signInWithPopup    
 } from '@/lib/firebase'; 
@@ -35,7 +31,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Helper to create a more complete mock FirebaseUser object
 const createMockUser = (email?: string, displayName?: string): FirebaseUser => ({
   uid: `mock-uid-${Date.now()}`,
   email: email || 'mockuser@example.com',
@@ -48,7 +43,7 @@ const createMockUser = (email?: string, displayName?: string): FirebaseUser => (
     lastSignInTime: new Date().toISOString(),
   },
   providerData: [{
-    providerId: 'password', // or 'mock'
+    providerId: 'password',
     uid: `mock-uid-${Date.now()}`,
     displayName: displayName || 'Mock User',
     email: email || 'mockuser@example.com',
@@ -75,84 +70,53 @@ const createMockUser = (email?: string, displayName?: string): FirebaseUser => (
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<FirebaseUser | null>(null);
-  const [loading, setLoading] = useState(true); // Start true to mimic initial load
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
   const { toast } = useToast();
 
   useEffect(() => {
-    // Simulate initial auth check (no actual Firebase call)
-    // If you want to persist the mock login across refresh, you could use localStorage here
-    // For now, it will always start as logged out.
     setLoading(false); 
-    // const unsubscribe = auth.onAuthStateChanged((currentUser) => {
-    //   setUser(currentUser);
-    //   setLoading(false);
-    // });
-    // return () => unsubscribe();
   }, []);
 
-  const loginWithEmail = async (credentials: EmailCredentials) => {
+  const loginWithEmail = useCallback(async (credentials: EmailCredentials) => {
     setLoading(true);
     console.log("Attempting MOCK login with:", credentials.email);
-    // Simulate Firebase call
-    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
-    
-    // Instead of calling Firebase:
-    // await signInWithEmailAndPassword(auth, credentials.email, credentials.password);
-    
+    await new Promise(resolve => setTimeout(resolve, 500));
     const mockUser = createMockUser(credentials.email);
     setUser(mockUser);
-    
     toast({ title: "Mock Login Successful", description: `Welcome back, ${mockUser.displayName}!` });
     router.push('/dashboard'); 
     setLoading(false);
-  };
+  }, [router, toast]);
 
-  const signupWithEmail = async (credentials: SignupCredentials) => {
+  const signupWithEmail = useCallback(async (credentials: SignupCredentials) => {
     setLoading(true);
     console.log("Attempting MOCK signup for:", credentials.email);
-    // Simulate Firebase call
     await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Instead of calling Firebase:
-    // const userCredential = await createUserWithEmailAndPassword(auth, credentials.email, credentials.password);
-    // if (userCredential.user && credentials.displayName) {
-    //   await updateProfile(userCredential.user, { displayName: credentials.displayName });
-    //   setUser({...userCredential.user, displayName: credentials.displayName });
-    // } else if (userCredential.user) {
-    //   setUser(userCredential.user);
-    // }
-    
     const mockUser = createMockUser(credentials.email, credentials.displayName);
     setUser(mockUser);
-
     toast({ title: "Mock Signup Successful", description: `Welcome to Trackwise, ${mockUser.displayName}!` });
     router.push('/dashboard');
     setLoading(false);
-  };
+  }, [router, toast]);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     setLoading(true);
     console.log("Attempting MOCK logout");
-    // Simulate Firebase call
     await new Promise(resolve => setTimeout(resolve, 300));
-
-    // Instead of calling Firebase:
-    // await signOut(auth);
-    
     setUser(null);
     toast({ title: "Mock Logged Out", description: "You have been successfully logged out." });
     router.push('/login'); 
     setLoading(false);
-  };
+  }, [router, toast]);
 
-  const value: AuthContextType = {
+  const value = useMemo(() => ({
     user,
     loading,
     loginWithEmail,
     signupWithEmail,
     logout,
-  };
+  }), [user, loading, loginWithEmail, signupWithEmail, logout]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

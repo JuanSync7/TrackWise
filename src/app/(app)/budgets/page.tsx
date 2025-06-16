@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense, useCallback } from 'react';
 import { PageHeader } from '@/components/shared/page-header';
 import type { BudgetGoal } from '@/lib/types';
 import { usePersonalFinance } from '@/contexts/personal-finance-context';
@@ -20,7 +20,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { BudgetGoalPieChart } from '@/components/dashboard/budget-goal-pie-chart';
-// import { BudgetList } from '@/components/budgets/budget-list'; // Lazy load this
 import { exportToCsv } from '@/lib/utils';
 import { format as formatDate } from 'date-fns';
 import { DEFAULT_CURRENCY } from '@/lib/constants';
@@ -45,15 +44,16 @@ export default function BudgetsPage() {
   }, [isFormOpen]);
 
 
-  const handleSaveBudget = async (data: Omit<BudgetGoal, 'id' | 'currentSpending'>) => {
+  const handleSaveBudget = useCallback(async (data: Omit<BudgetGoal, 'id' | 'currentSpending'>) => {
     setIsSubmitting(true);
     try {
+      const categoryName = getCategoryById(data.categoryId)?.name || 'Category';
       if (editingBudget) {
         updateBudgetGoal({ ...editingBudget, ...data });
-        toast({ title: "Budget Updated", description: `Budget goal for "${getCategoryById(data.categoryId)?.name || 'Category'}" has been successfully updated.` });
+        toast({ title: "Budget Updated", description: `Budget goal for "${categoryName}" has been successfully updated.` });
       } else {
         addBudgetGoal(data);
-        toast({ title: "Budget Goal Set", description: `New budget goal for "${getCategoryById(data.categoryId)?.name || 'Category'}" has been successfully set.` });
+        toast({ title: "Budget Goal Set", description: `New budget goal for "${categoryName}" has been successfully set.` });
       }
       setIsFormOpen(false);
       setEditingBudget(undefined); 
@@ -62,32 +62,32 @@ export default function BudgetsPage() {
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [editingBudget, addBudgetGoal, updateBudgetGoal, getCategoryById, toast]);
 
-  const handleEditBudget = (budget: BudgetGoal) => {
+  const handleEditBudget = useCallback((budget: BudgetGoal) => {
     setEditingBudget(budget);
     setIsFormOpen(true);
-  };
+  }, []);
 
-  const handleDeleteBudget = (budgetId: string) => {
+  const handleDeleteBudget = useCallback((budgetId: string) => {
     setBudgetToDelete(budgetId);
-  };
+  }, []);
 
-  const confirmDeleteBudget = () => {
+  const confirmDeleteBudget = useCallback(() => {
     if (budgetToDelete) {
       const budgetName = getCategoryById(budgetGoals.find(b => b.id === budgetToDelete)?.categoryId || "")?.name || "The budget";
       contextDeleteBudget(budgetToDelete);
       toast({ title: "Budget Goal Deleted", description: `"${budgetName}" goal has been successfully deleted.` });
       setBudgetToDelete(null);
     }
-  };
+  }, [budgetToDelete, budgetGoals, contextDeleteBudget, getCategoryById, toast]);
 
-  const openFormForNew = () => {
+  const openFormForNew = useCallback(() => {
     setEditingBudget(undefined);
     setIsFormOpen(true);
-  }
+  }, []);
 
-  const handleExportBudgetGoals = () => {
+  const handleExportBudgetGoals = useCallback(() => {
     const headerRow = [
       "ID", "Category Name", "Budgeted Amount", "Period", "Current Spending (Expenses)", "Currency"
     ];
@@ -107,7 +107,7 @@ export default function BudgetsPage() {
     const filename = `trackwise_budget_goals_${formatDate(new Date(), 'yyyy-MM-dd')}.csv`;
     exportToCsv(filename, [headerRow, ...dataRows]);
     toast({ title: "Budget Goals Exported", description: `Budget goals have been exported to ${filename}` });
-  };
+  }, [budgetGoals, getCategoryById, toast]);
 
 
   return (

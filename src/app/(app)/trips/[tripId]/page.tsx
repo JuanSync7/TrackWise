@@ -15,8 +15,6 @@ import { usePersonalFinance } from '@/contexts/personal-finance-context';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from "@/hooks/use-toast";
 import type { Trip, TripMember, TripContribution, TripTransaction, TripSettlement, CalculatedMemberFinancials, MemberDisplayFinancials } from '@/lib/types';
-// import { TripMemberList } from '@/components/trips/trip-member-list'; // Lazy load
-// import { TripSettlementList } from '@/components/trips/trip-settlement-list'; // Lazy load
 import { DEFAULT_CURRENCY, POT_PAYER_ID } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -179,6 +177,8 @@ export default function TripDetailPage() {
         isSplit: formData.transactionType === 'expense' ? formData.isSplit : false,
         paidByTripMemberId: formData.transactionType === 'expense' ? formData.paidByMemberId : undefined,
         splitWithTripMemberIds: formData.transactionType === 'expense' ? formData.splitWithTripMemberIds : [],
+        splitType: formData.transactionType === 'expense' && formData.isSplit ? formData.splitType : undefined,
+        customSplitAmounts: formData.transactionType === 'expense' && formData.isSplit && formData.splitType === 'custom' ? formData.customSplitAmounts : [],
       };
       addTripTransaction(tripTransactionData);
       toast({ title: "Trip Transaction Added", description: `Transaction "${formData.description}" recorded for the trip.` });

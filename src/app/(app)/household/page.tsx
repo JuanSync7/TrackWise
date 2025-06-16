@@ -21,14 +21,12 @@ import { usePersonalFinance } from '@/contexts/personal-finance-context';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from "@/hooks/use-toast";
 import type { Member, Contribution, HouseholdTransaction, HouseholdSettlement, MemberDisplayFinancials, TransactionType } from '@/lib/types';
-// import { MemberList } from '@/components/household/member-list'; // Lazy load
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { format } from 'date-fns';
 import { DEFAULT_CURRENCY, HOUSEHOLD_EXPENSE_CATEGORY_ID, POT_PAYER_ID } from '@/lib/constants';
 import Link from 'next/link';
 import { cn, exportToCsv } from '@/lib/utils';
-// import { TripSettlementList } from '@/components/trips/trip-settlement-list'; // Lazy load
 
 const MemberForm = React.lazy(() => import('@/components/household/member-form').then(module => ({ default: module.MemberForm })));
 const ContributionForm = React.lazy(() => import('@/components/household/contribution-form').then(module => ({ default: module.ContributionForm })));
@@ -145,6 +143,8 @@ export default function HouseholdPage() {
       isSplit: data.transactionType === 'expense' ? data.isSplit : false,
       paidByMemberId: data.transactionType === 'expense' ? data.paidByMemberId : undefined,
       splitWithMemberIds: data.transactionType === 'expense' ? data.splitWithMemberIds : [],
+      splitType: data.transactionType === 'expense' && data.isSplit ? data.splitType : undefined,
+      customSplitAmounts: data.transactionType === 'expense' && data.isSplit && data.splitType === 'custom' ? data.customSplitAmounts : [],
     };
 
     if (transactionData.transactionType === 'expense' && !transactionData.categoryId && !transactionData.sharedBudgetId) {
@@ -328,9 +328,9 @@ export default function HouseholdPage() {
       <Dialog open={isExpenseFormOpen} onOpenChange={setIsExpenseFormOpen}>
         <DialogContent className="sm:max-w-[425px] md:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Add New Shared Transaction</DialogTitle>
+            <DialogTitle>Log Shared Household Transaction</DialogTitle>
             <DialogDescription>
-              Fill in the details for a new shared household transaction. Select "Paid from Pot" if the communal fund is used for expenses.
+              Record new expenses or income shared by the household. These can be linked to shared budgets or categorized as general household items. Select "Paid from Pot" if the communal fund is used for expenses.
             </DialogDescription>
           </DialogHeader>
           <Suspense fallback={<div className="flex justify-center items-center h-96"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
@@ -540,8 +540,3 @@ export default function HouseholdPage() {
     </div>
   );
 }
-
-
-    
-
-      

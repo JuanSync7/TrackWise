@@ -11,7 +11,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useHousehold } from '@/contexts/household-context';
 import { useToast } from "@/hooks/use-toast";
 import type { ShoppingListItem } from '@/lib/types';
-// import { ShoppingList } from '@/components/household/shopping-list'; // Lazy load
 import { exportToCsv } from '@/lib/utils';
 import { format as formatDate, parseISO } from 'date-fns';
 
@@ -46,12 +45,12 @@ export default function ShoppingListPage() {
     { name: "Toilet Paper", icon: Layers, defaultQuantity: "1 pack", notes: "e.g., 6 rolls, 12 rolls (Using Layers as placeholder)" },
   ];
 
-  const handleAddCommonItem = (itemName: string, quantity: string, itemNotes?: string) => {
+  const handleAddCommonItem = useCallback((itemName: string, quantity: string, itemNotes?: string) => {
       addShoppingListItem({ itemName, quantity, notes: itemNotes });
       toast({ title: `${itemName} Added`, description: "Item added to your shopping list." });
-  };
+  }, [addShoppingListItem, toast]);
 
-  const handleSaveItem = async (data: Omit<ShoppingListItem, 'id' | 'isPurchased' | 'addedAt'>) => {
+  const handleSaveItem = useCallback(async (data: Omit<ShoppingListItem, 'id' | 'isPurchased' | 'addedAt'>) => {
     setIsSubmitting(true);
     try {
       if (editingItem) {
@@ -68,48 +67,48 @@ export default function ShoppingListPage() {
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [editingItem, addShoppingListItem, editShoppingListItem, toast]);
 
-  const handleEditItemModal = (item: ShoppingListItem) => {
+  const handleEditItemModal = useCallback((item: ShoppingListItem) => {
     setEditingItem(item);
     setIsFormOpen(true);
-  };
+  }, []);
 
-  const handleDeleteItem = (itemId: string) => {
+  const handleDeleteItem = useCallback((itemId: string) => {
     setItemToDelete(itemId);
-  };
+  }, []);
 
-  const confirmDeleteItem = () => {
+  const confirmDeleteItem = useCallback(() => {
     if (itemToDelete) {
       contextDeleteShoppingListItem(itemToDelete);
       toast({ title: "Item Deleted", description: "The shopping list item has been successfully deleted." });
       setItemToDelete(null);
     }
-  };
+  }, [itemToDelete, contextDeleteShoppingListItem, toast]);
 
-  const handleTogglePurchased = (itemId: string) => {
+  const handleTogglePurchased = useCallback((itemId: string) => {
     toggleShoppingListItemPurchased(itemId);
     const item = shoppingListItems.find(i => i.id === itemId);
     if (item) {
         toast({ title: "Status Updated", description: `${item.itemName} marked as ${!item.isPurchased ? "purchased" : "not purchased"}.` });
     }
-  };
+  }, [shoppingListItems, toggleShoppingListItemPurchased, toast]);
 
   const openFormForNew = useCallback(() => {
     setEditingItem(undefined);
     setIsFormOpen(true);
   }, []);
 
-  const handleCopyItems = () => {
+  const handleCopyItems = useCallback(() => {
     const count = copyLastWeeksPurchasedItems();
     if (count > 0) {
       toast({ title: "Items Copied", description: `${count} item(s) from recent purchases were added to your list.` });
     } else {
       toast({ title: "No Items to Copy", description: "No recently purchased items found to copy to the list." });
     }
-  };
+  }, [copyLastWeeksPurchasedItems, toast]);
 
-  const handleExportShoppingList = () => {
+  const handleExportShoppingList = useCallback(() => {
     const headerRow = [
       "ID", "Item Name", "Quantity", "Notes", "Added At", "Is Purchased"
     ];
@@ -126,7 +125,7 @@ export default function ShoppingListPage() {
     const filename = `trackwise_shopping_list_${formatDate(new Date(), 'yyyy-MM-dd')}.csv`;
     exportToCsv(filename, [headerRow, ...dataRows]);
     toast({ title: "Shopping List Exported", description: `Shopping list has been exported to ${filename}` });
-  };
+  }, [shoppingListItems, toast]);
 
   return (
     <div className="container mx-auto flex flex-col h-full">
@@ -226,6 +225,3 @@ export default function ShoppingListPage() {
     </div>
   );
 }
-
-
-    

@@ -2,7 +2,7 @@
 "use client";
 
 import type { Debt } from '@/lib/types';
-import { useHousehold } from '@/contexts/household-context'; // Changed context
+import { useHousehold } from '@/contexts/household-context'; 
 import { DEFAULT_CURRENCY } from '@/lib/constants';
 import { format } from 'date-fns';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,7 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import React, { useState } from 'react'; // Added React
+import React, { useState, useCallback } from 'react';
 import { useToast } from "@/hooks/use-toast";
 
 interface DebtItemProps {
@@ -27,7 +27,7 @@ interface DebtItemProps {
 }
 
 const DebtItemComponent = ({ debt }: DebtItemProps) => {
-  const { getMemberById, settleDebt, unsettleDebt } = useHousehold(); // Changed context
+  const { getMemberById, settleDebt, unsettleDebt } = useHousehold(); 
   const { toast } = useToast();
   const [isConfirmingSettlement, setIsConfirmingSettlement] = useState(false);
   const [isConfirmingUnsettlement, setIsConfirmingUnsettlement] = useState(false);
@@ -45,17 +45,17 @@ const DebtItemComponent = ({ debt }: DebtItemProps) => {
     );
   }
 
-  const handleSettle = () => {
+  const handleSettle = useCallback(() => {
     settleDebt(debt.id);
     toast({ title: "Debt Settled", description: `Debt for "${debt.expenseDescription}" marked as settled.` });
     setIsConfirmingSettlement(false);
-  };
+  }, [debt.id, debt.expenseDescription, settleDebt, toast]);
 
-  const handleUnsettle = () => {
+  const handleUnsettle = useCallback(() => {
     unsettleDebt(debt.id);
     toast({ title: "Debt Unsettled", description: `Debt for "${debt.expenseDescription}" marked as unsettled.` });
     setIsConfirmingUnsettlement(false);
-  };
+  }, [debt.id, debt.expenseDescription, unsettleDebt, toast]);
 
   return (
     <>
