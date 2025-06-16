@@ -40,7 +40,7 @@ export default function SettingsPage() {
   const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
   const [isSubmittingCategory, setIsSubmittingCategory] = useState(false);
 
-  const defaultCategoryIds = new Set(INITIAL_CATEGORIES.map(c => c.id));
+  const defaultCategoryIds = useMemo(() => new Set(INITIAL_CATEGORIES.map(c => c.id)), []);
 
   useEffect(() => {
     setMounted(true);

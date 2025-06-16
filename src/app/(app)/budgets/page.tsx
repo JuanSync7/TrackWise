@@ -69,7 +69,7 @@ export default function BudgetsPage() {
     setIsFormOpen(true);
   }, []);
 
-  const handleDeleteBudget = useCallback((budgetId: string) => {
+  const handleDeleteBudgetRequest = useCallback((budgetId: string) => {
     setBudgetToDelete(budgetId);
   }, []);
 
@@ -176,7 +176,7 @@ export default function BudgetsPage() {
         <BudgetList
           budgetGoals={budgetGoals}
           onEditBudget={handleEditBudget}
-          onDeleteBudget={handleDeleteBudget}
+          onDeleteBudget={handleDeleteBudgetRequest}
         />
       </Suspense>
     </div>

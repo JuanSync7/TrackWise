@@ -273,7 +273,7 @@ export default function HouseholdPage() {
                 <Download className="mr-2 h-4 w-4" /> Export Household Data
             </Button>
             <Button variant="outline" onClick={() => setIsExpenseFormOpen(true)}>
-              <ListChecks className="mr-2 h-4 w-4" /> Add Shared Transaction
+              <ListChecks className="mr-2 h-4 w-4" /> Log Shared Transaction
             </Button>
             <Button onClick={openMemberFormForNew}>
               <PlusCircle className="mr-2 h-4 w-4" /> Add New Member

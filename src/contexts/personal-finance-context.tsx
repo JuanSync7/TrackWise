@@ -114,7 +114,7 @@ export const PersonalFinanceProvider: React.FC<{ children: ReactNode }> = ({ chi
     const newGoal: FinancialGoal = {
       ...goalData,
       id: uuidv4(),
-      createdAt: formatISO(new Date()),
+      createdAt: format(new Date(), "yyyy-MM-dd"),
       currentAmount: 0,
     };
     setFinancialGoals(prev => [...prev, newGoal]);
@@ -136,7 +136,7 @@ export const PersonalFinanceProvider: React.FC<{ children: ReactNode }> = ({ chi
         addTransaction({
             description: `Contribution to goal: ${goal.name}`,
             amount: amount,
-            date: formatISO(new Date()),
+            date: format(new Date(), "yyyy-MM-dd"),
             categoryId: savingsCategory?.id || 'other',
             transactionType: 'expense',
             notes: `Automated contribution for financial goal.`
@@ -148,7 +148,7 @@ export const PersonalFinanceProvider: React.FC<{ children: ReactNode }> = ({ chi
     const newDebt: PersonalDebt = {
       ...debtData,
       id: uuidv4(),
-      createdAt: formatISO(new Date()),
+      createdAt: format(new Date(), "yyyy-MM-dd"),
       currentBalance: debtData.initialAmount,
     };
     setPersonalDebts(prev => [...prev, newDebt]);
@@ -175,7 +175,7 @@ export const PersonalFinanceProvider: React.FC<{ children: ReactNode }> = ({ chi
         addTransaction({
             description: transactionDetails?.description || `Payment for: ${debt.name}`,
             amount: paymentAmount,
-            date: transactionDetails?.date || formatISO(new Date()),
+            date: transactionDetails?.date || format(new Date(), "yyyy-MM-dd"),
             categoryId: debtCategory?.id || 'other',
             transactionType: 'expense',
             notes: transactionDetails?.notes || `Automated payment log for debt ${debt.name}.`
